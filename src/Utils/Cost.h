@@ -6,11 +6,13 @@ class NNZ
 {
 public:
 	// A must be symmetric
-	static size_t StrictTriPart(const SparseMatrix& A)
+	template <typename T> // a matrix of any scalar type (the levels of U-AMG in single precision)
+	static size_t StrictTriPart(const SparseMatrixOf<T>& A)
 	{
 		return (A.nonZeros() - A.rows()) / 2;
 	}
-	static size_t TriPart(const SparseMatrix& A)
+	template <typename T>
+	static size_t TriPart(const SparseMatrixOf<T>& A)
 	{
 		return StrictTriPart(A) + A.rows();
 	}
@@ -44,7 +46,8 @@ public:
 
 	// UX+Y or LX+Y where U=upper(A), L=lower(A)
 	// Requires A symmetric
-	static Flops DAXPY_StrictTri(const SparseMatrix& A)
+	template <typename T>
+	static Flops DAXPY_StrictTri(const SparseMatrixOf<T>& A)
 	{
 		return DAXPY(NNZ::StrictTriPart(A));
 	}
@@ -91,7 +94,8 @@ public:
 
 
 	// Sparse forward elimination (A must be symmetric)
-	static Flops SpFWElimination(const SparseMatrix& A)
+	template <typename T>
+	static Flops SpFWElimination(const SparseMatrixOf<T>& A)
 	{
 		return SpFWElimination(NNZ::StrictTriPart(A), A.rows());
 	}
@@ -102,7 +106,8 @@ public:
 	}
 
 	// Sparse backward substitution (A must be symmetric)
-	static Flops SpBWSubstitution(const SparseMatrix& A)
+	template <typename T>
+	static Flops SpBWSubstitution(const SparseMatrixOf<T>& A)
 	{
 		return SpBWSubstitution(NNZ::StrictTriPart(A), A.rows());
 	}

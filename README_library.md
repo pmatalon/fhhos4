@@ -390,8 +390,8 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | Maximum number of rows of the coarsest matrix |
 | `CoarseSolver` | `Cholesky` if symmetric, `LU` if non-symmetric | <ul><li>`Cholesky`, `LU`: Eigen's on one process, MUMPS's on several</li><li>`MUMPS`: MUMPS's on one process too</li></ul> |
-| `MixedPrecision` | `true` | Levels stored and cycled in single precision (half the memory, faster); the Krylov method, residuals and solution stay in double. Symmetric matrix, Chebyshev smoothers only; otherwise ignored |
-| `BlockCSRStorage` | `false` | Level operators stored by blocks of faces when `FaceDegree >= 1` (faster smoothing). Always so in mixed precision; in double, costs a copy of the condensed matrix. Chebyshev smoothers only |
+| `MixedPrecision` | `true` | Levels stored and cycled in single precision (half the memory, faster); the Krylov method, residuals and solution stay in double. Chebyshev and Gauss-Seidel smoothers (all but `DampedBlockJacobi`); otherwise ignored |
+| `BlockCSRStorage` | `false` | Level operators stored by blocks of faces when `FaceDegree >= 1` (faster smoothing). Always so in mixed precision; in double, costs a copy of the condensed matrix. Chebyshev and Gauss-Seidel smoothers |
 | `Threads` | `0`: OpenMP's setting, at most one per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (shared among the processes on the same CPUs) | Number of threads |
 | `Comm` | (MPI only) `MPI_COMM_NULL`: one process, no MPI call (MPI may be uninitialized, except with `CoarseSolver::MUMPS`) | <ul><li>`MPI_COMM_SELF`: one process</li><li>the communicator of a distributed system</li></ul> |
 | `Verbosity` | `0`: silent | <ul><li>`1`: one line per setup and per solve</li><li>`2`: all messages, with the residual at each iteration</li></ul> |

@@ -192,35 +192,43 @@ TEST(DistributedLibrary, SingularMatrix)
 }
 
 // Mixed precision (the default: the levels in single precision, in block CSR with 2 components) and in double: the same
-// iterations within 1, as on one process (UAMGMixedPrecisionProgram); the levels in single precision on the processes
+// iterations within 1, as on one process (UAMGMixedPrecisionProgram); the levels in single precision on the processes.
+// Symmetric (the Chebyshev smoothers) and not (asymmetry 0.3: the l1 hybrid block Gauss-Seidel).
 TEST(DistributedLibrary, MixedPrecision)
 {
-	for (int components : { 1, 2 })
+	for (double asymmetry : { 0.0, 0.3 })
 	{
-		string setupLog;
-		int mixed = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, components, true, &setupLog);
-		int inDouble = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, components, false);
-		EXPECT_LE(abs(mixed - inDouble), 1) << components << " components";
-		if (World().IsRoot())
+		for (int components : { 1, 2 })
 		{
-			EXPECT_EQ(setupLog.find("Levels in double precision"), string::npos) << setupLog;
-			EXPECT_NE(setupLog.find("single precision)"), string::npos) << setupLog;
-			if (components == 2)
-				EXPECT_NE(setupLog.find("single precision, in block CSR (blocks of 2))"), string::npos) << setupLog;
+			string setupLog;
+			int mixed = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, asymmetry, false, components, true, &setupLog);
+			int inDouble = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, asymmetry, false, components, false);
+			EXPECT_LE(abs(mixed - inDouble), 1) << components << " components, asymmetry " << asymmetry;
+			if (World().IsRoot())
+			{
+				EXPECT_EQ(setupLog.find("Levels in double precision"), string::npos) << setupLog;
+				EXPECT_NE(setupLog.find("single precision)"), string::npos) << setupLog;
+				if (components == 2)
+					EXPECT_NE(setupLog.find("single precision, in block CSR (blocks of 2))"), string::npos) << setupLog;
+			}
 		}
 	}
 }
 
 // The block CSR storage in double (BlockCSRStorage; 2 components: blocks of 2 on all the levels but the coarsest) and
-// CSR: the same iterations on 1-4 processes, the levels in block CSR on the processes
+// CSR: the same iterations on 1-4 processes, the levels in block CSR on the processes. Symmetric (the Chebyshev
+// smoothers) and not (the l1 hybrid block Gauss-Seidel).
 TEST(DistributedLibrary, BlockCSR)
 {
-	string setupLog;
-	int blocks = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, 2, false, &setupLog, true);
-	int csr = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, 0, false, 2, false);
-	EXPECT_EQ(blocks, csr);
-	if (World().IsRoot())
-		EXPECT_NE(setupLog.find("(and in block CSR (blocks of 2))"), string::npos) << setupLog;
+	for (double asymmetry : { 0.0, 0.3 })
+	{
+		string setupLog;
+		int blocks = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, asymmetry, false, 2, false, &setupLog, true);
+		int csr = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::Reconstruction, asymmetry, false, 2, false);
+		EXPECT_EQ(blocks, csr) << "asymmetry " << asymmetry;
+		if (World().IsRoot())
+			EXPECT_NE(setupLog.find("(and in block CSR (blocks of 2))"), string::npos) << setupLog;
+	}
 }
 
 // The inputs are checked on all the processes: an error on one of them is an error on all of them

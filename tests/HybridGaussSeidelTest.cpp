@@ -1,6 +1,7 @@
 // Unit tests of the hybrid Gauss-Seidel sweeps (GaussSeidel and BlockGaussSeidel with hybrid = true, HybridChunks):
 // Gauss-Seidel in the chunk of each thread, Jacobi between the chunks, hence deterministic; the sequential sweeps if the
-// chunks are poorly separated; the l1 Gauss-Seidel of the block sweeps (the l1 terms of the rows coupled to other chunks).
+// chunks are poorly separated; the l1 Gauss-Seidel of the block sweeps (the l1 terms of the rows coupled to other chunks);
+// the matrix stored by blocks (block CSR) and in single precision.
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <memory>
@@ -8,6 +9,7 @@
 #include <vector>
 #include "Solver/FixedPoint/BlockGaussSeidel.h"
 #include "Solver/FixedPoint/GaussSeidel.h"
+#include "Utils/SparseMatrixOps.h"
 
 namespace
 {
@@ -141,7 +143,8 @@ namespace
 		return x;
 	}
 
-	std::unique_ptr<IterativeSolver> CreateGaussSeidel(const SparseMatrix& A, int blockSize, bool hybrid, Direction direction, const std::vector<BigNumber>* order, bool l1 = false)
+	// One iteration of Gauss-Seidel (scalar if blockSize = 1), not set up
+	std::unique_ptr<IterativeSolver> NewGaussSeidel(int blockSize, bool hybrid, Direction direction, const std::vector<BigNumber>* order, bool l1 = false)
 	{
 		std::unique_ptr<IterativeSolver> gs;
 		if (blockSize == 1)
@@ -159,6 +162,12 @@ namespace
 		gs->StoppingCrit = StoppingCriteria::MaxIterations;
 		gs->MaxIterations = 1;
 		gs->PrintIterationResults = false;
+		return gs;
+	}
+
+	std::unique_ptr<IterativeSolver> CreateGaussSeidel(const SparseMatrix& A, int blockSize, bool hybrid, Direction direction, const std::vector<BigNumber>* order, bool l1 = false)
+	{
+		std::unique_ptr<IterativeSolver> gs = NewGaussSeidel(blockSize, hybrid, direction, order, l1);
 		gs->Setup(A);
 		return gs;
 	}
@@ -171,13 +180,22 @@ namespace
 		return x;
 	}
 
+	// The same in single precision
+	FloatVector SingleSweep(IterativeSolver& gs, const FloatVector& b, const FloatVector& x0, bool xEquals0)
+	{
+		FloatVector x = x0;
+		gs.SolveInSinglePrecision(b, x, xEquals0, nullptr, nullptr);
+		return x;
+	}
+
 	double MaxDiff(const Vector& x, const Vector& y)
 	{
 		return (x - y).lpNorm<Eigen::Infinity>();
 	}
 
 	// Exactly equal (+0 and -0 being equal)
-	bool Identical(const Vector& x, const Vector& y)
+	template <typename T>
+	bool Identical(const VectorOf<T>& x, const VectorOf<T>& y)
 	{
 		return x.size() == y.size() && (x.array() == y.array()).all();
 	}
@@ -348,4 +366,91 @@ TEST(HybridGaussSeidelTest, SequentialIfPoorlySeparated)
 			}
 		}
 	}
+}
+
+// The matrix stored by blocks (block CSR, SetupBlockCSR(), and SetupBlockCSRFrom() for a second smoother): the sweeps of
+// CSR, bit for bit (the same sums in the same order), hybrid or not, l1 or not, on 1 and 4 threads; the block sizes of the
+// kernels known at compile time (3) or not (7)
+TEST(HybridGaussSeidelTest, BlockCSR)
+{
+	for (int nThreads : { 1, 4 })
+	{
+		Threads threads(nThreads);
+		ForEachCase([nThreads](const SparseMatrix& A, int blockSize, const std::vector<BigNumber>* order, Direction direction, const Vector& b, const Vector& x0, bool xEquals0, const std::string& description)
+		{
+			if (blockSize == 1) // the scalar Gauss-Seidel runs in CSR
+				return;
+			BlockSparseMatrix<double> blocks = BlockSparseMatrix<double>::FromCSR(A, blockSize);
+			for (bool hybrid : { true, false })
+			{
+				for (bool l1 : { false, true })
+				{
+					std::string label = description + (hybrid ? ", hybrid" : "") + (l1 ? ", l1" : "") + ", " + std::to_string(nThreads) + " threads";
+					Vector csr = Sweep(*CreateGaussSeidel(A, blockSize, hybrid, direction, order, l1), b, x0, xEquals0);
+					auto bcsr = NewGaussSeidel(blockSize, hybrid, direction, order, l1);
+					ASSERT_TRUE(bcsr->SupportsBlockCSR());
+					bcsr->SetupBlockCSR(blocks, nullptr);
+					EXPECT_TRUE(Identical(Sweep(*bcsr, b, x0, xEquals0), csr)) << label;
+					auto copy = NewGaussSeidel(blockSize, hybrid, direction, order, l1);
+					EXPECT_TRUE(copy->SetupBlockCSRFrom(blocks, nullptr, *bcsr)) << label;
+					EXPECT_TRUE(Identical(Sweep(*copy, b, x0, xEquals0), csr)) << label;
+				}
+			}
+		});
+	}
+	Threads threads(4);
+	SparseMatrix A = TestMatrix(7, 20);
+	Vector b = Vector::LinSpaced(A.rows(), -1, 1);
+	Vector x0 = Vector::LinSpaced(A.rows(), 2, -3).array().sin().matrix();
+	BlockSparseMatrix<double> blocks = BlockSparseMatrix<double>::FromCSR(A, 7);
+	for (bool hybrid : { true, false })
+	{
+		auto bcsr = NewGaussSeidel(7, hybrid, Direction::Backward, nullptr, true);
+		bcsr->SetupBlockCSR(blocks, nullptr);
+		EXPECT_TRUE(Identical(Sweep(*bcsr, b, x0, false), Sweep(*CreateGaussSeidel(A, 7, hybrid, Direction::Backward, nullptr, true), b, x0, false))) << "block size 7" << (hybrid ? ", hybrid" : "");
+	}
+}
+
+// In single precision (SetupSinglePrecision(), SolveInSinglePrecision()): the sweeps of double precision to the rounding
+// of float, the residual and A x of the scalar sweeps too; in block CSR in single precision, those of CSR in single
+// precision, bit for bit
+TEST(HybridGaussSeidelTest, SinglePrecision)
+{
+	Threads threads(4);
+	ForEachCase([](const SparseMatrix& A, int blockSize, const std::vector<BigNumber>* order, Direction direction, const Vector& b, const Vector& x0, bool xEquals0, const std::string& description)
+	{
+		FloatSparseMatrix singleA = SparseMatrixOps::Cast<float>(A);
+		FloatVector singleB = b.cast<float>(), singleX0 = x0.cast<float>();
+		for (bool hybrid : { true, false })
+		{
+			bool l1 = blockSize > 1 && hybrid;
+			std::string label = description + (hybrid ? ", hybrid" : "") + (l1 ? ", l1" : "");
+			Vector reference = Sweep(*CreateGaussSeidel(A, blockSize, hybrid, direction, order, l1), b, x0, xEquals0);
+			auto csr = NewGaussSeidel(blockSize, hybrid, direction, order, l1);
+			ASSERT_TRUE(csr->SupportsSinglePrecision());
+			csr->SetupSinglePrecision(singleA);
+			FloatVector x = SingleSweep(*csr, singleB, singleX0, xEquals0);
+			EXPECT_LT(MaxDiff(x.cast<double>(), reference), 1e-5 * reference.lpNorm<Eigen::Infinity>()) << label;
+			auto copy = NewGaussSeidel(blockSize, hybrid, direction, order, l1);
+			EXPECT_TRUE(copy->SetupSinglePrecisionFrom(singleA, *csr)) << label;
+			EXPECT_TRUE(Identical(SingleSweep(*copy, singleB, singleX0, xEquals0), x)) << label;
+			if (blockSize > 1)
+			{
+				BlockSparseMatrix<float> singleBlocks = BlockSparseMatrix<float>::FromCSR(A, blockSize);
+				auto bcsr = NewGaussSeidel(blockSize, hybrid, direction, order, l1);
+				bcsr->SetupBlockCSR(singleBlocks, nullptr);
+				EXPECT_TRUE(Identical(SingleSweep(*bcsr, singleB, singleX0, xEquals0), x)) << label << ", block CSR";
+			}
+			else if (csr->CanOptimizeResidualComputation()) // the residual and A x deduced from the sweep
+			{
+				auto gs = CreateGaussSeidel(A, 1, hybrid, direction, order);
+				Vector xDouble = x0;
+				gs->Solve(b, xDouble, xEquals0, true, true);
+				FloatVector y = singleX0, residual, Ax;
+				csr->SolveInSinglePrecision(singleB, y, xEquals0, &residual, &Ax);
+				EXPECT_LT(MaxDiff(residual.cast<double>(), gs->Residual), 1e-5 * b.lpNorm<Eigen::Infinity>()) << label;
+				EXPECT_LT(MaxDiff(Ax.cast<double>(), gs->Ax), 1e-5 * b.lpNorm<Eigen::Infinity>()) << label;
+			}
+		}
+	});
 }

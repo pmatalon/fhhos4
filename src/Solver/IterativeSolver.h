@@ -11,6 +11,91 @@ protected:
 	// error of the iterates is computed (see ComputeExactSolution).
 	// Column-major type: see EigenSparseLU.
 	Eigen::SparseLU<ColMajorSparseMatrix> _directSolver;
+
+	// The matrix of the smoothers that support the single precision and the block CSR storage (SetupSinglePrecision(),
+	// SetupBlockCSR()), besides Matrix (CSR in double): in CSR in single precision, in block CSR in double or in single
+	// precision; on several processes, the distributed matrix in single precision whose block Diag is _singleMatrix or
+	// _singleBlockMatrix (null on one process)
+	const FloatSparseMatrix* _singleMatrix = nullptr;
+	const DistributedMatrixOf<float>* _singleDistributed = nullptr;
+	const BlockSparseMatrix<double>* _blockMatrix = nullptr;
+	const BlockSparseMatrix<float>* _singleBlockMatrix = nullptr;
+
+	// The matrix in CSR, the distributed matrix (null on one process) and the matrix in block CSR (null in CSR) in
+	// precision T
+	template <typename T>
+	const SparseMatrixOf<T>& MatrixOf() const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return *_singleMatrix;
+		else
+			return *this->Matrix;
+	}
+
+	template <typename T>
+	const DistributedMatrixOf<T>* DistributedOf() const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleDistributed;
+		else
+			return this->Distributed;
+	}
+
+	template <typename T>
+	const BlockSparseMatrix<T>* BlockMatrixOf() const
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleBlockMatrix;
+		else
+			return _blockMatrix;
+	}
+
+	// The numbers of rows and of non-zeros (stored coefficients) of the matrix in precision T, in CSR or block CSR
+	template <typename T>
+	BigNumber Rows() const
+	{
+		return BlockMatrixOf<T>() ? BlockMatrixOf<T>()->Rows() : MatrixOf<T>().rows();
+	}
+
+	template <typename T>
+	BigNumber NonZeros() const
+	{
+		return BlockMatrixOf<T>() ? BlockMatrixOf<T>()->NonZeros() : MatrixOf<T>().nonZeros();
+	}
+
+	// The matrix of the setup in one storage, the others null (the Gauss-Seidel smoothers)
+	void SetStorage(const SparseMatrix* A, const FloatSparseMatrix* singleA, const BlockSparseMatrix<double>* blocks, const BlockSparseMatrix<float>* singleBlocks, const DistributedMatrix* distributed, const DistributedMatrixOf<float>* singleDistributed)
+	{
+		this->Matrix = A;
+		_singleMatrix = singleA;
+		_blockMatrix = blocks;
+		_singleBlockMatrix = singleBlocks;
+		this->Distributed = distributed;
+		_singleDistributed = singleDistributed;
+	}
+
+	bool SameStorage(const IterativeSolver& o) const
+	{
+		return o.Matrix == this->Matrix && o._singleMatrix == _singleMatrix && o._blockMatrix == _blockMatrix && o._singleBlockMatrix == _singleBlockMatrix
+			&& o.Distributed == this->Distributed && o._singleDistributed == _singleDistributed;
+	}
+
+	// Whether the matrix of the setup is in single precision
+	bool InSinglePrecision() const
+	{
+		return _singleMatrix || _singleBlockMatrix;
+	}
+
+	// The numbers of rows and of non-zeros of the matrix of the setup (SetStorage())
+	BigNumber MatrixRows() const
+	{
+		return InSinglePrecision() ? Rows<float>() : Rows<double>();
+	}
+
+	BigNumber MatrixNonZeros() const
+	{
+		return InSinglePrecision() ? NonZeros<float>() : NonZeros<double>();
+	}
 public:
 	Vector ExactSolution;
 	double Tolerance = 1e-3;
@@ -93,22 +178,29 @@ protected:
 	// the process (Diag): b - Offd x, with the values of x of the other processes from the start of the sweep (Jacobi
 	// between the processes, Gauss-Seidel within each one, as the hybrid smoothers between threads); b on one process, or
 	// from x = 0. With l1 terms (l1 Gauss-Seidel, BlockGaussSeidel::L1Theta: not empty), + l1Terms .* x. buffer: its
-	// storage.
+	// storage. distributed: the distributed matrix (null on one process), in precision T (float: the l1 terms added in
+	// double).
 	// Collective on the halo.
-	const Vector& SweepRhs(const Vector& b, const Vector& x, bool xEquals0, Vector& buffer, const Vector* l1Terms = nullptr) const
+	template <typename T>
+	const VectorOf<T>& SweepRhs(const VectorOf<T>& b, const VectorOf<T>& x, bool xEquals0, VectorOf<T>& buffer, const DistributedMatrixOf<T>* distributed, const Vector* l1Terms = nullptr) const
 	{
 		bool l1 = l1Terms && l1Terms->size() > 0;
-		if ((!this->Distributed && !l1) || xEquals0)
+		if ((!distributed && !l1) || xEquals0)
 			return b;
 		buffer = b;
-		if (this->Distributed)
+		if (distributed)
 		{
-			Vector ghosts = this->Distributed->GhostValues(x);
-			if (this->Distributed->Offd.nonZeros() > 0)
-				buffer.noalias() -= this->Distributed->Offd * ghosts;
+			VectorOf<T> ghosts = distributed->GhostValues(x);
+			if (distributed->Offd.nonZeros() > 0)
+				buffer.noalias() -= distributed->Offd * ghosts;
 		}
 		if (l1)
-			buffer += l1Terms->cwiseProduct(x);
+		{
+			if constexpr (std::is_same_v<T, double>)
+				buffer += l1Terms->cwiseProduct(x);
+			else
+				buffer = (buffer.template cast<double>() + l1Terms->cwiseProduct(x.template cast<double>())).template cast<T>();
+		}
 		return buffer;
 	}
 

@@ -1733,6 +1733,30 @@ Possible now that reordering the arithmetic operations is allowed (rejected so f
   -12% (3D k=2 27k cells, 3.20 -> 2.82 s), the setup unchanged; on 8 threads no consistent gain (solve x0.86-1.27,
   mostly within +-7%, the noise between runs): the solve is bound by the bandwidth there (the fine products), not by
   the block solves. Worth it for the runs on few threads; the singular blocks still to handle (see above).
+- **Gauss-Seidel in block CSR and in single precision** — done (2026-11-03, the user: "Implement the block CSR and
+  single precision Gauss-Seidel"; `.scratch/uamg/issues/08`). `BlockGaussSeidel` (all its variants: hybrid, l1) in
+  block CSR in double and in float, `GaussSeidel` (scalar, the levels of degree 0) in float; the mixed precision now
+  also for a non-symmetric matrix (the library's default `MixedPrecision` applies to `SetupNonSym()`). The double path
+  bit-identical (`solutions.sh`: 68 of 70 runs OK, the 2 others the known `fcgaggregamg` k=1 failure); in double, the
+  block CSR sweeps are those of CSR, bit for bit (`HybridGaussSeidelTest.BlockCSR`). The program (`fcguamg -smoothers
+  bgs`, `gcruamg -uamg-nonsym`: `l1hbgs,l1hrbgs`), double CSR / double block CSR (`-uamg-bcsr`) / mixed precision
+  (`-uamg-mixed`, block CSR in float) interleaved, best of 2, plugged in (`build/gs_mixed/bench.sh`); solve (s) and its
+  time ratio to double CSR (below 1: faster), the same iterations in all the modes:
+
+  | Case | Threads | Iterations | Double CSR | Double block CSR | Mixed precision |
+  |---|---|---|---|---|---|
+  | Cube-tet n=10 k=2 | 1 | 34 | 0.439 | 0.410 (x0.93) | 0.304 (x0.69) |
+  | Square-tri n=128 k=2 | 1 | 19 | 0.383 | 0.378 (x0.99) | 0.310 (x0.81) |
+  | Cube-tet n=16 k=2 | 8 | 33 | 1.667 | 1.558 (x0.93) | 1.219 (x0.73) |
+  | Cube-tet n=16 k=2, `-uamg-nonsym` | 8 | 35 | 1.740 | 1.646 (x0.95) | 1.183 (x0.68) |
+  | Square-tri n=256 k=2 | 8 | 20 | 2.080 | 1.923 (x0.92) | 1.595 (x0.77) |
+  | Square-tri n=256 k=2, `-uamg-nonsym` | 8 | 29 | 2.661 | 2.574 (x0.97) | 1.905 (x0.72) |
+  | Cube-tet n=32 k=0 | 1 | 28 | 0.740 | - | 0.657 (x0.89) |
+  | Cube-tet n=32 k=0 | 8 | 28 | 0.579 | - | 0.526 (x0.91) |
+
+  The block CSR alone gains little (x0.92-0.99, against x0.74-0.94 for Chebyshev); likely cause, not measured: a sweep
+  sums each row in one chain of dependent operations (see "Shorter dependency chains in the sweeps"), which fewer bytes
+  per non-zero don't shorten.
 
 From the comparison with NGSolve's BDDC (2026-10-19; results in `CLAUDE.md`, "Python module"; profile above), U-AMG
 1.2-2x faster at k=1, 1.1-1.5x slower at k=2 on 8 threads, where its iterations cost 1.15-1.75x more (with the new

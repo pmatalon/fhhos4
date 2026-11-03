@@ -495,14 +495,14 @@ void print_usage() {
 	cout << "      (float), but the coarsest solve; the setup computes in double (the same levels, rounded), the Krylov method," << endl;
 	cout << "      the matrix, the residuals and the solution are in double. Faster cycles. With the options that it doesn't" << endl;
 	cout << "      support (other than the flat coarsening passes with the chained coarsening prolongations, p-levels after" << endl;
-	cout << "      h-levels, a non-symmetric matrix, smoothers other than Chebyshev, the exports of the multigrid), the" << endl;
+	cout << "      h-levels, smoothers other than Chebyshev and Gauss-Seidel (Jacobi, SOR), the exports of the multigrid), the" << endl;
 	cout << "      levels are in double. The library's default (fhhos4::Solver::MixedPrecision)." << endl;
 	cout << endl;
 	cout << "-uamg-bcsr" << endl;
 	cout << "      U-AMG in double precision with the operators of the levels whose faces have several DoFs (k >= 1) also" << endl;
 	cout << "      stored by blocks (block CSR: one column index per block of coupled faces) for the smoothers and the cycle:" << endl;
 	cout << "      faster passes over the matrices, at the cost of a copy of them. Always so in mixed precision (-uamg-mixed)." << endl;
-	cout << "      The Chebyshev smoothers (-smoothers bcheb4, bcheb). fhhos4::Solver::BlockCSRStorage." << endl;
+	cout << "      The Chebyshev and block Gauss-Seidel smoothers (not Jacobi, SOR). fhhos4::Solver::BlockCSRStorage." << endl;
 	cout << endl;
 	cout << "-uamg-bfc" << endl;
 	cout << "      U-AMG in the program (-s uamg, fcguamg, gcruamg): the faces of the boundary of the domain in the system" << endl;

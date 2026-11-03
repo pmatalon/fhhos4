@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Utils/Utils.h"
+#include "../../Utils/BlockSparseMatrix.h"
 using namespace std;
 
 // Chunks of the hybrid Gauss-Seidel sweeps (GaussSeidel and BlockGaussSeidel with hybrid = true). The sweep sequence of
@@ -20,6 +21,9 @@ using namespace std;
 // columns (the rows are sorted by column): at most two external ranges and one internal range on each side.
 // Set up once per matrix, number of chunks and order: with an order, one pass over the matrix; in the natural order, the
 // first and last non-zeros of the rows, and the boundary rows.
+// The matrix in CSR, in double or in single precision (the values of x read in double), or stored by blocks (block CSR,
+// BlockSparseMatrix): the ranges are then those of the blocks of each block row, and the products the same, in the same
+// order (the external fraction counts the blocks: that of the non-zeros if the blocks are full).
 class HybridChunks
 {
 public:
@@ -44,14 +48,14 @@ private:
 		BigNumber NExternal = 0;      // number of external non-zeros
 	};
 
-	const SparseMatrix* _A = nullptr;
-	int _blockSize = 1;
+	int _blockSize = 1;    // the rows of the pattern of each block row: those of the block row in CSR, 1 in block CSR
+	int _dofBlockSize = 1; // the DoFs of each block row
 	const vector<BigNumber>* _order = nullptr;
 	int _nChunks = 0; // 0: not set up
 	bool _parallel = false;
 	vector<Chunk> _chunks;
 	vector<BigNumber> _exported; // block rows read by another chunk, increasing
-	Vector _old;                 // the values of x at the start of the sweep, on the exported block rows
+	Vector _old;                 // the values of x at the start of the sweep, on the exported block rows (in double: exact)
 
 public:
 	// Above this fraction of external non-zeros, the sweeps are sequential. Measured (U-AMG, FCG or GCR, 4 threads): with
@@ -91,19 +95,32 @@ public:
 		return _order ? (*_order)[position] : position;
 	}
 
-	void Setup(const SparseMatrix& A, int blockSize, const vector<BigNumber>* order, int nChunks)
+	// A in CSR (of any precision), in block rows of blockSize rows
+	template <typename T>
+	void Setup(const SparseMatrixOf<T>& A, int blockSize, const vector<BigNumber>* order, int nChunks)
+	{
+		Setup(A.outerIndexPtr(), A.innerIndexPtr(), A.rows() / blockSize, A.nonZeros(), blockSize, blockSize, order, nChunks);
+	}
+
+	// A stored by blocks (of the same size)
+	template <typename T>
+	void Setup(const BlockSparseMatrix<T>& A, const vector<BigNumber>* order, int nChunks)
+	{
+		Setup(A.RowStart.data(), A.Cols.data(), A.NBlocks(), A.Cols.size(), 1, A.BlockSize, order, nChunks);
+	}
+
+private:
+	// From the pattern (outer, col) of nb block rows of blockSize rows each (nonZeros entries), of dofBlockSize DoFs each
+	void Setup(const SparseMatrixIndex* outer, const SparseMatrixIndex* col, BigNumber nb, BigNumber nonZeros, int blockSize, int dofBlockSize, const vector<BigNumber>* order, int nChunks)
 	{
 		Clear();
-		_A = &A;
 		_blockSize = blockSize;
+		_dofBlockSize = dofBlockSize;
 		_order = order;
 		_nChunks = nChunks;
 		if (nChunks == 1)
 			return;
 		_chunks.assign(nChunks, Chunk());
-		BigNumber nb = A.rows() / blockSize;
-		const SparseMatrixIndex* outer = A.outerIndexPtr();
-		const SparseMatrixIndex* col = A.innerIndexPtr();
 
 		for (int c = 0; c < nChunks; c++)
 			tie(_chunks[c].Begin, _chunks[c].End) = Parallelism::Chunk(nb, c, nChunks);
@@ -174,7 +191,7 @@ public:
 		BigNumber nExternal = 0;
 		for (const Chunk& chunk : _chunks)
 			nExternal += chunk.NExternal;
-		if (nExternal > MaxExternalFraction * A.nonZeros())
+		if (nExternal > MaxExternalFraction * nonZeros)
 		{
 			_chunks.clear();
 			return;
@@ -204,9 +221,10 @@ public:
 			if (exported[J])
 				_exported.push_back(J);
 		}
-		_old.resize(A.rows());
+		_old.resize(nb * dofBlockSize);
 	}
 
+public:
 	// In a parallel region: f(c) for the chunks of the calling thread (its own one if the region has one thread per chunk)
 	template <class F>
 	void ForEachChunk(F f) const
@@ -217,13 +235,14 @@ public:
 
 	// Before the sweep, by every thread of the parallel region (then a barrier before any thread writes x): copies the
 	// values of x of the exported block rows, split evenly among the threads, into the old values
-	void SaveExported(const Vector& x)
+	template <typename T>
+	void SaveExported(const VectorOf<T>& x)
 	{
 		auto [begin, end] = Parallelism::ThreadChunk(_exported.size());
 		for (BigNumber e = begin; e < end; e++)
 		{
-			BigNumber i0 = _exported[e] * _blockSize;
-			for (BigNumber i = i0; i < i0 + _blockSize; i++)
+			BigNumber i0 = _exported[e] * _dofBlockSize;
+			for (BigNumber i = i0; i < i0 + _dofBlockSize; i++)
 				_old[i] = x[i];
 		}
 	}
@@ -259,11 +278,12 @@ public:
 		}
 	}
 
-	// sums[i] += sum_j |a_ij| over the external non-zeros of the row i (in other chunks; none in the interior block rows),
-	// in the order of the row
-	void AddExternalAbsoluteSums(Vector& sums) const
+	// sums[i] += sum_j |a_ij| over the external non-zeros of the row i of A (in other chunks; none in the interior block
+	// rows), in the order of the row
+	template <typename T>
+	void AddExternalAbsoluteSums(const SparseMatrixOf<T>& A, Vector& sums) const
 	{
-		const double* val = _A->valuePtr();
+		const T* val = A.valuePtr();
 		#pragma omp parallel for
 		for (int c = 0; c < Count(); c++)
 		{
@@ -273,7 +293,7 @@ public:
 			{
 				for (BigNumber i = BlockRow(chunk.Boundary[q]) * _blockSize, r = q * _blockSize; r < (q + 1) * _blockSize; i++, r++)
 				{
-					SparseMatrixIndex start = _A->outerIndexPtr()[i];
+					SparseMatrixIndex start = A.outerIndexPtr()[i];
 					for (BigNumber j = chunk.RangeBegin[r]; j < chunk.LowerBegin[r]; j++)
 					{
 						for (SparseMatrixIndex p = start + chunk.Ranges[j].first; p < start + chunk.Ranges[j].second; p++)
@@ -284,26 +304,56 @@ public:
 		}
 	}
 
-	// b_i - sum_j a_ij x_j over the j outside the diagonal block, for the row i = blockRow * blockSize + k of the boundary
-	// block row q of the chunk c: the external products with the old values (SaveExported(); none if xEquals0: x = 0),
-	// the internal ones selected by 'products' with the current values of x
-	double BoundaryRowRhs(int c, BigNumber q, BigNumber blockRow, int k, const Vector& b, const Vector& x, bool xEquals0, InternalProducts products) const
+	// The same for A stored by blocks: each row summed in the order of its columns, as in CSR
+	template <typename T>
+	void AddExternalAbsoluteSums(const BlockSparseMatrix<T>& A, Vector& sums) const
+	{
+		const int n = _dofBlockSize;
+		#pragma omp parallel for
+		for (int c = 0; c < Count(); c++)
+		{
+			const Chunk& chunk = _chunks[c];
+			BigNumber nBoundary = chunk.Boundary.size();
+			for (BigNumber q = 0; q < nBoundary; q++)
+			{
+				BigNumber I = BlockRow(chunk.Boundary[q]);
+				const T* values = A.Values.data() + A.ValueStart[I];
+				for (BigNumber j = chunk.RangeBegin[q]; j < chunk.LowerBegin[q]; j++)
+				{
+					for (SparseMatrixIndex p = chunk.Ranges[j].first; p < chunk.Ranges[j].second; p++)
+					{
+						const T* block = values + (size_t)p * n * n;
+						for (int l = 0; l < n; l++)
+							for (int r = 0; r < n; r++)
+								sums[I * n + r] += abs(block[l * n + r]);
+					}
+				}
+			}
+		}
+	}
+
+	// b_i - sum_j a_ij x_j over the j outside the diagonal block, for the row i = blockRow * blockSize + k of A (in CSR, of
+	// precision T: the sums in double) of the boundary block row q of the chunk c: the external products with the old
+	// values (SaveExported(); none if xEquals0: x = 0), the internal ones selected by 'products' with the current values
+	// of x
+	template <typename T>
+	double BoundaryRowRhs(const SparseMatrixOf<T>& A, int c, BigNumber q, BigNumber blockRow, int k, const VectorOf<T>& b, const VectorOf<T>& x, bool xEquals0, InternalProducts products) const
 	{
 		const Chunk& chunk = _chunks[c];
-		const SparseMatrixIndex* col = _A->innerIndexPtr();
-		const double* val = _A->valuePtr();
-		const double* xp = x.data();
+		const SparseMatrixIndex* col = A.innerIndexPtr();
+		const T* val = A.valuePtr();
+		const T* xp = x.data();
 		const double* old = _old.data();
 		BigNumber i = blockRow * _blockSize + k;
 		BigNumber r = q * _blockSize + k;
-		SparseMatrixIndex start = _A->outerIndexPtr()[i];
+		SparseMatrixIndex start = A.outerIndexPtr()[i];
 		double s = b[i];
 		if (!xEquals0)
 		{
 			for (BigNumber j = chunk.RangeBegin[r]; j < chunk.LowerBegin[r]; j++)
 			{
 				for (SparseMatrixIndex p = start + chunk.Ranges[j].first; p < start + chunk.Ranges[j].second; p++)
-					s -= val[p] * old[col[p]];
+					s -= (double)val[p] * old[col[p]];
 			}
 		}
 		BigNumber first = products == InternalProducts::Upper ? chunk.UpperBegin[r] : chunk.LowerBegin[r];
@@ -311,47 +361,86 @@ public:
 		for (BigNumber j = first; j < last; j++)
 		{
 			for (SparseMatrixIndex p = start + chunk.Ranges[j].first; p < start + chunk.Ranges[j].second; p++)
-				s -= val[p] * xp[col[p]];
+				s -= (double)val[p] * xp[col[p]];
 		}
 		return s;
 	}
 
 	// The same for all the rows of the boundary block row: rhs[k] for its row k. samePattern: its rows have the same
 	// non-zero pattern: processed together, as in BlockGaussSeidel::BlockRowRhsSamePattern().
-	void BoundaryRowRhs(int c, BigNumber q, BigNumber blockRow, const Vector& b, const Vector& x, bool xEquals0, InternalProducts products, double* rhs, bool samePattern) const
+	template <typename T>
+	void BoundaryRowRhs(const SparseMatrixOf<T>& A, int c, BigNumber q, BigNumber blockRow, const VectorOf<T>& b, const VectorOf<T>& x, bool xEquals0, InternalProducts products, double* rhs, bool samePattern) const
 	{
 		if (samePattern)
 		{
 			switch (_blockSize)
 			{
-				case 2: BoundaryRowRhsSamePattern<2>(c, q, blockRow, b, x, xEquals0, products, rhs); return;
-				case 3: BoundaryRowRhsSamePattern<3>(c, q, blockRow, b, x, xEquals0, products, rhs); return;
-				case 4: BoundaryRowRhsSamePattern<4>(c, q, blockRow, b, x, xEquals0, products, rhs); return;
-				case 5: BoundaryRowRhsSamePattern<5>(c, q, blockRow, b, x, xEquals0, products, rhs); return;
-				case 6: BoundaryRowRhsSamePattern<6>(c, q, blockRow, b, x, xEquals0, products, rhs); return;
+				case 2: BoundaryRowRhsSamePattern<T, 2>(A, c, q, blockRow, b, x, xEquals0, products, rhs); return;
+				case 3: BoundaryRowRhsSamePattern<T, 3>(A, c, q, blockRow, b, x, xEquals0, products, rhs); return;
+				case 4: BoundaryRowRhsSamePattern<T, 4>(A, c, q, blockRow, b, x, xEquals0, products, rhs); return;
+				case 5: BoundaryRowRhsSamePattern<T, 5>(A, c, q, blockRow, b, x, xEquals0, products, rhs); return;
+				case 6: BoundaryRowRhsSamePattern<T, 6>(A, c, q, blockRow, b, x, xEquals0, products, rhs); return;
 			}
 		}
 		for (int k = 0; k < _blockSize; k++)
-			rhs[k] = BoundaryRowRhs(c, q, blockRow, k, b, x, xEquals0, products);
+			rhs[k] = BoundaryRowRhs(A, c, q, blockRow, k, b, x, xEquals0, products);
+	}
+
+	// The same for A stored by blocks: the ranges of blocks of the block row, each row summed in the same order as in CSR;
+	// B: the block size if it is known at compile time, 0 otherwise
+	template <typename T, int B>
+	void BoundaryRowRhs(const BlockSparseMatrix<T>& A, int c, BigNumber q, BigNumber blockRow, const VectorOf<T>& b, const VectorOf<T>& x, bool xEquals0, InternalProducts products, double* rhs) const
+	{
+		const Chunk& chunk = _chunks[c];
+		const int n = B > 0 ? B : _dofBlockSize;
+		BigNumber i0 = blockRow * n;
+		for (int r = 0; r < n; r++)
+			rhs[r] = b[i0 + r];
+		const SparseMatrixIndex* cols = A.Cols.data() + A.RowStart[blockRow];
+		const T* values = A.Values.data() + A.ValueStart[blockRow];
+		// rhs -= the blocks of the positions of the range times v
+		auto subtract = [&](const Range& range, const auto* v)
+		{
+			for (SparseMatrixIndex p = range.first; p < range.second; p++)
+			{
+				const T* block = values + (size_t)p * n * n;
+				const auto* v_J = v + (BigNumber)cols[p] * n;
+				for (int l = 0; l < n; l++)
+				{
+					double v_l = v_J[l];
+					for (int r = 0; r < n; r++)
+						rhs[r] -= (double)block[l * n + r] * v_l;
+				}
+			}
+		};
+		if (!xEquals0)
+		{
+			for (BigNumber j = chunk.RangeBegin[q]; j < chunk.LowerBegin[q]; j++)
+				subtract(chunk.Ranges[j], _old.data());
+		}
+		BigNumber first = products == InternalProducts::Upper ? chunk.UpperBegin[q] : chunk.LowerBegin[q];
+		BigNumber last = products == InternalProducts::Lower ? chunk.UpperBegin[q] : chunk.RangeBegin[q + 1];
+		for (BigNumber j = first; j < last; j++)
+			subtract(chunk.Ranges[j], x.data());
 	}
 
 private:
 	// The rows of a block row with the same pattern are stored one after the other with the same length, and have the
 	// same ranges (those of its first row): processed together, column by column
-	template <int BlockSize>
-	void BoundaryRowRhsSamePattern(int c, BigNumber q, BigNumber blockRow, const Vector& b, const Vector& x, bool xEquals0, InternalProducts products, double* rhs) const
+	template <typename T, int BlockSize>
+	void BoundaryRowRhsSamePattern(const SparseMatrixOf<T>& A, int c, BigNumber q, BigNumber blockRow, const VectorOf<T>& b, const VectorOf<T>& x, bool xEquals0, InternalProducts products, double* rhs) const
 	{
 		const Chunk& chunk = _chunks[c];
 		BigNumber i0 = blockRow * BlockSize;
 		BigNumber r0 = q * BlockSize;
-		SparseMatrixIndex start = _A->outerIndexPtr()[i0];
-		SparseMatrixIndex length = _A->outerIndexPtr()[i0 + 1] - start;
-		const SparseMatrixIndex* col = _A->innerIndexPtr() + start;
-		const double* val[BlockSize]; // coefficients of each row
+		SparseMatrixIndex start = A.outerIndexPtr()[i0];
+		SparseMatrixIndex length = A.outerIndexPtr()[i0 + 1] - start;
+		const SparseMatrixIndex* col = A.innerIndexPtr() + start;
+		const T* val[BlockSize]; // coefficients of each row
 		double s[BlockSize];
 		for (int k = 0; k < BlockSize; k++)
 		{
-			val[k] = _A->valuePtr() + start + k * length;
+			val[k] = A.valuePtr() + start + k * length;
 			s[k] = b[i0 + k];
 		}
 		if (!xEquals0)
@@ -362,11 +451,11 @@ private:
 				{
 					double old_j = _old[col[p]];
 					for (int k = 0; k < BlockSize; k++)
-						s[k] -= val[k][p] * old_j;
+						s[k] -= (double)val[k][p] * old_j;
 				}
 			}
 		}
-		const double* xp = x.data();
+		const T* xp = x.data();
 		BigNumber first = products == InternalProducts::Upper ? chunk.UpperBegin[r0] : chunk.LowerBegin[r0];
 		BigNumber last = products == InternalProducts::Lower ? chunk.UpperBegin[r0] : chunk.RangeBegin[r0 + 1];
 		for (BigNumber j = first; j < last; j++)
@@ -375,7 +464,7 @@ private:
 			{
 				double x_j = xp[col[p]];
 				for (int k = 0; k < BlockSize; k++)
-					s[k] -= val[k][p] * x_j;
+					s[k] -= (double)val[k][p] * x_j;
 			}
 		}
 		for (int k = 0; k < BlockSize; k++)

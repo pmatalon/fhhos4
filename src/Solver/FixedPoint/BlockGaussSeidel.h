@@ -5,6 +5,9 @@
 #include "HybridChunks.h"
 using namespace std;
 
+// The matrix of the setup in CSR in double (Setup()) or in single precision (SetupSinglePrecision(), the sweeps of float
+// vectors, their sums in double), or stored by blocks in either precision (SetupBlockCSR(): the same sums in the same
+// order, the same results as in CSR)
 class BlockGaussSeidel : public IterativeSolver
 {
 protected:
@@ -14,8 +17,8 @@ protected:
 	bool _l1 = false; // l1 Gauss-Seidel (see L1Theta)
 
 	BlockDiagonalSolver diagBlockSolver; // solves the systems with the diagonal blocks
-	DiagonalBlockPositions _diagBlock;   // positions of the diagonal block in each row
-	// For each block row, whether its rows have the same non-zero pattern (always the case for the HHO matrices)
+	DiagonalBlockPositions _diagBlock;   // positions of the diagonal block in each row (in CSR)
+	// For each block row, whether its rows have the same non-zero pattern (always the case for the HHO matrices; in CSR)
 	vector<char> _samePattern;
 	HybridChunks _chunks; // of the hybrid sweeps (see Chunks())
 	// The l1 term of each row (see L1Theta) in the factorized diagonal blocks; empty: none
@@ -79,6 +82,7 @@ public:
 	void Setup(const SparseMatrix& A) override
 	{
 		IterativeSolver::Setup(A);
+		SetStorage(&A, nullptr, nullptr, nullptr, nullptr, nullptr);
 		SetupLocal(A);
 	}
 
@@ -86,50 +90,129 @@ public:
 	void Setup(const DistributedMatrix& A) override
 	{
 		SetDistributedMatrix(A);
+		SetStorage(&A.Diag, nullptr, nullptr, nullptr, &A, nullptr);
 		SetupLocal(A.Diag);
 	}
 
-private:
-	void SetupLocal(const SparseMatrix& A)
+	// Mixed precision: the same sweeps of float vectors (SolveInSinglePrecision()), their sums in double
+	bool SupportsSinglePrecision() const override
 	{
-		auto nb = A.rows() / _blockSize;
+		return true;
+	}
+
+	void SetupSinglePrecision(const FloatSparseMatrix& A) override
+	{
+		SetStorage(nullptr, &A, nullptr, nullptr, nullptr, nullptr);
+		SetupLocal(A);
+	}
+
+	void SetupSinglePrecision(const DistributedMatrixOf<float>& A) override
+	{
+		SetStorage(nullptr, &A.Diag, nullptr, nullptr, nullptr, &A);
+		SetupLocal(A.Diag);
+	}
+
+	// The matrix stored by blocks of the block size of the smoother (block CSR); on several processes, the block Diag of
+	// distributed
+	bool SupportsBlockCSR() const override
+	{
+		return true;
+	}
+
+	void SetupBlockCSR(const BlockSparseMatrix<double>& A, const DistributedMatrix* distributed) override
+	{
+		SetStorage(nullptr, nullptr, &A, nullptr, distributed, nullptr);
+		SetupLocal(A);
+	}
+
+	void SetupBlockCSR(const BlockSparseMatrix<float>& A, const DistributedMatrixOf<float>* distributed) override
+	{
+		SetStorage(nullptr, nullptr, nullptr, &A, nullptr, distributed);
+		SetupLocal(A);
+	}
+
+private:
+	template <typename T>
+	void SetupLocal(const SparseMatrixOf<T>& A)
+	{
 		this->diagBlockSolver.Setup(A, _blockSize, BlockDiagonalSolver::SmootherMethod);
-		_l1Terms = Vector();
 		_diagBlock.Setup(A, _blockSize);
-		SetupSamePattern();
+		SetupSamePattern(A);
+		SetupChunksAndCost();
+	}
+
+	template <typename T>
+	void SetupLocal(const BlockSparseMatrix<T>& A)
+	{
+		if (A.BlockSize != _blockSize)
+			Utils::FatalError("The block CSR storage of a block Gauss-Seidel smoother requires blocks of its block size (" + to_string(_blockSize) + "), got " + to_string(A.BlockSize) + ".");
+		this->diagBlockSolver.Setup(A, _blockSize, BlockDiagonalSolver::SmootherMethod);
+		_diagBlock = DiagonalBlockPositions();
+		_samePattern.clear();
+		SetupChunksAndCost();
+	}
+
+	void SetupChunksAndCost()
+	{
+		_l1Terms = Vector();
 		_chunks.Clear();
 		if (_hybrid)
 			Chunks();
 		else
 			SetupL1Terms();
 
-		this->SetupComputationalWork = nb * 2.0/3.0*pow(_blockSize, 3)*1e-6;
+		this->SetupComputationalWork = MatrixRows() / _blockSize * 2.0/3.0*pow(_blockSize, 3)*1e-6;
 	}
 
 public:
-	// The factorized diagonal blocks, the positions of the blocks and, with the same order, the hybrid chunks of
-	// another block Gauss-Seidel set up for A with the same block size
+	// The setup of another block Gauss-Seidel of the same block size set up for the same matrix in the same storage (the
+	// pre-smoother of the level): its factorized diagonal blocks, the positions of the blocks and, with the same order,
+	// its hybrid chunks
 	bool SetupFrom(const SparseMatrix& A, const IterativeSolver& other) override
 	{
-		const BlockGaussSeidel* o = dynamic_cast<const BlockGaussSeidel*>(&other);
-		if (!o || o->Matrix != &A || o->Distributed || o->_blockSize != _blockSize || this->ComputeExactSolution)
-			return false;
-		IterativeSolver::Setup(A);
-		CopySetup(*o);
-		return true;
+		return SetupFromOther(other, [&] { SetStorage(&A, nullptr, nullptr, nullptr, nullptr, nullptr); });
 	}
 
 	bool SetupFrom(const DistributedMatrix& A, const IterativeSolver& other) override
 	{
-		const BlockGaussSeidel* o = dynamic_cast<const BlockGaussSeidel*>(&other);
-		if (!o || o->Distributed != &A || o->_blockSize != _blockSize || this->ComputeExactSolution)
-			return false;
-		SetDistributedMatrix(A);
-		CopySetup(*o);
-		return true;
+		return SetupFromOther(other, [&] { SetStorage(&A.Diag, nullptr, nullptr, nullptr, &A, nullptr); });
+	}
+
+	bool SetupSinglePrecisionFrom(const FloatSparseMatrix& A, const IterativeSolver& other) override
+	{
+		return SetupFromOther(other, [&] { SetStorage(nullptr, &A, nullptr, nullptr, nullptr, nullptr); });
+	}
+
+	bool SetupSinglePrecisionFrom(const DistributedMatrixOf<float>& A, const IterativeSolver& other) override
+	{
+		return SetupFromOther(other, [&] { SetStorage(nullptr, &A.Diag, nullptr, nullptr, nullptr, &A); });
+	}
+
+	bool SetupBlockCSRFrom(const BlockSparseMatrix<double>& A, const DistributedMatrix* distributed, const IterativeSolver& other) override
+	{
+		return SetupFromOther(other, [&] { SetStorage(nullptr, nullptr, &A, nullptr, distributed, nullptr); });
+	}
+
+	bool SetupBlockCSRFrom(const BlockSparseMatrix<float>& A, const DistributedMatrixOf<float>* distributed, const IterativeSolver& other) override
+	{
+		return SetupFromOther(other, [&] { SetStorage(nullptr, nullptr, nullptr, &A, nullptr, distributed); });
 	}
 
 private:
+	// setStorage(): the matrix of this setup. False (the caller then sets this smoother up) if other is not set up for it.
+	template <class SetStorageFunction>
+	bool SetupFromOther(const IterativeSolver& other, SetStorageFunction setStorage)
+	{
+		const BlockGaussSeidel* o = dynamic_cast<const BlockGaussSeidel*>(&other);
+		if (!o || o->_blockSize != _blockSize || this->ComputeExactSolution)
+			return false;
+		setStorage();
+		if (!SameStorage(*o))
+			return false;
+		CopySetup(o);
+		return true;
+	}
+
 	void CopySetup(const BlockGaussSeidel* o)
 	{
 		diagBlockSolver = o->diagBlockSolver;
@@ -145,20 +228,32 @@ private:
 		this->SetupComputationalWork = o->SetupComputationalWork;
 	}
 
-	void CopySetup(const BlockGaussSeidel& o)
-	{
-		CopySetup(&o);
-	}
-
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
 		assert(!computeResidual && !computeAx);
+		Iterate(b, x, xEquals0);
+		result.SetX(x);
+		result.AddWorkInFlops(IterationFlops());
+		return result;
+	}
 
-		const SparseMatrix& A = *this->Matrix;
+public:
+	// The iterations in single precision (the residual and A x computed by the caller: CanOptimizeResidualComputation()
+	// is false)
+	void SolveInSinglePrecision(const FloatVector& b, FloatVector& x, bool xEquals0, FloatVector* residual, FloatVector* Ax) override
+	{
+		assert(this->MaxIterations > 0 && InSinglePrecision() && !residual && !Ax);
+		for (this->IterationCount = 0; this->IterationCount < this->MaxIterations; this->IterationCount++)
+			Iterate(b, x, xEquals0);
+		this->SolvingComputationalWork = this->MaxIterations * IterationFlops() * 1e-6;
+	}
 
-		auto nb = A.rows() / _blockSize;
-
+private:
+	// One iteration (one sweep, two if symmetric) in precision T
+	template <typename T>
+	void Iterate(const VectorOf<T>& b, VectorOf<T>& x, bool& xEquals0)
+	{
 		if (!_hybrid)
 		{
 			if (_direction == Direction::Forward)
@@ -205,50 +300,63 @@ private:
 		}
 
 		xEquals0 = false;
+	}
 
-		result.SetX(x);
-		double sweepWork = 2 * A.nonZeros() + nb * pow(_blockSize, 2);
-		result.AddWorkInFlops(_direction == Direction::Symmetric ? 2*sweepWork : sweepWork);
-		return result;
+	Flops IterationFlops() const
+	{
+		double sweepWork = 2 * MatrixNonZeros() + MatrixRows() / _blockSize * pow(_blockSize, 2);
+		return _direction == Direction::Symmetric ? 2*sweepWork : sweepWork;
 	}
 
 	// Which off-diagonal blocks of a block row are multiplied by x: in the first sweep from x = 0, those of the block
 	// rows not processed yet multiply zeros (the upper ones in a forward sweep, the lower ones in a backward sweep)
 	enum class OffDiagonalBlocks { Both, Lower, Upper };
 
-	void Sweep(const Vector& givenB, Vector& x, bool backward, bool xEquals0)
+	// The work vectors of the sweeps, allocated once per sweep (per thread in the hybrid sweeps): the right-hand side of a
+	// block row (its sums in double) and the solution of its diagonal block; their copies in float for the LU solves in
+	// single precision
+	struct SweepWork
 	{
-		Vector distributedRhs;
-		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs, &_l1Terms);
-		BigNumber nb = this->Matrix->rows() / _blockSize;
-		Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors for ProcessBlockRow()
-		if (SweepOrder && xEquals0)
-			x = Vector::Zero(this->Matrix->rows());
-		SweepRange(b, x, backward, xEquals0, 0, nb, tmp_x, tmp_xi);
+		Vector Rhs, Solution;
+		FloatVector SingleRhs, SingleSolution;
+		SweepWork(int blockSize) : Rhs(blockSize), Solution(blockSize), SingleRhs(blockSize), SingleSolution(blockSize) {}
+	};
+
+	template <typename T>
+	void Sweep(const VectorOf<T>& givenB, VectorOf<T>& x, bool backward, bool xEquals0)
+	{
+		VectorOf<T> distributedRhs;
+		const VectorOf<T>& b = SweepRhs(givenB, x, xEquals0, distributedRhs, DistributedOf<T>(), &_l1Terms);
+		BigNumber n = Rows<T>();
+		SweepWork work(_blockSize);
+		if (xEquals0 && (SweepOrder || x.size() != n))
+			x = VectorOf<T>::Zero(n);
+		SweepRange(b, x, backward, xEquals0, 0, n / _blockSize, work);
 	}
 
 	// The block rows at the positions [begin, end) of the sweep sequence: the natural order (processed backward if
 	// backward), or SweepOrder (all the sweeps follow it)
-	void SweepRange(const Vector& b, Vector& x, bool backward, bool xEquals0, BigNumber begin, BigNumber end, Vector& tmp_x, Vector& tmp_xi)
+	template <typename T>
+	void SweepRange(const VectorOf<T>& b, VectorOf<T>& x, bool backward, bool xEquals0, BigNumber begin, BigNumber end, SweepWork& work)
 	{
 		if (SweepOrder)
 		{
 			// The block rows not processed yet are not the upper ones: from x = 0, all the off-diagonal blocks are
 			// multiplied (by zeros for those)
 			for (BigNumber k = begin; k < end; ++k)
-				ProcessBlockRow((*SweepOrder)[k], b, x, tmp_x, tmp_xi, OffDiagonalBlocks::Both, true);
+				ProcessBlockRow((*SweepOrder)[k], b, x, work, OffDiagonalBlocks::Both, true);
 			return;
 		}
 		OffDiagonalBlocks blocks = !xEquals0 ? OffDiagonalBlocks::Both : (backward ? OffDiagonalBlocks::Upper : OffDiagonalBlocks::Lower);
 		if (backward)
 		{
 			for (BigNumber i = end; i-- > begin; )
-				ProcessBlockRow(i, b, x, tmp_x, tmp_xi, blocks, true);
+				ProcessBlockRow(i, b, x, work, blocks, true);
 		}
 		else
 		{
 			for (BigNumber i = begin; i < end; ++i)
-				ProcessBlockRow(i, b, x, tmp_x, tmp_xi, blocks, false);
+				ProcessBlockRow(i, b, x, work, blocks, false);
 		}
 	}
 
@@ -258,24 +366,26 @@ private:
 	// timing; on one thread, or if the chunks are poorly separated (HybridChunks::Parallel()), it is Sweep(). From x = 0,
 	// the products by the values of the other chunks and by those not computed yet are skipped, as in Sweep() (except in
 	// SweepOrder).
-	void HybridSweep(const Vector& givenB, Vector& x, bool backward, bool xEquals0)
+	template <typename T>
+	void HybridSweep(const VectorOf<T>& givenB, VectorOf<T>& x, bool backward, bool xEquals0)
 	{
 		if (!Chunks().Parallel())
 		{
 			Sweep(givenB, x, backward, xEquals0);
 			return;
 		}
-		Vector distributedRhs;
-		const Vector& b = SweepRhs(givenB, x, xEquals0, distributedRhs, &_l1Terms);
-		BigNumber n = this->Matrix->rows();
+		VectorOf<T> distributedRhs;
+		const VectorOf<T>& b = SweepRhs(givenB, x, xEquals0, distributedRhs, DistributedOf<T>(), &_l1Terms);
+		BigNumber n = Rows<T>();
 		if (xEquals0 && (SweepOrder || x.size() != n))
-			x = Vector::Zero(n); // as Sweep()
+			x = VectorOf<T>::Zero(n); // as Sweep()
 		bool interleaveRows = backward || SweepOrder; // as in Sweep()
 		bool backwardChunks = backward && !SweepOrder;
 		auto products = !xEquals0 || SweepOrder ? HybridChunks::InternalProducts::Both : (backward ? HybridChunks::InternalProducts::Upper : HybridChunks::InternalProducts::Lower);
+		const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>();
 		#pragma omp parallel num_threads(_chunks.Count())
 		{
-			Vector tmp_x(_blockSize), tmp_xi(_blockSize); // work vectors, allocated once per thread
+			SweepWork work(_blockSize); // allocated once per thread
 			if (!xEquals0)
 			{
 				_chunks.SaveExported(x);
@@ -284,12 +394,14 @@ private:
 			_chunks.ForEachChunk([&](int c)
 			{
 				_chunks.SweepChunk(c, backwardChunks,
-					[&](BigNumber begin, BigNumber end) { SweepRange(b, x, backward, xEquals0, begin, end, tmp_x, tmp_xi); },
+					[&](BigNumber begin, BigNumber end) { SweepRange(b, x, backward, xEquals0, begin, end, work); },
 					[&](BigNumber q, BigNumber blockRow)
 					{
-						_chunks.BoundaryRowRhs(c, q, blockRow, b, x, xEquals0, products, tmp_x.data(), interleaveRows && _samePattern[blockRow]);
-						this->diagBlockSolver.Solve(blockRow, tmp_x, tmp_xi);
-						x.segment(blockRow * _blockSize, _blockSize) = tmp_xi;
+						if (blocks)
+							DispatchBlockSize(_blockSize, [&](auto size) { _chunks.BoundaryRowRhs<T, decltype(size)::value>(*blocks, c, q, blockRow, b, x, xEquals0, products, work.Rhs.data()); });
+						else
+							_chunks.BoundaryRowRhs(MatrixOf<T>(), c, q, blockRow, b, x, xEquals0, products, work.Rhs.data(), interleaveRows && _samePattern[blockRow]);
+						SolveDiagonalBlock(blockRow, work, x.data() + blockRow * _blockSize);
 					});
 			});
 		}
@@ -302,7 +414,14 @@ private:
 		int nChunks = Parallelism::NThreads();
 		if (!_chunks.IsSetUp(nChunks, SweepOrder))
 		{
-			_chunks.Setup(*this->Matrix, _blockSize, SweepOrder, nChunks);
+			if (_blockMatrix)
+				_chunks.Setup(*_blockMatrix, SweepOrder, nChunks);
+			else if (_singleBlockMatrix)
+				_chunks.Setup(*_singleBlockMatrix, SweepOrder, nChunks);
+			else if (_singleMatrix)
+				_chunks.Setup(*_singleMatrix, _blockSize, SweepOrder, nChunks);
+			else
+				_chunks.Setup(*this->Matrix, _blockSize, SweepOrder, nChunks);
 			SetupL1Terms();
 		}
 		return _chunks;
@@ -312,46 +431,70 @@ private:
 	// in parallel; the diagonal blocks whose l1 terms change factorized again
 	void SetupL1Terms()
 	{
+		if (InSinglePrecision())
+			SetupL1Terms<float>();
+		else
+			SetupL1Terms<double>();
+	}
+
+	template <typename T>
+	void SetupL1Terms()
+	{
 		double theta = _l1 ? L1Theta : 0;
 		if (theta == 0 && _l1Terms.size() == 0)
 			return;
-		const SparseMatrix& A = *this->Matrix;
-		Vector terms = Vector::Zero(A.rows());
+		BigNumber n = Rows<T>();
+		Vector terms = Vector::Zero(n);
 		if (theta != 0)
 		{
-			if (this->Distributed)
+			if (const DistributedMatrixOf<T>* distributed = DistributedOf<T>())
 			{
-				const SparseMatrix& O = this->Distributed->Offd;
+				const SparseMatrixOf<T>& O = distributed->Offd;
 				#pragma omp parallel for
 				for (BigNumber i = 0; i < O.rows(); i++)
 				{
-					for (SparseMatrix::InnerIterator it(O, i); it; ++it)
+					for (typename SparseMatrixOf<T>::InnerIterator it(O, i); it; ++it)
 						terms[i] += abs(it.value());
 				}
 			}
 			if (_hybrid && _chunks.Parallel())
-				_chunks.AddExternalAbsoluteSums(terms);
+			{
+				if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
+					_chunks.AddExternalAbsoluteSums(*blocks, terms);
+				else
+					_chunks.AddExternalAbsoluteSums(MatrixOf<T>(), terms);
+			}
 			terms *= theta;
 		}
-		Vector old = _l1Terms.size() > 0 ? _l1Terms : Vector::Zero(A.rows());
+		Vector old = _l1Terms.size() > 0 ? _l1Terms : Vector::Zero(n);
 		vector<BigNumber> changed;
-		for (BigNumber I = 0; I < A.rows() / _blockSize; I++)
+		for (BigNumber I = 0; I < n / _blockSize; I++)
 		{
 			if ((terms.segment(I * _blockSize, _blockSize).array() != old.segment(I * _blockSize, _blockSize).array()).any())
 				changed.push_back(I);
 		}
-		diagBlockSolver.Refactorize(changed, [&](BigNumber I)
+		diagBlockSolver.Refactorize<T>(changed, [&](BigNumber I)
 		{
-			DenseMatrix D = A.block(I * _blockSize, I * _blockSize, _blockSize, _blockSize);
+			DenseMatrix D = DiagonalBlock<T>(I);
 			D.diagonal() += terms.segment(I * _blockSize, _blockSize);
 			return D;
 		});
 		_l1Terms = (terms.array() != 0).any() ? terms : Vector();
 	}
 
-	void SetupSamePattern()
+	// The diagonal block I of the matrix in precision T, in double
+	template <typename T>
+	DenseMatrix DiagonalBlock(BigNumber I) const
 	{
-		const SparseMatrix& A = *this->Matrix;
+		if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
+			return blocks->DiagonalBlock(I);
+		Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> D = MatrixOf<T>().block(I * _blockSize, I * _blockSize, _blockSize, _blockSize);
+		return D.template cast<double>();
+	}
+
+	template <typename T>
+	void SetupSamePattern(const SparseMatrixOf<T>& A)
+	{
 		const SparseMatrixIndex* outer = A.outerIndexPtr();
 		const SparseMatrixIndex* col = A.innerIndexPtr();
 		BigNumber nb = A.rows() / _blockSize;
@@ -371,11 +514,13 @@ private:
 		}
 	}
 
-	// interleaveRows: whether to use BlockRowRhsSamePattern() when possible. Measured on the HHO matrices (U-AMG, k=2):
-	// in a forward sweep, BlockRowRhs() is faster (it reads the matrix as one sequential stream, which the hardware
-	// prefetcher follows); in a backward sweep, BlockRowRhsSamePattern() is (BlockRowRhs() jumps back at each block row,
-	// and the prefetcher doesn't follow: reading the rows together starts their memory accesses together).
-	void ProcessBlockRow(BigNumber currentBlockRow, const Vector& b, Vector& x, Vector& tmp_x, Vector& tmp_xi, OffDiagonalBlocks blocks, bool interleaveRows)
+	// interleaveRows: whether to use BlockRowRhsSamePattern() when possible (in CSR). Measured on the HHO matrices
+	// (U-AMG, k=2): in a forward sweep, BlockRowRhs() is faster (it reads the matrix as one sequential stream, which the
+	// hardware prefetcher follows); in a backward sweep, BlockRowRhsSamePattern() is (BlockRowRhs() jumps back at each
+	// block row, and the prefetcher doesn't follow: reading the rows together starts their memory accesses together).
+	// In block CSR, the rows of a block row are read together.
+	template <typename T>
+	void ProcessBlockRow(BigNumber currentBlockRow, const VectorOf<T>& b, VectorOf<T>& x, SweepWork& work, OffDiagonalBlocks blocks, bool interleaveRows)
 	{
 		// BlockRow i: [ --- Li --- | Di | --- Ui --- ]
 
@@ -385,36 +530,65 @@ private:
 		x.segment(i * _blockSize, _blockSize) = -_omega * Li * x.head(i * _blockSize) - _omega * Ui * x.tail((nb - i - 1) * _blockSize) + (1 - _omega)*Di*x.segment(i * _blockSize, _blockSize) + _omega * bi;
 		x.segment(i * _blockSize, _blockSize) = this->invD.block(i * _blockSize, 0, _blockSize, _blockSize) * x.segment(i * _blockSize, _blockSize);*/
 
-		// tmp_x = b_i - (Li | Ui) * x
-		if (interleaveRows && _samePattern[currentBlockRow])
+		// rhs = b_i - (Li | Ui) * x
+		double* rhs = work.Rhs.data();
+		if (const BlockSparseMatrix<T>* M = BlockMatrixOf<T>())
+			DispatchBlockSize(_blockSize, [&](auto size) { BlockRowRhs<T, decltype(size)::value>(*M, currentBlockRow, b, x, rhs, blocks); });
+		else if (interleaveRows && _samePattern[currentBlockRow])
 		{
 			switch (_blockSize)
 			{
-				case 2: BlockRowRhsSamePattern<2>(currentBlockRow, b, x, tmp_x, blocks); break;
-				case 3: BlockRowRhsSamePattern<3>(currentBlockRow, b, x, tmp_x, blocks); break;
-				case 4: BlockRowRhsSamePattern<4>(currentBlockRow, b, x, tmp_x, blocks); break;
-				case 5: BlockRowRhsSamePattern<5>(currentBlockRow, b, x, tmp_x, blocks); break;
-				case 6: BlockRowRhsSamePattern<6>(currentBlockRow, b, x, tmp_x, blocks); break;
-				default: BlockRowRhs(currentBlockRow, b, x, tmp_x, blocks);
+				case 2: BlockRowRhsSamePattern<T, 2>(currentBlockRow, b, x, rhs, blocks); break;
+				case 3: BlockRowRhsSamePattern<T, 3>(currentBlockRow, b, x, rhs, blocks); break;
+				case 4: BlockRowRhsSamePattern<T, 4>(currentBlockRow, b, x, rhs, blocks); break;
+				case 5: BlockRowRhsSamePattern<T, 5>(currentBlockRow, b, x, rhs, blocks); break;
+				case 6: BlockRowRhsSamePattern<T, 6>(currentBlockRow, b, x, rhs, blocks); break;
+				default: BlockRowRhs(MatrixOf<T>(), currentBlockRow, b, x, rhs, blocks);
 			}
 		}
 		else
-			BlockRowRhs(currentBlockRow, b, x, tmp_x, blocks);
+			BlockRowRhs(MatrixOf<T>(), currentBlockRow, b, x, rhs, blocks);
 
-		this->diagBlockSolver.Solve(currentBlockRow, tmp_x, tmp_xi);
-		x.segment(currentBlockRow * _blockSize, _blockSize) = tmp_xi;
+		SolveDiagonalBlock(currentBlockRow, work, x.data() + currentBlockRow * _blockSize);
+	}
+
+	// x_I = D_I^-1 work.Rhs (destroyed): in double, the solve of BlockDiagonalSolver; in single precision, the inverse
+	// applied with the sums in double (ApplyInverse()), or the LU solve in float
+	template <typename T>
+	void SolveDiagonalBlock(BigNumber I, SweepWork& work, T* x_I) const
+	{
+		if constexpr (std::is_same_v<T, double>)
+		{
+			this->diagBlockSolver.Solve(I, work.Rhs, work.Solution);
+			for (int k = 0; k < _blockSize; k++)
+				x_I[k] = work.Solution[k];
+		}
+		else if (diagBlockSolver.Method() == DiagBlockSolveMethod::Inverse)
+		{
+			DispatchBlockSize(_blockSize, [&](auto size) { diagBlockSolver.ApplyInverse<T, decltype(size)::value>(I, work.Rhs.data(), work.Solution.data()); });
+			for (int k = 0; k < _blockSize; k++)
+				x_I[k] = (T)work.Solution[k];
+		}
+		else
+		{
+			work.SingleRhs = work.Rhs.template cast<T>();
+			this->diagBlockSolver.Solve(I, work.SingleRhs, work.SingleSolution);
+			for (int k = 0; k < _blockSize; k++)
+				x_I[k] = work.SingleSolution[k];
+		}
 	}
 
 	// rhs = b_i - (Li | Ui) * x for the block row i: for each row, b_k - a_kj*x_j - ..., the products subtracted one by one
 	// in the order of the row. The sum of a row is a chain of dependent operations: it is kept in a register.
 	// The blocks excluded by 'blocks' multiply zeros: skipped (s - 0 = s, exactly, up to the sign of a zero s).
-	void BlockRowRhs(BigNumber iBlock, const Vector& b, const Vector& x, Vector& rhs, OffDiagonalBlocks blocks) const
+	// In precision T: the sums in double.
+	template <typename T>
+	void BlockRowRhs(const SparseMatrixOf<T>& A, BigNumber iBlock, const VectorOf<T>& b, const VectorOf<T>& x, double* rhs, OffDiagonalBlocks blocks) const
 	{
-		const SparseMatrix& A = *this->Matrix;
 		const SparseMatrixIndex* outer = A.outerIndexPtr();
 		const SparseMatrixIndex* col = A.innerIndexPtr();
-		const double* val = A.valuePtr();
-		const double* xp = x.data();
+		const T* val = A.valuePtr();
+		const T* xp = x.data();
 		for (int k = 0; k < _blockSize; k++)
 		{
 			BigNumber i = iBlock * _blockSize + k;
@@ -422,12 +596,12 @@ private:
 			if (blocks != OffDiagonalBlocks::Upper) // Li
 			{
 				for (SparseMatrixIndex p = outer[i]; p < _diagBlock.Begin[i]; p++)
-					s -= val[p] * xp[col[p]];
+					s -= (double)val[p] * xp[col[p]];
 			}
 			if (blocks != OffDiagonalBlocks::Lower) // Ui
 			{
 				for (SparseMatrixIndex p = _diagBlock.End[i]; p < outer[i + 1]; p++)
-					s -= val[p] * xp[col[p]];
+					s -= (double)val[p] * xp[col[p]];
 			}
 			rhs[k] = s;
 		}
@@ -436,24 +610,24 @@ private:
 	// Same as BlockRowRhs (same operations in the same order), when the rows of the block row have the same pattern:
 	// they are then stored one after the other with the same length, and processed together, column by column.
 	// Their sums are independent chains of operations, which the CPU interleaves.
-	template <int BlockSize>
-	void BlockRowRhsSamePattern(BigNumber iBlock, const Vector& b, const Vector& x, Vector& rhs, OffDiagonalBlocks blocks) const
+	template <typename T, int BlockSize>
+	void BlockRowRhsSamePattern(BigNumber iBlock, const VectorOf<T>& b, const VectorOf<T>& x, double* rhs, OffDiagonalBlocks blocks) const
 	{
-		const SparseMatrix& A = *this->Matrix;
+		const SparseMatrixOf<T>& A = MatrixOf<T>();
 		BigNumber i0 = iBlock * BlockSize;
 		SparseMatrixIndex start = A.outerIndexPtr()[i0];
 		SparseMatrixIndex length = A.outerIndexPtr()[i0 + 1] - start;
 		SparseMatrixIndex diagBegin = _diagBlock.Begin[i0] - start;
 		SparseMatrixIndex diagEnd = _diagBlock.End[i0] - start;
 		const SparseMatrixIndex* col = A.innerIndexPtr() + start;
-		const double* val[BlockSize]; // coefficients of each row
+		const T* val[BlockSize]; // coefficients of each row
 		double s[BlockSize];
 		for (int k = 0; k < BlockSize; k++)
 		{
 			val[k] = A.valuePtr() + start + k * length;
 			s[k] = b[i0 + k];
 		}
-		const double* xp = x.data();
+		const T* xp = x.data();
 
 		if (blocks != OffDiagonalBlocks::Upper) // Li
 		{
@@ -461,7 +635,7 @@ private:
 			{
 				double x_j = xp[col[p]];
 				for (int k = 0; k < BlockSize; k++)
-					s[k] -= val[k][p] * x_j;
+					s[k] -= (double)val[k][p] * x_j;
 			}
 		}
 		if (blocks != OffDiagonalBlocks::Lower) // Ui
@@ -470,10 +644,37 @@ private:
 			{
 				double x_j = xp[col[p]];
 				for (int k = 0; k < BlockSize; k++)
-					s[k] -= val[k][p] * x_j;
+					s[k] -= (double)val[k][p] * x_j;
 			}
 		}
 		for (int k = 0; k < BlockSize; k++)
 			rhs[k] = s[k];
+	}
+
+	// The same on the matrix stored by blocks: the blocks of the block row but the diagonal one (and those excluded by
+	// 'blocks'), each row summed in the order of its columns, as in CSR; B: the block size if it is known at compile
+	// time, 0 otherwise
+	template <typename T, int B>
+	void BlockRowRhs(const BlockSparseMatrix<T>& A, BigNumber I, const VectorOf<T>& b, const VectorOf<T>& x, double* rhs, OffDiagonalBlocks blocks) const
+	{
+		const int n = B > 0 ? B : _blockSize;
+		for (int r = 0; r < n; r++)
+			rhs[r] = b[I * n + r];
+		const T* block = A.Values.data() + A.ValueStart[I];
+		const T* xp = x.data();
+		for (SparseMatrixIndex p = A.RowStart[I]; p < A.RowStart[I + 1]; p++, block += n * n)
+		{
+			BigNumber J = A.Cols[p];
+			if (J == I || (J < I && blocks == OffDiagonalBlocks::Upper) || (J > I && blocks == OffDiagonalBlocks::Lower))
+				continue;
+			const T* x_J = xp + J * n;
+			for (int l = 0; l < n; l++)
+			{
+				double x_l = x_J[l];
+				const T* column = block + l * n;
+				for (int r = 0; r < n; r++)
+					rhs[r] -= (double)column[r] * x_l;
+			}
+		}
 	}
 };

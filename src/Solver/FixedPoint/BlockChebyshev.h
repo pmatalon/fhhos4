@@ -40,9 +40,10 @@ private:
 	double _lambdaMaxEstimate = 0; // Lanczos estimate of the largest eigenvalue of D^-1 A (0 before the setup)
 
 	// Blocks of size > 1: their inverses (DiagBlockSolveMethod::Inverse, computed in double), applied by a small product in
-	// the passes (ApplyInverseBlock()): in block CSR, passes 1.7x faster than with the LU solves in 2D (3x3 blocks), 1.25x
-	// in 3D (6x6; PERFORMANCE.md). Their rounding doesn't limit the accuracy of the solution: the smoother is a part of
-	// the preconditioner (the outer Krylov method checks the true residual); the blocks of an SPD matrix are invertible.
+	// the passes (BlockDiagonalSolver::ApplyInverse()): in block CSR, passes 1.7x faster than with the LU solves in 2D
+	// (3x3 blocks), 1.25x in 3D (6x6; PERFORMANCE.md). Their rounding doesn't limit the accuracy of the solution: the
+	// smoother is a part of the preconditioner (the outer Krylov method checks the true residual); the blocks of an SPD
+	// matrix are invertible.
 	BlockDiagonalSolver _diagBlockSolver;
 
 	// The inverses of the diagonal coefficients (blocks of size 1) and the work vectors of the iterations (kept from one
@@ -55,12 +56,6 @@ private:
 	};
 	Precision<double> _double;
 	Precision<float> _single;
-	const FloatSparseMatrix* _singleMatrix = nullptr; // the matrix in single precision (SetupSinglePrecision())
-	// On several processes, the matrix in single precision distributed by rows (_singleMatrix: its block Diag); null on one
-	const DistributedMatrixOf<float>* _singleDistributed = nullptr;
-	// The matrix stored by blocks (block CSR, SetupBlockCSR()), in double or in single precision; null: in CSR
-	const BlockSparseMatrix<double>* _blockMatrix = nullptr;
-	const BlockSparseMatrix<float>* _singleBlockMatrix = nullptr;
 
 	template <typename T>
 	Precision<T>& In()
@@ -80,46 +75,6 @@ private:
 			return _double;
 	}
 
-	template <typename T>
-	const SparseMatrixOf<T>& MatrixOf() const
-	{
-		if constexpr (std::is_same_v<T, float>)
-			return *_singleMatrix;
-		else
-			return *this->Matrix;
-	}
-
-	// The distributed matrix in precision T (null on one process)
-	template <typename T>
-	const DistributedMatrixOf<T>* DistributedOf() const
-	{
-		if constexpr (std::is_same_v<T, float>)
-			return _singleDistributed;
-		else
-			return this->Distributed;
-	}
-
-	template <typename T>
-	const BlockSparseMatrix<T>* BlockMatrixOf() const
-	{
-		if constexpr (std::is_same_v<T, float>)
-			return _singleBlockMatrix;
-		else
-			return _blockMatrix;
-	}
-
-	// The numbers of rows and of non-zeros (stored coefficients) of the matrix in precision T, in CSR or block CSR
-	template <typename T>
-	BigNumber Rows() const
-	{
-		return BlockMatrixOf<T>() ? BlockMatrixOf<T>()->Rows() : MatrixOf<T>().rows();
-	}
-
-	template <typename T>
-	BigNumber NonZeros() const
-	{
-		return BlockMatrixOf<T>() ? BlockMatrixOf<T>()->NonZeros() : MatrixOf<T>().nonZeros();
-	}
 public:
 
 	BlockChebyshev(int blockSize, ChebyshevKind kind, double ratio = DefaultRatio)
@@ -575,7 +530,7 @@ private:
 					}
 					if (dOut)
 					{
-						ApplyInverseBlock<T, 0>(I, r_I.data(), z_I.data());
+						_diagBlockSolver.template ApplyInverse<T, 0>(I, r_I.data(), z_I.data());
 						for (int k = 0; k < _blockSize; k++)
 							dOut[i0 + k] = (T)((dIn ? a * dIn[i0 + k] : 0) + c * z_I[k]);
 					}
@@ -625,7 +580,7 @@ private:
 				}
 				if (dOut)
 				{
-					ApplyInverseBlock<T, B>(I, r_I, z_I);
+					_diagBlockSolver.template ApplyInverse<T, B>(I, r_I, z_I);
 					for (int k = 0; k < bs; k++)
 						dOut[i0 + k] = (T)((dIn ? a * dIn[i0 + k] : 0) + c * z_I[k]);
 				}
@@ -635,24 +590,6 @@ private:
 						x[i0 + k] = xEquals0 ? dIn[i0 + k] : x[i0 + k] + dIn[i0 + k];
 				}
 			}
-		}
-	}
-
-	// z_I = D_I^-1 r_I by the inverse of the diagonal block I (blocks of size > 1), summed in double in the order of the
-	// columns of the inverse; B: the block size if it is known at compile time, 0 otherwise
-	template <typename T, int B>
-	inline void ApplyInverseBlock(BigNumber I, const T* r_I, double* z_I) const
-	{
-		const int bs = B > 0 ? B : _blockSize;
-		const T* inverse = _diagBlockSolver.template Block<T>(I);
-		for (int k = 0; k < bs; k++)
-			z_I[k] = 0;
-		for (int l = 0; l < bs; l++)
-		{
-			double r_l = r_I[l];
-			const T* column = inverse + l * bs;
-			for (int k = 0; k < bs; k++)
-				z_I[k] += (double)column[k] * r_l;
 		}
 	}
 
@@ -672,7 +609,7 @@ private:
 			#pragma omp for
 			for (BigNumber I = 0; I < nb; I++)
 			{
-				ApplyInverseBlock<T, 0>(I, r.data() + I * _blockSize, z_I.data());
+				_diagBlockSolver.template ApplyInverse<T, 0>(I, r.data() + I * _blockSize, z_I.data());
 				for (int k = 0; k < _blockSize; k++)
 					z[I * _blockSize + k] = (T)z_I[k];
 			}

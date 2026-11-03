@@ -57,7 +57,8 @@ program too: `-DENABLE_PROGRAM=ON`).
   finer level's last pass), the coarsest cast back to double for MUMPS (`Multigrid::_coarseDistributedOperator`).
   Block CSR (`docs/uamg.md`) as on one process, for `Diag`: `Level::BlockOperator`/`SingleBlockOperator` next to the
   distributed operator (its `Offd`, maps), the products `Multiply(x, diagBlocks)`, `BlockChebyshev::PassBlocks()` with
-  the rows of `Offd` (the sums in the order of CSR: the same results); the float copies of the finest and p-levels'
+  the rows of `Offd` (the sums in the order of CSR: the same results), the Gauss-Seidel sweeps on `Diag` after
+  `SweepRhs()` (`b - Offd x`, in the precision of the level); the float copies of the finest and p-levels'
   operators without `Diag` (`Cast<float>(false)`), the h-levels' keep theirs (assembled).
 - Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
   processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostNumbers faceGhosts)` (local columns: own faces then

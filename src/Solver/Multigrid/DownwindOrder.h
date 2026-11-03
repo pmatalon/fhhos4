@@ -25,14 +25,15 @@ using namespace std;
 // 4 on HArDCore3D's convection-dominated case on 8 threads). The couplings are computed once (stored as the rows of
 // the matrix), the upstream lists filled by contiguous ranges of rows per thread.
 // Empty if no coupling is one-sided (symmetric or diffusion-dominated matrix): the natural order is then kept.
-// nOneSided, nCycleBreaks: statistics, for the log.
-inline vector<BigNumber> DownwindOrder(const SparseMatrix& A, int blockSize, const Vector& interpOfOne, double threshold, BigNumber& nOneSided, BigNumber& nCycleBreaks)
+// nOneSided, nCycleBreaks: statistics, for the log. A of any precision (the couplings computed in double).
+template <typename T>
+vector<BigNumber> DownwindOrder(const SparseMatrixOf<T>& A, int blockSize, const Vector& interpOfOne, double threshold, BigNumber& nOneSided, BigNumber& nCycleBreaks)
 {
 	BigNumber nb = A.rows() / blockSize;
 	auto c = [&](BigNumber I) { return interpOfOne.rows() > 0 ? interpOfOne[I] : 1.0; };
 	const SparseMatrixIndex* outer = A.outerIndexPtr();
 	const SparseMatrixIndex* col = A.innerIndexPtr();
-	const double* val = A.valuePtr();
+	const T* val = A.valuePtr();
 
 	// Couplings -c_I c_J a_IJ of the first DoFs, I != J, stored as rows (by increasing J: the rows of A are sorted by
 	// column), and the maximum of each row

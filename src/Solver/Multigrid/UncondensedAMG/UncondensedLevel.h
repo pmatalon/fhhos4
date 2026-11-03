@@ -178,7 +178,7 @@ public:
 
 	// Mixed precision: the levels in single precision (UncondensedLevelOf<float>) run the flat coarsening passes with the
 	// chained coarsening prolongations (and, checked by UncondensedAMG, the Galerkin operators, the p-levels before the
-	// h-levels only, on one process, for a symmetric matrix)
+	// h-levels only)
 	bool MixedPrecisionApplies(H_CoarsStgy coarseningStgy, FaceCoarseningStrategy faceCoarseningStgy) const
 	{
 		return FlatPassesApply(coarseningStgy, faceCoarseningStgy) && _multigridProlong == UAMGProlongation::ChainedCoarseningProlongations;
@@ -1812,13 +1812,17 @@ public:
 	}
 
 	// Non-symmetric matrix: the downwind order of the faces, followed by all the sweeps of the smoothers (pre- and
-	// post-smoothing) if some couplings are one-sided (convection), the natural order otherwise
+	// post-smoothing) if some couplings are one-sided (convection), the natural order otherwise. From the operator in
+	// double, or in single precision on the h-levels in single precision (which have no other).
 	void SetupDownwindOrder()
 	{
 		if (Symmetric || !DownwindOrdering || this->IsCoarsestLevel())
 			return;
 		BigNumber nOneSided, nCycleBreaks;
-		_downwindOrder = DownwindOrder(*this->OperatorMatrix, _faceBlockSize, FaceInterpOfOne, _strongCouplingThreshold, nOneSided, nCycleBreaks);
+		if (this->OperatorMatrix)
+			_downwindOrder = DownwindOrder(*this->OperatorMatrix, _faceBlockSize, FaceInterpOfOne, _strongCouplingThreshold, nOneSided, nCycleBreaks);
+		else
+			_downwindOrder = DownwindOrder(*this->SingleOperatorMatrix, _faceBlockSize, FaceInterpOfOne, _strongCouplingThreshold, nOneSided, nCycleBreaks);
 		Utils::Log() << "\t\tDownwind order      : ";
 		if (_downwindOrder.empty())
 			Utils::Log() << "none (no one-sided coupling): natural order" << endl;

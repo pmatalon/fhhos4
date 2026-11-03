@@ -98,7 +98,7 @@ private:
 
 		Vector xNew(xOld.rows());
 		Vector distributedRhs;
-		const Vector& rhs = SweepRhs(b, xOld, xEquals0, distributedRhs); // on several processes, b - Offd xOld
+		const Vector& rhs = SweepRhs(b, xOld, xEquals0, distributedRhs, this->Distributed); // on several processes, b - Offd xOld
 
 		#pragma omp parallel
 		{

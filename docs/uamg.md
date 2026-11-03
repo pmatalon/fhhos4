@@ -110,8 +110,9 @@ ADR-0010. `Solver::MixedPrecision` (library default true), `Multigrid::MixedPrec
 - The setup is the double one (blocks, couplings, local matrices of the operators, prolongations of the passes,
   operators of the p-levels), its results stored in float as produced: the coarse operators assembled in float
   (`LocalMatrices::Assemble<T>()`), the transfers and the p-levels' operators rounded (`SparseMatrixOps::Cast`), the
-  smoothers set up from the float operators (`BlockChebyshev`, `BlockDiagonalSolver`: factorizations in double, stored
-  in float).
+  smoothers set up from the float operators (`BlockChebyshev`, `BlockGaussSeidel`, `GaussSeidel`,
+  `BlockDiagonalSolver`: factorizations in double, stored in float; the l1 terms, and the downwind order of the
+  h-levels, from the float values).
 - `UncondensedLevelOf<T>` (T: the precision of the cycle's matrices; the non-template base `UncondensedLevel` holds the
   options, the blocks and `LocalOp`), `Multigrid::CycleIn<T>`; the double instantiation is bitwise the former code.
 - The only copy: the finest operator in float (`UncondensedAMG::_singleA`); the p-levels' operators in double are
@@ -120,10 +121,16 @@ ADR-0010. `Solver::MixedPrecision` (library default true), `Multigrid::MixedPrec
 - Out of the cycle, in double: `A` (A x for the outer Krylov method: a parallel full product, FCG's own being
   sequential), the residuals and x: each cycle corrects the residual of the current x (iterative refinement:
   `Krylov::None`, non-zero initial guesses).
-- Supported (`UncondensedAMG::MixedPrecisionApplies()`): a symmetric matrix (on several processes too: `docs/mpi.md`),
-  the flat passes with the chained prolongations and the Galerkin operators, no option needing `A_F_F`
-  (p-levels after h-levels), the Chebyshev smoothers, no zero-mean/compatibility conditions nor exports; otherwise the
-  levels are in double (the reason logged).
+- The smoothers in single precision (`IterativeSolver::SolveInSinglePrecision()`, the storages `_singleMatrix`...):
+  the vectors and matrices in float, the sums in double, rounded when stored. Gauss-Seidel (`BlockGaussSeidel` and its
+  hybrid and l1 variants; `GaussSeidel` on the levels of degree 0): its kernels templated on the precision; the block
+  solves by `BlockDiagonalSolver::ApplyInverse()` on the right-hand side in double (the LU solves in float with
+  `-diag-block-solve lu`).
+- Supported (`UncondensedAMG::MixedPrecisionApplies()`): symmetric and non-symmetric matrices (on several processes
+  too: `docs/mpi.md`), the flat passes with the chained prolongations and the Galerkin operators, no option needing
+  `A_F_F` (p-levels after h-levels), the Chebyshev and Gauss-Seidel smoothers (of the block size of the finest level
+  and scalar), no zero-mean/compatibility conditions nor exports; otherwise the levels are in double (the reason
+  logged).
 
 ## Block CSR storage
 
@@ -132,15 +139,18 @@ program `-uamg-bcsr`.
 - The operator of the cycle of the levels whose faces have several DoFs (but the coarsest) stored by dense blocks,
   column-major, one column index per block (`Level::BlockOperator`/`SingleBlockOperator`, built by
   `UncondensedLevelOf::OnStartSetup()` from the operator in double; in mixed precision instead of the CSR copy in float,
-  in double a copy). Used by the Chebyshev smoothers (`BlockChebyshev::PassBlocks()`, Lanczos) and
-  `Level::ResidualOf()/Apply()`. On several processes, `Diag` (`Offd`, whose columns are ghosts, stays in CSR).
+  in double a copy). Used by the Chebyshev smoothers (`BlockChebyshev::PassBlocks()`, Lanczos), the block Gauss-Seidel
+  (`BlockGaussSeidel::BlockRowRhs()`; the hybrid chunks by ranges of blocks, `HybridChunks::Setup(BlockSparseMatrix)`)
+  and `Level::ResidualOf()/Apply()`. On several processes, `Diag` (`Offd`, whose columns are ghosts, stays in CSR).
 - Block sizes per block row (`BlockStart`: variable degrees, a future need), all the same today; kernels templated on
   the block size, instances for 2, 3, 4, 5, 6, 9, 10, 15, 16 (`DispatchBlockSize()`, once per pass) and a run-time-size
   one (any, variable).
-- The passes sum in the order of the CSR ones; Lanczos' products differ (Eigen 5's sparse product sums with two
-  accumulators): results equal to rounding, the same iterations.
+- The passes and sweeps sum in the order of the CSR ones (the Gauss-Seidel sweeps: the results of CSR, bit for bit);
+  Lanczos' and the residuals' products differ (Eigen 5's sparse product sums with two accumulators): results equal to
+  rounding, the same iterations.
 - Inverses of the diagonal blocks in the block smoothers (`DiagBlockSolveMethod::Inverse`, computed in double;
-  `ApplyInverseBlock()`, fused in the passes): Chebyshev, Gauss-Seidel (hybrid too), SOR, Jacobi
+  `BlockDiagonalSolver::ApplyInverse()` in Chebyshev, fused in the passes, and in Gauss-Seidel in single precision):
+  Chebyshev, Gauss-Seidel (hybrid too), SOR, Jacobi
   (`BlockDiagonalSolver::SmootherMethod`); the block Jacobi smoothing of the coarsening's prolongations keeps the LU
   solves (`DefaultMethod`); `-diag-block-solve lu|inv` forces both. Never in the static condensation (ADR-0009).
 

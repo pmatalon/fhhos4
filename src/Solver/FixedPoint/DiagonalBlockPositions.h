@@ -15,7 +15,9 @@ struct DiagonalBlockPositions
 	vector<SparseMatrixIndex> Begin;
 	vector<SparseMatrixIndex> End;
 
-	void Setup(const SparseMatrix& A, int blockSize)
+	// A of any precision (the arrays of its pattern only)
+	template <typename T>
+	void Setup(const SparseMatrixOf<T>& A, int blockSize)
 	{
 		// Uncompressed, the row i doesn't end at outerIndexPtr()[i + 1]
 		if (!A.isCompressed())

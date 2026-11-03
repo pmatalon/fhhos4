@@ -104,13 +104,37 @@ private:
 	}
 
 public:
-	// After a setup in double: the blocks i of 'blocks' factorized again, D_i being diagonalBlock(i) (in double)
-	template <class DiagonalBlock>
+	DiagBlockSolveMethod Method() const
+	{
+		return _method;
+	}
+
+	// After a setup in precision T: the blocks i of 'blocks' factorized again, D_i being diagonalBlock(i) (in double)
+	template <typename T, class DiagonalBlock>
 	void Refactorize(const vector<BigNumber>& blocks, DiagonalBlock diagonalBlock)
 	{
 		#pragma omp parallel for
 		for (BigNumber q = 0; q < (BigNumber)blocks.size(); q++)
-			Factorize<double>(blocks[q], diagonalBlock(blocks[q]));
+			Factorize<T>(blocks[q], diagonalBlock(blocks[q]));
+	}
+
+	// z = D_i^-1 r by the inverse of the block i (DiagBlockSolveMethod::Inverse) stored in precision T, summed in double in
+	// the order of the columns of the inverse; B: the block size if it is known at compile time, 0 otherwise. r: in T, or
+	// in double (sums not rounded yet).
+	template <typename T, int B, typename R>
+	inline void ApplyInverse(BigNumber i, const R* r, double* z) const
+	{
+		const int bs = B > 0 ? B : _blockSize;
+		const T* inverse = Block<T>(i);
+		for (int k = 0; k < bs; k++)
+			z[k] = 0;
+		for (int l = 0; l < bs; l++)
+		{
+			double r_l = r[l];
+			const T* column = inverse + l * bs;
+			for (int k = 0; k < bs; k++)
+				z[k] += (double)column[k] * r_l;
+		}
 	}
 
 	// x = D_i^{-1} b (b can have several columns), in the precision of b and x (that of the matrix of the setup).

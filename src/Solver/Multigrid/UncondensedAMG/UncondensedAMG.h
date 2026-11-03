@@ -354,33 +354,35 @@ private:
 	}
 
 	// Mixed precision: the levels in single precision run the default options (UncondensedLevel::MixedPrecisionApplies(),
-	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels; a symmetric matrix) and
-	// smoothers that have a single precision version (Chebyshev), without the zero-mean and compatibility conditions nor
-	// the exports of the multigrid. Otherwise the levels are in double (the reason printed).
+	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels) and smoothers that have
+	// a single precision version (Chebyshev, Gauss-Seidel), without the zero-mean and compatibility conditions nor the
+	// exports of the multigrid. Otherwise the levels are in double (the reason printed).
 	bool MixedPrecisionApplies(const UncondensedLevel& fine) const
 	{
+		// Those of the blocks of the finest level and of the levels of degree 0 (scalar: the scalar Gauss-Seidel)
 		auto smootherSupports = [this](SmootherType type, int iterations)
 		{
-			return unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, this->BlockSizeForBlockSmoothers, this->RelaxationParameter))->SupportsSinglePrecision();
+			bool supports = true;
+			for (int blockSize : { this->BlockSizeForBlockSmoothers, 1 })
+				supports = supports && unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, blockSize, this->RelaxationParameter))->SupportsSinglePrecision();
+			return supports;
 		};
 		string unsupported;
-		if (!_symmetric)
-			unsupported = "a non-symmetric matrix";
-		else if (!fine.MixedPrecisionApplies(this->H_CS, this->FaceCoarseningStgy) || !this->UseGalerkinOperator || A_F_FNeeded())
+		if (!fine.MixedPrecisionApplies(this->H_CS, this->FaceCoarseningStgy) || !this->UseGalerkinOperator || A_F_FNeeded())
 			unsupported = "the coarsening options other than the flat passes with the chained coarsening prolongations, the Galerkin operators and the p-levels before the h-levels";
 		else if (this->ApplyZeroMeanCondition || this->EnforceCompatibilityCondition)
 			unsupported = "the zero-mean and compatibility conditions";
 		else if (this->ExportComponents || this->ExportIterationVectors)
 			unsupported = "the exports of the multigrid";
 		else if (!smootherSupports(this->PreSmoother, this->PreSmoothingIterations) || !smootherSupports(this->PostSmoother, this->PostSmoothingIterations))
-			unsupported = "smoothers without a single precision version (the Chebyshev smoothers have one)";
+			unsupported = "smoothers without a single precision version (the Chebyshev and Gauss-Seidel smoothers have one)";
 		if (!unsupported.empty())
 			Utils::Log() << "\tLevels in double precision: the mixed precision does not support " << unsupported << endl;
 		return unsupported.empty();
 	}
 
-	// The block CSR storage in double (BlockCSRStorage): with smoothers that support it (Chebyshev); otherwise in CSR (the
-	// reason printed)
+	// The block CSR storage in double (BlockCSRStorage): with smoothers that support it (Chebyshev, block Gauss-Seidel);
+	// otherwise in CSR (the reason printed)
 	bool BlockCSRApplies() const
 	{
 		if (_faceBlockSize == 1) // no level has blocks
@@ -391,7 +393,7 @@ private:
 		};
 		bool applies = smootherSupports(this->PreSmoother, this->PreSmoothingIterations) && smootherSupports(this->PostSmoother, this->PostSmoothingIterations);
 		if (!applies)
-			Utils::Log() << "\tOperators in CSR: the block CSR storage requires smoothers that support it (the Chebyshev smoothers)" << endl;
+			Utils::Log() << "\tOperators in CSR: the block CSR storage requires smoothers that support it (the Chebyshev and block Gauss-Seidel smoothers)" << endl;
 		return applies;
 	}
 
