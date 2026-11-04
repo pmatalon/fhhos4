@@ -113,10 +113,13 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 
 # 3. How to use
 
-Pass the blocks of the uncondensed matrix, `A_TT, A_TF, A_FF` for a symmetric system (and `A_FT` for a non-symmetric
-one), and the two blocks of the right-hand side `b_T, b_F`. The library condenses the system internally and solves it for both the
-cell and face unknowns `x_T, x_F`. This way, your code doesn't have to implement any static condensation process, and gets the complete
-hybrid solution directly.
+Your code assembles the uncondensed system, i.e.
+- the matrix blocks `A_TT, A_TF, A_FF` for a symmetric system, and `A_FT` for a non-symmetric one,
+- the two blocks of the right-hand side `(b_T, b_F)`, without the DoFs of the Dirichlet faces (moved to the right-hand side).
+
+That's it, no static condensation.
+The library condenses the system internally and solves it for both the
+cell and face unknowns `(x_T, x_F)`.
 
 Krylov methods are included: `fhhos4` is meant to be used directly as a solver. It can also be used as a preconditioner for an outer Krylov method.
 
@@ -136,15 +139,9 @@ Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size());
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
 
-Your code assembles the uncondensed system, without the DoFs of the Dirichlet faces (moved to the right-hand side:
-`b_T -= A_TD x_D`, `b_F -= A_FD x_D`), and nothing else: no static condensation. The blocks are Eigen matrices, read
+The blocks are Eigen matrices, read
 in place, in the format of the library: `fhhos4::SparseMatrix` (row-major, compressed), or an Eigen map of your own
-arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy). The library condenses the system,
-solves the condensed system and computes the cell unknowns, `x_T = A_TT^{-1} (b_T - A_TF x_F)`. The condensed matrix is
-available for other uses: `CondensedMatrix()` (an Eigen map, on one process), `ApplyCondensedMatrix(x, y)` (the product
-`y = A x`, on any number of processes), and `Solve(b, x)` solves the condensed system for a
-right-hand side `b` condensed by your code or by `CondenseRHS()` (see [As a preconditioner](#as-a-preconditioner)). The setup builds the levels once: call `Solve()` for each right-hand side.
-The blocks may be freed after the setup.
+arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy).
 
 ### Non-symmetric systems
 
