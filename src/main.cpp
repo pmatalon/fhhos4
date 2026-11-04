@@ -1267,8 +1267,8 @@ int Run(int argc, char* argv[])
 					argument_error("-cheb-ratio argument must be > 1.");
 				break;
 			case OPT_GaussSeidelL1:
-				IterativeSolver::L1Theta = atof(optarg);
-				if (!(IterativeSolver::L1Theta >= 0))
+				args.Solver.MG.L1Theta = atof(optarg);
+				if (!(args.Solver.MG.L1Theta >= 0))
 					argument_error("-gs-l1 argument must be >= 0.");
 				break;
 			case OPT_Restart:

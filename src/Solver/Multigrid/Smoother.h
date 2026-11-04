@@ -215,7 +215,7 @@ public:
 class BlockGaussSeidelSmoother : public Smoother
 {
 public:
-	BlockGaussSeidelSmoother(int blockSize, Direction direction, bool hybrid, int nSmoothingIterations, bool l1 = false) : Smoother(new BlockGaussSeidel(blockSize, direction, hybrid, l1), nSmoothingIterations) {}
+	BlockGaussSeidelSmoother(int blockSize, Direction direction, bool hybrid, int nSmoothingIterations, double l1Theta = 0) : Smoother(new BlockGaussSeidel(blockSize, direction, hybrid, l1Theta), nSmoothingIterations) {}
 };
 
 // Number of smoothing iterations: the degree of the polynomial
@@ -229,5 +229,5 @@ class GaussSeidelSmoother : public Smoother
 {
 public:
 	GaussSeidelSmoother(Direction direction, int nSmoothingIterations) : Smoother(new GaussSeidel(direction), nSmoothingIterations) {}
-	GaussSeidelSmoother(Direction direction, bool hybrid, int nSmoothingIterations, bool l1 = false) : Smoother(new GaussSeidel(direction, hybrid, l1), nSmoothingIterations) {}
+	GaussSeidelSmoother(Direction direction, bool hybrid, int nSmoothingIterations, double l1Theta = 0) : Smoother(new GaussSeidel(direction, hybrid, l1Theta), nSmoothingIterations) {}
 };

@@ -144,7 +144,8 @@ Your code assembles the uncondensed system, without the DoFs of the Dirichlet fa
 in place, in the format of the library: `fhhos4::SparseMatrix` (row-major, compressed), or an Eigen map of your own
 arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy). The library condenses the system,
 solves the condensed system and computes the cell unknowns, `x_T = A_TT^{-1} (b_T - A_TF x_F)`. The condensed matrix is
-available for other uses: `CondensedMatrix()` (an Eigen map), and `Solve(b, x)` solves the condensed system for a
+available for other uses: `CondensedMatrix()` (an Eigen map, on one process), `ApplyCondensedMatrix(x, y)` (the product
+`y = A x`, on any number of processes), and `Solve(b, x)` solves the condensed system for a
 right-hand side `b` condensed by your code or by `CondenseRHS()` (see [As a preconditioner](#as-a-preconditioner)). The setup builds the levels once: call `Solve()` for each right-hand side.
 The blocks may be freed after the setup.
 
@@ -172,24 +173,26 @@ method working on the condensed system:
 solver.Krylov = fhhos4::Krylov::None;                 // disable Krylov method in fhhos4
 solver.MaxIterations = 1;                             // one cycle per application
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
-fhhos4::SparseMatrixMap A = solver.CondensedMatrix(); // get the condensed matrix computed by fhhos4
 Eigen::VectorXd b(b_F.size());
 solver.CondenseRHS(b_T, b_F, b);                      // b: the condensed right-hand side
 
 // Your Krylov method on A x_F = b
-Eigen::VectorXd x_F = Eigen::VectorXd::Zero(b.size()), r = b, z(b.size()), p, Ap;
+Eigen::VectorXd x_F = Eigen::VectorXd::Zero(b.size()), r = b, z(b.size()), p, Ap(b.size());
 while (r.norm() > tolerance * b.norm())
 {
     z.setZero();
     solver.Solve(r, z); // the preconditioner, z = M^{-1} r: one cycle
     p = ...;            // the new search direction, from z
-    Ap = A * p;         // the matrix-vector product (Eigen)
+    solver.ApplyCondensedMatrix(p, Ap); // the matrix-vector product, Ap = A p
     ...                 // the updates of x_F and r
 }
 
 Eigen::VectorXd x_T(b_T.size());
 solver.SolveCellUnknowns(b_T, x_F, x_T); // use fhhos4 to solve the cell unknowns at the end
 ```
+
+On several processes, the same calls with the vectors of the faces of each process (the dot products of your Krylov
+method summed over the processes). On one process, `CondensedMatrix()` gives the matrix itself (an Eigen map).
 
 The default K-cycle is non-linear, which means that your Krylov method **must be flexible** (FCG, FGMRES, GCR).
 V- and W-cycles work with any Krylov method (CG, GMRES), but are not recommended for performance reasons.
@@ -216,6 +219,7 @@ solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, fhhos4::Ghos
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the cells and faces of the process
 ```
 
+- **`A_FF` in full** on several processes (both triangles; a triangular one is refused).
 - **The faces of a process**: its own faces first, in the order of the rows of `A_FF`, then its ghosts, in any order:
   one numbering for the columns of `A_TF` and `A_FF`, whose ghosts are all the faces of other processes in these rows
   (those of its cells, and those coupled to its faces in `A_FF` through the cells of other processes). This is the
@@ -235,7 +239,19 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
 - Available on several processes: the uncondensed system (`SetupSym()`, `SetupNonSym()`), with all the
   parameters; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread), Jacobi
   between the processes, which can diverge (e.g. in 3D at degree 2 or more), except in the l1 ones (the default).
-  Not yet: `CondensedMatrix()`.
+  `CondensedMatrix()`: one process only (its products: `ApplyCondensedMatrix()`).
+- **Global columns**: if your blocks have the global numbers of the faces (and cells) as columns, `LocalColumnsSym()`
+  and `LocalColumnsNonSym()` (copies, no communication) number them locally and give the ghosts:
+  ```cpp
+  // A_TF, A_FF: the rows of the process; the DoF k of the face f is the column f * faceBlockSize + k
+  fhhos4::DistributedBlocks blocks = fhhos4::LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize);
+  solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne,
+                  fhhos4::GhostNumbers(blocks.FaceGhosts.size(), blocks.FaceGhosts.data()));
+  // Non-symmetric: LocalColumnsNonSym(A_TF, A_FT, A_FF, firstFace, firstCell, faceBlockSize, cellBlockSize), whose
+  // CellGhosts are the cellGhosts of SetupNonSym()
+  ```
+  `firstFace`: the global number of the first face of the process (`firstCell`, of its first cell); the ghosts by
+  increasing global number.
 - **Threads**: with several threads per process, give MUMPS's BLAS one thread (e.g. `BLIS_NUM_THREADS=1` with
   conda-forge's MUMPS, which uses BLIS; `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1` for others): a threaded BLAS
   (BLIS starts its threads at each call) makes the many small products of the coarsest solves much slower. MUMPS
@@ -285,7 +301,9 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   returns a copy (`fhhos4.CSRMatrix`). The arrays of a `fhhos4.CSRMatrix`
   (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.
 - The helpers have the same names: `ExtractBlocksSym(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
-  dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`.
+  dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`,
+  `LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize)` and `LocalColumnsNonSym()` (their `FaceGhosts` and
+  `CellGhosts`: read-only `int64` NumPy arrays, the `faceGhosts` and `cellGhosts` of the setups).
 - The errors raise `fhhos4.Error`, a `RuntimeError`.
 - The setups, solves and helpers release the GIL.
 - Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), `solver.Comm` not set: one process, as
@@ -312,7 +330,9 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 
 - **The blocks** `A_TT` (cells x cells), `A_TF` (cells x faces), `A_FF` (faces x faces), and `A_FT` (faces x cells) for
   a non-symmetric matrix. The DoFs of each cell (resp. face) are contiguous, cells and faces in any order. In a
-  symmetric system, `A_TT` and `A_FF` are read from their lower triangular part.
+  symmetric system on one process, `A_TT` and `A_FF` are read from their lower triangular part (lower-only or full);
+  otherwise in full (`A_FF` on several processes, all the blocks of a non-symmetric system). A triangular block where
+  both triangles are read (or an upper triangular one where the lower is) is refused.
 - **The format of the matrices**: Eigen sparse matrices, compressed, row-major, with the index type of the library
   (`fhhos4::SparseIndex`: `int`, or 64 bits with `-DSMALL_INDEX=OFF`): `fhhos4::SparseMatrix`, or an Eigen map of your
   own CSR arrays, `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)`, the columns
@@ -384,8 +404,9 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `Cycle` | `Cycle::K` | <ul><li>`V`</li><li>`W`</li><li>`K`: non-linear: a Krylov method around it must be flexible (FCG, GCR, FGMRES)</li></ul> |
 | `PCoarsening` | `PCoarsening::Minus2` | Degrees of the p-levels, from `FaceDegree` k: <ul><li>`Minus2`: k, k-2, ..., 0</li><li>`Minus1`: k, k-1, ..., 0</li><li>`ToZero`: k, 0, for bases not ordered by degree (more iterations from k = 3)</li></ul> |
 | `PreSmoothingIterations`, `PostSmoothingIterations` | `2` for Chebyshev (its degree), else `1` | Any value `>= 0` (`0`: none) |
-| `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` if symmetric, else `L1HybridBlockGaussSeidel` | One block per face: <ul><li>`BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel`: sequential</li><li>`HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel`: parallel</li><li>`L1HybridBlockGaussSeidel`, `L1HybridBackwardBlockGaussSeidel`: parallel, l1 Gauss-Seidel (the diagonal of the rows coupled to other threads or processes increased by half the sum of the \|a_ij\| of these couplings): convergent whatever the numbers of threads and processes</li><li>`DampedBlockJacobi`: damping 2/3</li><li>`BlockChebyshevFirstKind`, `BlockChebyshevFourthKind`: parallel, symmetric matrices only</li></ul> |
+| `PreSmoother` | `Smoother::Default`: `BlockChebyshevFourthKind` if symmetric, else `L1HybridBlockGaussSeidel` | One block per face: <ul><li>`BlockGaussSeidel`, `BackwardBlockGaussSeidel`, `SymmetricBlockGaussSeidel`: sequential</li><li>`HybridBlockGaussSeidel`, `HybridBackwardBlockGaussSeidel`: parallel</li><li>`L1HybridBlockGaussSeidel`, `L1HybridBackwardBlockGaussSeidel`: parallel, l1 Gauss-Seidel (the diagonal of the rows coupled to other threads or processes increased by `L1Theta` times the sum of the \|a_ij\| of these couplings): convergent whatever the numbers of threads and processes</li><li>`DampedBlockJacobi`: damping 2/3</li><li>`BlockChebyshevFirstKind`, `BlockChebyshevFourthKind`: parallel, symmetric matrices only</li></ul> |
 | `PostSmoother` | `Smoother::Default`: the adjoint of `PreSmoother` (symmetric cycle) | Same as `PreSmoother` |
+| `L1Theta` | `0.5` | `>= 0`: the factor of the l1 terms of the `L1Hybrid...` smoothers (the sum of the \|a_ij\| of the couplings to other threads or processes added to the diagonal). From `0.5`, convergent for a symmetric matrix whatever the partition; smaller values may save iterations where the hybrid sweeps converge (`0`: `HybridBlockGaussSeidel`) |
 | `Prolongation` | `Prolongation::HarmonicExtension` | Values of the faces interior to an aggregate: <ul><li>`HarmonicExtension`: solve their rows of the condensed matrix (shorter setup)</li><li>`Reconstruction`: the article's, from the coarse cell, then one damped Jacobi iteration</li></ul> |
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
 | `CoarseMatrixMaxSize` | `1000` | Maximum number of rows of the coarsest matrix |

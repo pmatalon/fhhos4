@@ -7,6 +7,7 @@
 #include <memory>
 #include <random>
 #include <vector>
+#include "ProgramArguments.h"
 #include "Solver/FixedPoint/BlockGaussSeidel.h"
 #include "Solver/FixedPoint/GaussSeidel.h"
 #include "Utils/SparseMatrixOps.h"
@@ -143,19 +144,22 @@ namespace
 		return x;
 	}
 
-	// One iteration of Gauss-Seidel (scalar if blockSize = 1), not set up
+	// The theta of the l1 Gauss-Seidel: the default (Multigrid::L1Theta)
+	constexpr double L1Theta = 0.5;
+
+	// One iteration of Gauss-Seidel (scalar if blockSize = 1), not set up; l1: l1 Gauss-Seidel, theta L1Theta
 	std::unique_ptr<IterativeSolver> NewGaussSeidel(int blockSize, bool hybrid, Direction direction, const std::vector<BigNumber>* order, bool l1 = false)
 	{
 		std::unique_ptr<IterativeSolver> gs;
 		if (blockSize == 1)
 		{
-			GaussSeidel* scalar = new GaussSeidel(direction, hybrid, l1);
+			GaussSeidel* scalar = new GaussSeidel(direction, hybrid, l1 ? L1Theta : 0);
 			scalar->SweepOrder = order;
 			gs.reset(scalar);
 		}
 		else
 		{
-			BlockGaussSeidel* block = new BlockGaussSeidel(blockSize, direction, hybrid, l1);
+			BlockGaussSeidel* block = new BlockGaussSeidel(blockSize, direction, hybrid, l1 ? L1Theta : 0);
 			block->SweepOrder = order;
 			gs.reset(block);
 		}
@@ -304,13 +308,13 @@ TEST(HybridGaussSeidelTest, NumberOfThreadsChangesBetweenSolves)
 	}
 }
 
-// The l1 Gauss-Seidel (L1HybridBlockGaussSeidel: the l1 terms, IterativeSolver::L1Theta, of the (block) rows coupled to
+// The l1 Gauss-Seidel (L1HybridBlockGaussSeidel: the l1 terms, theta L1Theta, of the (block) rows coupled to
 // other chunks), scalar and in blocks, on 4 threads; when the number of threads changes between two solves, the blocks
 // with l1 terms follow it (none on 1 thread: the sequential sweep)
 TEST(HybridGaussSeidelTest, L1GaussSeidel)
 {
-	double theta = IterativeSolver::L1Theta;
-	EXPECT_EQ(theta, 0.5);
+	double theta = L1Theta;
+	EXPECT_EQ(MultigridArguments().L1Theta, theta);
 	{
 		Threads threads(4);
 		ForEachCase([theta](const SparseMatrix& A, int blockSize, const std::vector<BigNumber>* order, Direction direction, const Vector& b, const Vector& x0, bool xEquals0, const std::string& description)

@@ -14,31 +14,31 @@ protected:
 	int _blockSize;
 	Direction _direction;
 	bool _hybrid = false;
-	bool _l1 = false; // l1 Gauss-Seidel (see IterativeSolver::L1Theta)
+	double _l1Theta = 0; // > 0: l1 Gauss-Seidel, the factor theta of its l1 terms (see IterativeSolver::L1Terms())
 
 	BlockDiagonalSolver diagBlockSolver; // solves the systems with the diagonal blocks
 	DiagonalBlockPositions _diagBlock;   // positions of the diagonal block in each row (in CSR)
 	// For each block row, whether its rows have the same non-zero pattern (always the case for the HHO matrices; in CSR)
 	vector<char> _samePattern;
 	HybridChunks _chunks; // of the hybrid sweeps (see Chunks())
-	// The l1 term of each row (see L1Theta) in the factorized diagonal blocks; empty: none
+	// The l1 term of each row (see _l1Theta) in the factorized diagonal blocks; empty: none
 	Vector _l1Terms;
 public:
 	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the block rows in this order: the
 	// downwind order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
 	const vector<BigNumber>* SweepOrder = nullptr;
 
-	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid, bool l1 = false)
+	BlockGaussSeidel(int blockSize, Direction direction, bool hybrid, double l1Theta = 0)
 	{
 		this->_blockSize = blockSize;
 		this->_direction = direction;
 		this->_hybrid = hybrid;
-		this->_l1 = l1;
+		this->_l1Theta = l1Theta;
 	}
 
 	virtual void Serialize(ostream& os) const override
 	{
-		if (_l1)
+		if (_l1Theta > 0)
 			os << "l1 ";
 		if (_hybrid)
 			os << "Hybrid ";
@@ -419,7 +419,7 @@ private:
 		return _chunks;
 	}
 
-	// The l1 terms (L1Theta, if l1) of the rows coupled to other processes, and to other chunks if the hybrid sweeps run
+	// The l1 terms (if _l1Theta > 0) of the rows coupled to other processes, and to other chunks if the hybrid sweeps run
 	// in parallel; the diagonal blocks whose l1 terms change factorized again
 	void SetupL1Terms()
 	{
@@ -432,7 +432,7 @@ private:
 	template <typename T>
 	void SetupL1Terms()
 	{
-		double theta = _l1 ? L1Theta : 0;
+		double theta = _l1Theta;
 		if (theta == 0 && _l1Terms.size() == 0)
 			return;
 		BigNumber n = Rows<T>();

@@ -2,7 +2,9 @@
 # system of test_module.py distributed by rows, through mpi4py, against SciPy's direct solver on the whole system. The
 # cells of each process: horizontal strips; each face owned by the process of the smaller rank of its cells; the cells
 # and faces renumbered in rank order; the ghost faces (and cells of A_FT) of each process numbered in reverse order (any
-# order). Also with the process of rank 0 empty, and non-symmetric.
+# order). Also with the process of rank 0 empty, non-symmetric, and the blocks numbered locally by LocalColumnsSym() and
+# LocalColumnsNonSym() (the ghosts in increasing order). The condensed system (CondenseRHS(), Solve(b, x),
+# SolveCellUnknowns(), ApplyCondensedMatrix()) too.
 # Skipped (exit code 77) if the module is compiled without MPI, or without mpi4py.
 import os
 import sys
@@ -20,7 +22,7 @@ except ImportError:
     print("mpi4py is not installed: skipped")
     sys.exit(77)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from test_module import HybridSystem, RelativeError
+from test_module import HybridSystem, RelativeError, ToSciPy
 
 
 def Renumbering(ranks, nRanks):
@@ -31,7 +33,7 @@ def Renumbering(ranks, nRanks):
     return renumbering
 
 
-def DistributedSystem(emptyRank0, asymmetry=0.0):
+def DistributedSystem(emptyRank0, asymmetry=0.0, helpers=False):
     comm = MPI.COMM_WORLD
     rank, P = comm.Get_rank(), comm.Get_size()
     n = 48
@@ -73,7 +75,22 @@ def DistributedSystem(emptyRank0, asymmetry=0.0):
 
     ghosts = ghostsOf(np.concatenate([rowsTF.indices, rowsFF.indices]), faceBegin, nOwnFaces)
     cellGhosts = ghostsOf(rowsFT.indices, cellBegin, nOwnCells)
+    if helpers:
+        ghosts, cellGhosts = np.sort(ghosts), np.sort(cellGhosts)
     faceColumns = lambda rows: localColumns(rows, ghosts, faceBegin, nOwnFaces)
+    localA_TF, localA_FF, localA_FT = faceColumns(rowsTF), faceColumns(rowsFF), localColumns(rowsFT, cellGhosts, cellBegin, nOwnCells)
+    if helpers:
+        tf, ft, ff = (M.sorted_indices() for M in (rowsTF, rowsFT, rowsFF))
+        if asymmetry == 0:
+            blocks = fhhos4.LocalColumnsSym(tf, ff, faceBegin, 1)
+        else:
+            blocks = fhhos4.LocalColumnsNonSym(tf, ft, ff, faceBegin, cellBegin, 1, 1)
+        assert np.array_equal(blocks.FaceGhosts, ghosts) and np.array_equal(blocks.CellGhosts, cellGhosts if asymmetry != 0 else [])
+        assert (ToSciPy(blocks.A_TF) != localA_TF).nnz == 0 and (ToSciPy(blocks.A_FF) != localA_FF).nnz == 0
+        if asymmetry != 0:
+            assert (ToSciPy(blocks.A_FT) != localA_FT).nnz == 0
+            localA_FT, cellGhosts = blocks.A_FT, blocks.CellGhosts
+        localA_TF, localA_FF, ghosts = blocks.A_TF, blocks.A_FF, blocks.FaceGhosts
 
     solver = fhhos4.Solver()
     solver.Comm = comm
@@ -84,10 +101,9 @@ def DistributedSystem(emptyRank0, asymmetry=0.0):
     localA_TT = A_TT[ownCells][:, ownCells].tocsr()
     localA_TT.sort_indices()
     if asymmetry == 0:
-        solver.SetupSym(localA_TT, faceColumns(rowsTF), faceColumns(rowsFF), np.ones(nOwnCells), np.ones(nOwnFaces), ghosts)
+        solver.SetupSym(localA_TT, localA_TF, localA_FF, np.ones(nOwnCells), np.ones(nOwnFaces), ghosts)
     else:
-        localA_FT = localColumns(rowsFT, cellGhosts, cellBegin, nOwnCells)
-        solver.SetupNonSym(localA_TT, faceColumns(rowsTF), localA_FT, faceColumns(rowsFF), np.ones(nOwnCells), np.ones(nOwnFaces), ghosts, cellGhosts)
+        solver.SetupNonSym(localA_TT, localA_TF, localA_FT, localA_FF, np.ones(nOwnCells), np.ones(nOwnFaces), ghosts, cellGhosts)
     assert solver.IsSetUp() and solver.NumberOfLevels() > 1
     x_T, x_F = np.zeros(nOwnCells), np.zeros(nOwnFaces)
     result = solver.Solve(b_T[ownCells].copy(), b_F[ownFaces].copy(), x_T, x_F)
@@ -95,6 +111,29 @@ def DistributedSystem(emptyRank0, asymmetry=0.0):
     allX = np.concatenate(comm.allgather(x_T) + comm.allgather(x_F))
     reference = spla.spsolve(sp.bmat([[A_TT, A_TF], [A_FT, A_FF]]).tocsc(), np.concatenate([b_T, b_F]))
     assert RelativeError(allX, reference) < 1e-8
+    # The condensed system: the same solution; ApplyCondensedMatrix(), the rows of the process of the condensed matrix of
+    # the whole system
+    b, y_F, y_T = np.empty(nOwnFaces), np.zeros(nOwnFaces), np.empty(nOwnCells)
+    solver.CondenseRHS(b_T[ownCells].copy(), b_F[ownFaces].copy(), b)
+    assert solver.Solve(b, y_F).Converged
+    solver.SolveCellUnknowns(b_T[ownCells].copy(), y_F, y_T)
+    assert RelativeError(np.concatenate(comm.allgather(y_T) + comm.allgather(y_F)), reference) < 1e-8
+    x, Ax = np.linspace(-1, 2, nFaces), np.empty(nOwnFaces)
+    solver.ApplyCondensedMatrix(x[ownFaces].copy(), Ax)
+    assert RelativeError(np.concatenate(comm.allgather(Ax)), (PF @ system.A @ PF.T) @ x) < 1e-13
+    if asymmetry == 0 and P > 1:
+        # A_FF lower triangular on the last process (here diagonal: one coupling added), read in full on several
+        # processes: refused on all of them
+        lowerA_FF = faceColumns(rowsFF).tolil()
+        if rank == P - 1:
+            lowerA_FF[1, 0] = -0.1
+        lowerA_FF = lowerA_FF.tocsr()
+        lowerA_FF.sort_indices()
+        try:
+            solver.SetupSym(localA_TT, faceColumns(rowsTF), lowerA_FF, np.ones(nOwnCells), np.ones(nOwnFaces), ghosts)
+            assert False, "a lower triangular A_FF accepted on several processes"
+        except fhhos4.Error as e:
+            assert "lower triangular" in str(e), e
     # An error on one process only is raised on all of them
     wrong = np.ones(nOwnFaces + (1 if rank == P - 1 else 0))
     try:
@@ -117,6 +156,13 @@ def test_nonsymmetric_system():
     """SetupNonSym(): A_FT with the ghost cells of its rows (cellGhosts)"""
     DistributedSystem(emptyRank0=False, asymmetry=0.3)
     DistributedSystem(emptyRank0=True, asymmetry=0.3)
+
+
+def test_local_columns_helpers():
+    """The blocks with global columns numbered locally by LocalColumnsSym() and LocalColumnsNonSym()"""
+    for asymmetry in (0.0, 0.3):
+        DistributedSystem(emptyRank0=False, asymmetry=asymmetry, helpers=True)
+        DistributedSystem(emptyRank0=True, asymmetry=asymmetry, helpers=True)
 
 
 if __name__ == "__main__":

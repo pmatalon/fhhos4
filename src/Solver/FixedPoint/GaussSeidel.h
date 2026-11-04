@@ -11,10 +11,10 @@ class GaussSeidel : public IterativeSolver
 protected:
 	Direction _direction;
 	bool _hybrid = false; // see HybridSweep()
-	bool _l1 = false;     // l1 Gauss-Seidel (see IterativeSolver::L1Theta)
+	double _l1Theta = 0;  // > 0: l1 Gauss-Seidel, the factor theta of its l1 terms (see IterativeSolver::L1Terms())
 	vector<SparseMatrixIndex> _diagPos; // position of the diagonal coefficient of each row in the arrays of the matrix
 	HybridChunks _chunks; // of the hybrid sweeps (see Chunks())
-	// The l1 term of each row (see L1Theta), added to its diagonal coefficient; empty: none
+	// The l1 term of each row (see _l1Theta), added to its diagonal coefficient; empty: none
 	Vector _l1Terms;
 public:
 	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the rows in this order: the downwind
@@ -23,16 +23,16 @@ public:
 
 	GaussSeidel() : GaussSeidel(Direction::Forward) {}
 
-	GaussSeidel(Direction direction, bool hybrid = false, bool l1 = false)
+	GaussSeidel(Direction direction, bool hybrid = false, double l1Theta = 0)
 	{
 		this->_direction = direction;
 		this->_hybrid = hybrid;
-		this->_l1 = l1;
+		this->_l1Theta = l1Theta;
 	}
 
 	virtual void Serialize(ostream& os) const override
 	{
-		if (_l1)
+		if (_l1Theta > 0)
 			os << "l1 ";
 		if (_hybrid)
 			os << "Hybrid ";
@@ -160,7 +160,7 @@ private:
 		this->SetupComputationalWork = 0;
 	}
 
-	// The l1 terms (L1Theta, if l1) of the rows coupled to other processes, and to other chunks if the hybrid sweeps run
+	// The l1 terms (if _l1Theta > 0) of the rows coupled to other processes, and to other chunks if the hybrid sweeps run
 	// in parallel
 	void SetupL1Terms()
 	{
@@ -174,9 +174,9 @@ private:
 	void SetupL1Terms()
 	{
 		_l1Terms = Vector();
-		if (!_l1)
+		if (_l1Theta == 0)
 			return;
-		Vector terms = L1Terms<T>(L1Theta, [&](Vector& sums)
+		Vector terms = L1Terms<T>(_l1Theta, [&](Vector& sums)
 		{
 			if (_hybrid && _chunks.Parallel())
 				_chunks.AddExternalAbsoluteSums(MatrixOf<T>(), sums);

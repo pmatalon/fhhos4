@@ -66,9 +66,11 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 // asymmetry != 0. singular: the pure Neumann system (SingularMatrix; the right-hand side incompatible: projected),
 // the solutions compared up to the kernel (the constants, of each component). components: the system on each of them
 // (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision, blockCSR:
-// MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). Returns the iterations on the
-// processes; setupLog: the printouts of their setup (Verbosity 2, on the root process) if not null.
-int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false)
+// MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). localColumnsHelpers: the blocks with
+// local columns by LocalColumnsSym() or LocalColumnsNonSym() from their global columns (the ghosts by increasing global
+// numbers), checked against the test's. Returns the iterations on the processes; setupLog: the printouts of their setup
+// (Verbosity 2, on the root process) if not null.
+int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool localColumnsHelpers = false)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, asymmetry, singular);
@@ -80,6 +82,7 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 
 	// One process: the whole system
 	Vector expectedX_T(b_T.rows()), expectedX_F = Vector::Zero(b_F.rows());
+	Vector allX = Vector::LinSpaced(b_F.rows(), -1, 2), expectedAx(b_F.rows()); // ApplyCondensedMatrix()
 	int expectedIterations;
 	{
 		fhhos4::Solver solver = CartesianSolver(MPI_COMM_SELF);
@@ -96,6 +99,7 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 		else
 			solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes);
 		expectedIterations = solver.Solve(b_T, b_F, expectedX_T, expectedX_F).Iterations;
+		solver.ApplyCondensedMatrix(allX, expectedAx);
 	}
 
 	// The faces of the rows of the process (of A_TF and A_FF): its own, then the others; the cells of A_FT: the same
@@ -106,6 +110,27 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	fhhos4::SparseMatrix A_TT = OnEachComponent(system.A_TT, c), A_TF = OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c);
 	fhhos4::SparseMatrix A_FF = OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c), A_FT = OnEachComponent(LocalColumns(ownA_FT, cells, ghostCells), c);
 	vector<int64_t> faceGhosts(ghostFaces.begin(), ghostFaces.end()), cellGhosts(ghostCells.begin(), ghostCells.end());
+	if (localColumnsHelpers)
+	{
+		fhhos4::SparseMatrix rowsTF = OnEachComponent(ownA_TF, c), rowsFF = OnEachComponent(ownA_FF, c), rowsFT = OnEachComponent(ownA_FT, c);
+		fhhos4::DistributedBlocks blocks = asymmetry == 0 ? fhhos4::LocalColumnsSym(rowsTF, rowsFF, faces.Begin, c)
+		                                                  : fhhos4::LocalColumnsNonSym(rowsTF, rowsFT, rowsFF, faces.Begin, cells.Begin, c, c);
+		sort(ghostFaces.begin(), ghostFaces.end());
+		sort(ghostCells.begin(), ghostCells.end());
+		faceGhosts.assign(ghostFaces.begin(), ghostFaces.end());
+		cellGhosts = asymmetry == 0 ? vector<int64_t>() : vector<int64_t>(ghostCells.begin(), ghostCells.end());
+		EXPECT_EQ(blocks.FaceGhosts, faceGhosts);
+		EXPECT_EQ(blocks.CellGhosts, cellGhosts);
+		EXPECT_EQ(SparseMatrix(blocks.A_TF - OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c)).norm(), 0);
+		EXPECT_EQ(SparseMatrix(blocks.A_FF - OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c)).norm(), 0);
+		if (asymmetry == 0)
+			EXPECT_EQ(blocks.A_FT.rows(), 0);
+		else
+			EXPECT_EQ(SparseMatrix(blocks.A_FT - OnEachComponent(LocalColumns(ownA_FT, cells, ghostCells), c)).norm(), 0);
+		A_TF = blocks.A_TF;
+		A_FF = blocks.A_FF;
+		A_FT = blocks.A_FT;
+	}
 
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	solver.Prolongation = prolongation;
@@ -147,6 +172,10 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	}
 	EXPECT_LE((allX_F - expectedX_F).norm(), 1e-8 * expectedX_F.norm());
 	EXPECT_LE((allX_T - expectedX_T).norm(), 1e-8 * expectedX_T.norm());
+	// The product by the condensed matrix of the processes: that of the whole system
+	Vector Ax(c * faces.NOwned);
+	solver.ApplyCondensedMatrix(allX.segment(c * faces.Begin, c * faces.NOwned), Ax);
+	EXPECT_LE((Gathered(Ax) - expectedAx).norm(), 1e-13 * expectedAx.norm());
 	if (World().IsRoot())
 		cout << "\t" << World().Size() << " processes: " << result.Iterations << " iterations (" << expectedIterations << " on one)" << endl;
 	return result.Iterations;
@@ -231,6 +260,15 @@ TEST(DistributedLibrary, BlockCSR)
 	}
 }
 
+// LocalColumnsSym(), LocalColumnsNonSym(): the blocks of each process with global columns, numbered locally (and the
+// ghosts), on 1 and 2 components
+TEST(DistributedLibrary, LocalColumnsHelpers)
+{
+	for (double asymmetry : { 0.0, 0.3 })
+		for (int components : { 1, 2 })
+			ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, components, true, nullptr, false, true);
+}
+
 // The inputs are checked on all the processes: an error on one of them is an error on all of them
 TEST(DistributedLibrary, CollectiveErrors)
 {
@@ -248,6 +286,22 @@ TEST(DistributedLibrary, CollectiveErrors)
 		faceOnes = Vector::Ones(system.Faces->NOwned + 1);
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	EXPECT_THROW(solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data())), fhhos4::Error);
+	// A_FF lower triangular on the last process (as SetupSym() reads it on one process; here diagonal: one coupling
+	// added), read in full on several processes
+	faceOnes = Vector::Ones(system.Faces->NOwned);
+	fhhos4::SparseMatrix lowerA_FF = A_FF;
+	if (World().Rank() == World().Size() - 1 && lowerA_FF.rows() > 1)
+		lowerA_FF.coeffRef(1, 0) = -0.1;
+	lowerA_FF.makeCompressed();
+	try
+	{
+		solver.SetupSym(A_TT, A_TF, lowerA_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
+		ADD_FAILURE() << "a lower triangular A_FF accepted on several processes";
+	}
+	catch (const fhhos4::Error& e)
+	{
+		EXPECT_NE(string(e.what()).find("lower triangular"), string::npos) << e.what();
+	}
 	// Without Comm: each process alone, which refuses the inputs of a distributed system, the ghosts or the columns of
 	// ghost faces in A_FF (here those of A_TF: none on rank 0, which owns the faces between the processes), and tells to
 	// set Comm

@@ -53,12 +53,12 @@ private:
 			return new BlockSORSmoother(blockSize, omega, direction, nSmootherIterations);
 	}
 
-	// l1: the rows coupled to other threads or processes in l1 Gauss-Seidel
-	static Smoother* HybridBlockGaussSeidel(int blockSize, Direction direction, int nSmootherIterations, bool l1 = false)
+	// l1Theta > 0: the rows coupled to other threads or processes in l1 Gauss-Seidel, theta l1Theta
+	static Smoother* HybridBlockGaussSeidel(int blockSize, Direction direction, int nSmootherIterations, double l1Theta = 0)
 	{
 		if (blockSize == 1) // the scalar kernels are faster
-			return new GaussSeidelSmoother(direction, true, nSmootherIterations, l1);
-		return new BlockGaussSeidelSmoother(blockSize, direction, true, nSmootherIterations, l1);
+			return new GaussSeidelSmoother(direction, true, nSmootherIterations, l1Theta);
+		return new BlockGaussSeidelSmoother(blockSize, direction, true, nSmootherIterations, l1Theta);
 	}
 
 public:
@@ -96,7 +96,8 @@ public:
 		       smoother == SmootherType::ChebyshevFourthKind || smoother == SmootherType::BlockChebyshevFourthKind;
 	}
 
-	static Smoother* Create(SmootherType smoother, int nSmootherIterations, int blockSize, double omega)
+	// l1Theta: the theta of the l1 Gauss-Seidel smoothers (L1HybridBlockGaussSeidel...)
+	static Smoother* Create(SmootherType smoother, int nSmootherIterations, int blockSize, double omega, double l1Theta)
 	{
 		switch (smoother)
 		{
@@ -132,9 +133,9 @@ public:
 			case SmootherType::HybridBackwardBlockGaussSeidel:
 				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations);
 			case SmootherType::L1HybridBlockGaussSeidel:
-				return HybridBlockGaussSeidel(blockSize, Direction::Forward, nSmootherIterations, true);
+				return HybridBlockGaussSeidel(blockSize, Direction::Forward, nSmootherIterations, l1Theta);
 			case SmootherType::L1HybridBackwardBlockGaussSeidel:
-				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations, true);
+				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations, l1Theta);
 
 			case SmootherType::Jacobi:
 				return new BlockJacobiSmoother(1, omega, nSmootherIterations);

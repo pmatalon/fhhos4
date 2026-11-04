@@ -214,6 +214,7 @@ public:
 		mg->PreSmoothingIterations = args.Solver.MG.PreSmoothingIterations;
 		mg->PostSmoothingIterations = args.Solver.MG.PostSmoothingIterations;
 		mg->RelaxationParameter = args.Solver.RelaxationParameter;
+		mg->L1Theta = args.Solver.MG.L1Theta;
 		mg->BlockSizeForBlockSmoothers = blockSize;
 		mg->CoarseLevelChangeSmoothingCoeff = args.Solver.MG.CoarseLevelChangeSmoothingCoeff;
 		mg->CoarseLevelChangeSmoothingOperator = args.Solver.MG.CoarseLevelChangeSmoothingOperator;

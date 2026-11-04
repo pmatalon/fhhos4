@@ -182,6 +182,7 @@ program `-uamg-bcsr`.
   ADR-0018): the rows coupled to other parts get their l1 term, theta sum_j |a_ij| over those couplings
   (`IterativeSolver::L1Terms()`: the rows of `Offd`, `HybridChunks::AddExternalAbsoluteSums()`), on their diagonal (in
   the factorized blocks, refactorized when the chunks change: `SetupL1Terms()`; in the scalar kernels,
-  `GaussSeidel::Diagonal()`), and times the old x_i in the right-hand side (`SweepRhs()`). theta:
-  `IterativeSolver::L1Theta`, 1/2 (program `-gs-l1`): M + M^T - A >= D for a symmetric A, whatever the parts. No row
-  has an l1 term on one thread and one process.
+  `GaussSeidel::Diagonal()`), and times the old x_i in the right-hand side (`SweepRhs()`). theta: each smoother's
+  (`_l1Theta`, 0: no l1 terms), from `Multigrid::L1Theta` through `SmootherFactory::Create()` (library `L1Theta`, program
+  `-gs-l1`), 1/2 by default: M + M^T - A >= D for a symmetric A, whatever the parts. No row has an l1 term on one thread
+  and one process.

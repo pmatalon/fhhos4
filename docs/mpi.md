@@ -62,13 +62,16 @@ program too: `-DENABLE_PROGRAM=ON`).
   operators without `Diag` (`Cast<float>(false)`), the h-levels' keep theirs (assembled).
 - Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
   processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostNumbers faceGhosts)` (local columns: own faces then
-  ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full), `SetupNonSym(..., faceGhosts, cellGhosts)`
+  ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full: a triangular one refused, `CheckTriangles()`),
+  `SetupNonSym(..., faceGhosts, cellGhosts)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
   process may own nothing (NGSolve 6.2.2608's rank 0). `SingularMatrix`: the kernel on the own faces, the dot products
-  global, the pinned DoF of the coarsest level (one per component) on one process (`docs/uamg.md`). Not yet: `CondensedMatrix()`. Python:
-  `docs/python.md`.
+  global, the pinned DoF of the coarsest level (one per component) on one process (`docs/uamg.md`).
+  `ApplyCondensedMatrix()`: `DistributedA * x`. `LocalColumnsSym()`/`NonSym()`: the blocks of a process from their
+  global columns, no communication (`docs/library.md`). Not yet: `CondensedMatrix()` (its columns may reach beyond
+  `faceGhosts`: those of the received rows). Python: `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only. The mesh of each
   process is its part (`GMSHMesh`, built when `Communicator::Current()` is distributed). The partition (`OpenPart()`:
   METIS, `Mesh.PartitionCreateGhostCells`, GMSH's split files `part_<rank + 1>.msh`) is kept in the cache directory
@@ -101,7 +104,8 @@ program too: `-DENABLE_PROGRAM=ON`).
 
 ## Tests
 
-`fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes; `tests/support/PartitionedSystem.h`;
+`fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes, also in the release workflow;
+`tests/support/PartitionedSystem.h`;
 `MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; 3D k=0
 `-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps; `ProgramMPI_PartitionCache_*`: a partition written,

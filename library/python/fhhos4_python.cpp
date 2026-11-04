@@ -349,6 +349,21 @@ NB_MODULE(fhhos4, m)
 		.def_prop_ro("A_FT", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FT; }, nb::rv_policy::reference_internal)
 		.def_prop_ro("A_FF", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FF; }, nb::rv_policy::reference_internal);
 
+	using DistributedBlocks = fhhos4::detail::DistributedBlocks;
+	// The ghosts: read-only int64 NumPy arrays of the library's memory, which keep the blocks alive
+	auto ghostsOf = [](nb::handle blocks, const fhhos4::detail::IndexArray& numbers)
+	{
+		fhhos4::GhostNumbers v = numbers.View();
+		size_t shape[1] = { (size_t)v.Count };
+		return nb::ndarray<nb::numpy, const std::int64_t, nb::ndim<1>>(v.Numbers, 1, shape, blocks);
+	};
+	nb::class_<DistributedBlocks>(m, "DistributedBlocks", "The blocks of the rows of a process with their columns numbered locally, and its ghosts, owned by the library")
+		.def_prop_ro("A_TF", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_TF; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("A_FT", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FT; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("A_FF", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FF; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("FaceGhosts", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).FaceGhosts); })
+		.def_prop_ro("CellGhosts", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).CellGhosts); });
+
 	//------------------------------------------------ Helpers -----------------------------------------------//
 
 	m.def("ExtractBlocksSym", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
@@ -364,6 +379,24 @@ NB_MODULE(fhhos4, m)
 			nb::gil_scoped_release release;
 			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractBlocksNonSym(v, c, f); }); });
 		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its global matrix, for SetupNonSym()");
+
+	m.def("LocalColumnsSym", [](nb::handle A_TF, nb::handle A_FF, std::int64_t firstFace, int faceBlockSize)
+		{
+			PyCSRView a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
+			fhhos4::detail::CSRView tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
+			nb::gil_scoped_release release;
+			return fhhos4::detail::LocalColumns(tf, nullptr, ff, firstFace, 0, faceBlockSize, 1);
+		}, "A_TF"_a, "A_FF"_a, "firstFace"_a, "faceBlockSize"_a,
+		"A copy: the blocks of a process with global columns (the DoF k of the face f: f * faceBlockSize + k), their columns numbered locally (its faces from firstFace, then its ghosts FaceGhosts), for SetupSym()");
+
+	m.def("LocalColumnsNonSym", [](nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, std::int64_t firstFace, std::int64_t firstCell, int faceBlockSize, int cellBlockSize)
+		{
+			PyCSRView a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
+			fhhos4::detail::CSRView tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
+			nb::gil_scoped_release release;
+			return fhhos4::detail::LocalColumns(tf, &ft, ff, firstFace, firstCell, faceBlockSize, cellBlockSize);
+		}, "A_TF"_a, "A_FT"_a, "A_FF"_a, "firstFace"_a, "firstCell"_a, "faceBlockSize"_a, "cellBlockSize"_a,
+		"A copy: as LocalColumnsSym(), with A_FT (the DoF k of the cell c: the column c * cellBlockSize + k; its ghost cells CellGhosts), for SetupNonSym()");
 
 	m.def("Gather", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
 		{
@@ -425,6 +458,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("PostSmoothingIterations", &fhhos4::Solver::PostSmoothingIterations)
 		.def_rw("PreSmoother", &fhhos4::Solver::PreSmoother)
 		.def_rw("PostSmoother", &fhhos4::Solver::PostSmoother)
+		.def_rw("L1Theta", &fhhos4::Solver::L1Theta)
 		.def_rw("Prolongation", &fhhos4::Solver::Prolongation)
 		.def_rw("CoarseningFactor", &fhhos4::Solver::CoarseningFactor)
 		.def_rw("CoarseMatrixMaxSize", &fhhos4::Solver::CoarseMatrixMaxSize)
@@ -472,6 +506,9 @@ NB_MODULE(fhhos4, m)
 			"b_T"_a.noconvert(), "b_F"_a.noconvert(), "b"_a.noconvert(), noGIL)
 		.def("SolveCellUnknowns", [](PySolver& s, const ConstVector& b_T, const ConstVector& x_F, Vector x_T) { s.SolveCellUnknowns(b_T, x_F, x_T); },
 			"b_T"_a.noconvert(), "x_F"_a.noconvert(), "x_T"_a.noconvert(), noGIL)
+		// y = A x (A: the condensed matrix); y: a NumPy vector of float64, written in place
+		.def("ApplyCondensedMatrix", [](PySolver& s, const ConstVector& x, Vector y) { s.ApplyCondensedMatrix(x, y); },
+			"x"_a.noconvert(), "y"_a.noconvert(), noGIL)
 
 		// A copy of the condensed matrix (fhhos4.CSRMatrix)
 		.def("CondensedMatrix", [](const PySolver& s) { return fhhos4::detail::ToCSR(s.CondensedView()); })

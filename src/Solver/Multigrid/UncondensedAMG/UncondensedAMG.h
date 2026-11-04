@@ -364,7 +364,7 @@ private:
 		{
 			bool supports = true;
 			for (int blockSize : { this->BlockSizeForBlockSmoothers, 1 })
-				supports = supports && unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, blockSize, this->RelaxationParameter))->SupportsSinglePrecision();
+				supports = supports && unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, blockSize, this->RelaxationParameter, this->L1Theta))->SupportsSinglePrecision();
 			return supports;
 		};
 		string unsupported;
@@ -389,7 +389,7 @@ private:
 			return false;
 		auto smootherSupports = [this](SmootherType type, int iterations)
 		{
-			return unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, this->BlockSizeForBlockSmoothers, this->RelaxationParameter))->SupportsBlockCSR();
+			return unique_ptr<Smoother>(SmootherFactory::Create(type, iterations, this->BlockSizeForBlockSmoothers, this->RelaxationParameter, this->L1Theta))->SupportsBlockCSR();
 		};
 		bool applies = smootherSupports(this->PreSmoother, this->PreSmoothingIterations) && smootherSupports(this->PostSmoother, this->PostSmoothingIterations);
 		if (!applies)

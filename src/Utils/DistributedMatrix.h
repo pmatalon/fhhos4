@@ -69,8 +69,15 @@ public:
 	static DistributedMatrix FromGlobalColumns(shared_ptr<const IndexMap> rowMap, const IndexMap& colOwners, const SparseMatrix& rows, int rowBlockSize, int colBlockSize)
 	{
 		assert(rows.rows() == rowMap->NOwned * rowBlockSize);
-		// The entities of the columns not owned, each one once per thread (sorted and unique), then merged
-		BigNumber first = colOwners.Begin * colBlockSize, end = (colOwners.Begin + colOwners.NOwned) * colBlockSize;
+		vector<BigNumber> ghosts = ColumnGhosts(rows, colOwners.Begin * colBlockSize, (colOwners.Begin + colOwners.NOwned) * colBlockSize, colBlockSize);
+		auto colMap = make_shared<const IndexMap>(colOwners, std::move(ghosts));
+		return FromGlobalColumns(rowMap, colMap, rows, rowBlockSize, colBlockSize);
+	}
+
+	// The entities (blocks of colBlockSize columns) of the columns of rows outside [first, end): each one once per thread
+	// (sorted and unique in the list of each thread), the lists of the threads concatenated. One parallel pass.
+	static vector<BigNumber> ColumnGhosts(const SparseMatrix& rows, BigNumber first, BigNumber end, int colBlockSize)
+	{
 		ThreadLocal<vector<BigNumber>> ghostsTL;
 		#pragma omp parallel
 		{
@@ -95,11 +102,10 @@ public:
 		vector<BigNumber> ghosts;
 		for (vector<BigNumber>& g : ghostsTL)
 			ghosts.insert(ghosts.end(), g.begin(), g.end());
-		auto colMap = make_shared<const IndexMap>(colOwners, std::move(ghosts));
-		return FromGlobalColumns(rowMap, colMap, rows, rowBlockSize, colBlockSize);
+		return ghosts;
 	}
 
-	// Same, with the column map given (its ghosts must contain the entities of the columns not owned)
+	// FromGlobalColumns(), with the column map given (its ghosts must contain the entities of the columns not owned)
 	static DistributedMatrix FromGlobalColumns(shared_ptr<const IndexMap> rowMap, shared_ptr<const IndexMap> colMap, const SparseMatrix& rows, int rowBlockSize, int colBlockSize)
 	{
 		DistributedMatrix M;

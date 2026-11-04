@@ -8,10 +8,11 @@ Read before a release or a change of the conda recipe, the release workflow or t
 Change the version in `project()` and the release in "Install from source" of `README_library.md` (the clone command,
 the text and the link below it), commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are
 `Release_X.Y.Z`). `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the
-installation and the library alone with 64-bit indices (`SMALL_INDEX=OFF`) and the conda test client, and in a parallel
-job the conda package with its tests, then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag,
-which must not mention HArDCore3D). It pins GMSH, Eigen, CGAL, the compiler and rattler-build to the versions the tests
-were validated with: update them with the local environment (envs `fhhos4` and `rattler`). After a change of
+installation and the library alone with 64-bit indices (`SMALL_INDEX=OFF`) and the conda test client, the library
+with MPI (`ENABLE_MPI`) and its tests on 1-4 processes (`MPI_np*`), and in a parallel job the conda package with its
+tests, then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag, which must not mention
+HArDCore3D). It pins GMSH, Eigen, CGAL, the compiler, MPICH, MUMPS and rattler-build to the versions the tests were
+validated with: update them with the local environment (envs `fhhos4` and `rattler`). After a change of
 `release.yml` or of its pins, run it by hand on master (Actions > Release > Run workflow: no release) before pushing
 the tag; otherwise push the tag directly. After the release, conda-forge's bot updates the feedstock; the Spack package
 needs a PR to spack-packages (`spack checksum --add-to-package fhhos4 X.Y.Z`, then `spack install --test=root` and

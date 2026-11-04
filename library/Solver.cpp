@@ -127,6 +127,51 @@ namespace fhhos4
 				Utils::FatalError(matrix + " is not in the CSR format: in its row " + to_string(firstInvalidRow) + ", the columns are not strictly increasing (duplicates or unsorted: e.g. SciPy's sum_duplicates() sorts them and sums the duplicates), or outside [0, " + to_string(M.Cols) + "), or RowPointers decrease.");
 		}
 
+		// A_TT block diagonal: no non-zero value outside the diagonal blocks of blockSize rows (the cells). One parallel pass.
+		// cellDoFs: the size of the blocks, for the message.
+		void CheckBlockDiagonal(const SparseMatrix& A_TT, int blockSize, const string& cellDoFs)
+		{
+			BigNumber firstInvalidRow = A_TT.rows();
+			#pragma omp parallel for reduction(min:firstInvalidRow) schedule(static)
+			for (BigNumber i = 0; i < A_TT.rows(); i++)
+			{
+				for (SparseMatrix::InnerIterator it(A_TT, i); it; ++it)
+					if (it.col() / blockSize != i / blockSize && it.value() != 0)
+						firstInvalidRow = min(firstInvalidRow, i);
+			}
+			if (firstInvalidRow == A_TT.rows())
+				return;
+			for (SparseMatrix::InnerIterator it(A_TT, firstInvalidRow); it; ++it)
+				if (it.col() / blockSize != firstInvalidRow / blockSize && it.value() != 0)
+					Utils::FatalError("fhhos4::Solver: A_TT has a non-zero (" + to_string(firstInvalidRow) + ", " + to_string(it.col()) + ") outside the diagonal blocks of the cells, with " + cellDoFs + ".");
+		}
+
+		// The triangles of M that the setup reads, in its square part (the columns < M.rows(): on several processes, those of
+		// the faces of the process, in their order): both (readInFull), or the lower one. A triangular matrix where both are
+		// read, or an upper triangular one where the lower is, would silently give another matrix (e.g. A_FF given
+		// lower-only, as SetupSym() reads it on one process, on several processes). One parallel pass. reader: what reads M,
+		// for the message.
+		void CheckTriangles(const SparseMatrix& M, const string& name, bool readInFull, const string& reader)
+		{
+			BigNumber lower = 0, upper = 0;
+			#pragma omp parallel for reduction(+:lower, upper) schedule(static)
+			for (BigNumber i = 0; i < M.rows(); i++)
+			{
+				for (SparseMatrix::InnerIterator it(M, i); it; ++it)
+				{
+					if (it.value() != 0 && it.col() < M.rows())
+					{
+						lower += it.col() < i;
+						upper += it.col() > i;
+					}
+				}
+			}
+			if (readInFull && (lower == 0) != (upper == 0))
+				Utils::FatalError("fhhos4::Solver: " + name + " is " + (lower > 0 ? "lower" : "upper") + " triangular (no non-zero " + (lower > 0 ? "above" : "below") + " its diagonal), but " + reader + " reads it in full (both triangles).");
+			if (!readInFull && lower == 0 && upper > 0)
+				Utils::FatalError("fhhos4::Solver: " + name + " is upper triangular (no non-zero below its diagonal), but " + reader + " reads its lower triangular part: give it lower-only or in full.");
+		}
+
 		// The matrix of a view, read in place, after CheckCSR()
 		unique_ptr<BorrowedSparseMatrix> Borrow(const CSRView& M, const string& name)
 		{
@@ -275,6 +320,8 @@ namespace fhhos4
 				if (!symmetric && SmootherFactory::IsChebyshev(LibraryParameters::ProgramSmoother(smoother)))
 					Utils::FatalError("fhhos4::Solver: the Chebyshev smoothers require a symmetric positive definite matrix: leave PreSmoother and PostSmoother Default for a non-symmetric one.");
 			}
+			if (!(s.L1Theta >= 0))
+				Utils::FatalError("fhhos4::Solver: L1Theta must be >= 0, got " + to_string(s.L1Theta) + ".");
 			if (s.VectorComponents < 1)
 				Utils::FatalError("fhhos4::Solver: VectorComponents must be >= 1 (1 for a scalar problem), got " + to_string(s.VectorComponents) + ".");
 			PolynomialSpaceQ = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
@@ -305,15 +352,10 @@ namespace fhhos4
 			if (cellInterpOfOne.rows() != nCellDoFs / CellBlockSize || faceInterpOfOne.rows() != nFaceDoFs / FaceBlockSize)
 				Utils::FatalError("fhhos4::Solver: the interpolations of 1 on the cells and faces must have one coefficient per cell (" + to_string(nCellDoFs / CellBlockSize) + ": the rows of A_TF, with " + cellDoFs + ") and per face (" + to_string(nFaceDoFs / FaceBlockSize) + ": the columns of A_TF, with " + faceDoFs + "), got " + to_string(cellInterpOfOne.rows()) + " and " + to_string(faceInterpOfOne.rows()) + ".");
 
-			// A_TT is block diagonal
-			for (BigNumber i = 0; i < A_TT.rows(); i++)
-			{
-				for (SparseMatrix::InnerIterator it(A_TT, i); it; ++it)
-				{
-					if (it.col() / CellBlockSize != i / CellBlockSize && it.value() != 0)
-						Utils::FatalError("fhhos4::Solver: A_TT has a non-zero (" + to_string(i) + ", " + to_string(it.col()) + ") outside the diagonal blocks of the cells, with " + cellDoFs + ".");
-				}
-			}
+			CheckBlockDiagonal(A_TT, CellBlockSize, cellDoFs);
+			string reader = Symmetric ? "SetupSym()" : "SetupNonSym()";
+			CheckTriangles(A_TT, "A_TT", !Symmetric, reader);
+			CheckTriangles(A_FF, "A_FF", !Symmetric, reader);
 			CheckInterpOfOne(cellInterpOfOne, "cell");
 			CheckInterpOfOne(faceInterpOfOne, "face");
 		}
@@ -364,6 +406,7 @@ namespace fhhos4
 			mg.PreSmoothingIterations = s.PreSmoothingIterations >= 0 ? s.PreSmoothingIterations : DefaultSmoothingIterations(mg.PreSmoother);
 			// PostSmoother Default: of the type of the pre-smoother
 			mg.PostSmoothingIterations = s.PostSmoothingIterations >= 0 ? s.PostSmoothingIterations : DefaultSmoothingIterations(mg.PostSmoother != SmootherType::Default ? mg.PostSmoother : mg.PreSmoother);
+			mg.L1Theta = s.L1Theta;
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
 			mg.CoarseSolverCode = LibraryParameters::ProgramCoarseSolver(CoarseSolver, Symmetric);
@@ -580,11 +623,9 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: on several processes, A_FT (" + size(*a_FT) + ") has the rows of the faces of the process (those of A_FF, " + size(*a_FF) + "), and the columns of the cells of the process (the rows of A_TF, " + size(*a_TF) + ") then of its " + to_string(cellGhosts.Count) + " ghost cells (cellGhosts).");
 			if (cellInterpOfOne.Size != a_TF->rows() / cbs || faceInterpOfOne.Size != a_FF->rows() / fbs)
 				Utils::FatalError("fhhos4::Solver: on several processes, the interpolations of 1 have the cells (" + to_string(a_TF->rows() / cbs) + ") and faces (" + to_string(a_FF->rows() / fbs) + ") of the process, got " + to_string(cellInterpOfOne.Size) + " and " + to_string(faceInterpOfOne.Size) + ".");
-			// A_TT is block diagonal
-			for (BigNumber i = 0; i < a_TT->rows(); i++)
-				for (SparseMatrix::InnerIterator it(*a_TT, i); it; ++it)
-					if (it.col() / cbs != i / cbs && it.value() != 0)
-						Utils::FatalError("fhhos4::Solver: A_TT has a non-zero (" + to_string(i) + ", " + to_string(it.col()) + ") outside the diagonal blocks of the cells.");
+			CheckBlockDiagonal(*a_TT, cbs, to_string(cbs) + " DoFs per cell");
+			CheckTriangles(*a_TT, "A_TT", !symmetric, symmetric ? "SetupSym()" : "SetupNonSym()");
+			CheckTriangles(*a_FF, "A_FF", true, "on several processes, the setup");
 			Impl::CheckInterpOfOne(Eigen::Map<const Vector>(cellInterpOfOne.Data, cellInterpOfOne.Size), "cell");
 			Impl::CheckInterpOfOne(Eigen::Map<const Vector>(faceInterpOfOne.Data, faceInterpOfOne.Size), "face");
 		});
@@ -704,6 +745,23 @@ namespace fhhos4
 		});
 	}
 
+	void Solver::ApplyCondensedMatrixView(detail::ConstVectorView x, detail::VectorView y)
+	{
+		_impl->CheckSetUp("ApplyCondensedMatrix");
+		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
+		CollectiveCheck(_impl->Comm, [&]()
+		{
+			_impl->CheckVectorSize(x.Size, "x");
+			_impl->CheckVectorSize(y.Size, "y");
+		});
+		Eigen::Map<const Vector> callerX(x.Data, x.Size);
+		Eigen::Map<Vector> callerY(y.Data, y.Size);
+		if (_impl->IsDistributed())
+			callerY = _impl->DistributedA * Vector(callerX);
+		else
+			callerY = _impl->A * callerX; // in a temporary: x and y may be the same vector
+	}
+
 	CSRView Solver::CondensedMatrixView() const
 	{
 		_impl->CheckSetUp("CondensedMatrix");
@@ -749,6 +807,26 @@ namespace fhhos4
 				return CSRView();
 			const SparseMatrix& M = _impl->Matrix;
 			return CSRView(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr());
+		}
+
+		struct IndexArray::Impl
+		{
+			vector<std::int64_t> Numbers;
+		};
+
+		IndexArray::IndexArray() = default;
+		IndexArray::IndexArray(unique_ptr<Impl> impl)
+			: _impl(std::move(impl))
+		{}
+		IndexArray::~IndexArray() = default;
+		IndexArray::IndexArray(IndexArray&&) noexcept = default;
+		IndexArray& IndexArray::operator=(IndexArray&&) noexcept = default;
+
+		GhostNumbers IndexArray::View() const&
+		{
+			if (!_impl)
+				return GhostNumbers();
+			return GhostNumbers(_impl->Numbers.size(), _impl->Numbers.data());
 		}
 	}
 
@@ -864,6 +942,38 @@ namespace fhhos4
 			return blocks;
 		}
 
+		detail::IndexArray OwnNumbers(const vector<BigNumber>& numbers)
+		{
+			auto impl = make_unique<detail::IndexArray::Impl>();
+			impl->Numbers.assign(numbers.begin(), numbers.end());
+			return detail::IndexArray(std::move(impl));
+		}
+
+		// The matrices whose columns are global (the DoF k of the entity e: the column e * blockSize + k) with their columns
+		// numbered locally (local): the entities first, ..., first + nOwned - 1, then the others of their columns, the
+		// ghosts (returned), by increasing global number. The matrices: after CheckCSR().
+		vector<BigNumber> ToLocalColumns(const vector<const SparseMatrix*>& matrices, BigNumber first, BigNumber nOwned, int blockSize, vector<CSRMatrix>& local)
+		{
+			vector<BigNumber> ghosts;
+			for (const SparseMatrix* M : matrices)
+			{
+				vector<BigNumber> g = DistributedMatrix::ColumnGhosts(*M, first * blockSize, (first + nOwned) * blockSize, blockSize);
+				ghosts.insert(ghosts.end(), g.begin(), g.end());
+			}
+			sort(ghosts.begin(), ghosts.end());
+			ghosts.erase(unique(ghosts.begin(), ghosts.end()), ghosts.end());
+			auto localEntity = [&](BigNumber e) -> BigNumber
+			{
+				if (e >= first && e < first + nOwned)
+					return e - first;
+				return nOwned + (lower_bound(ghosts.begin(), ghosts.end(), e) - ghosts.begin());
+			};
+			BigNumber nCols = (nOwned + (BigNumber)ghosts.size()) * blockSize;
+			for (const SparseMatrix* M : matrices)
+				local.push_back(Own(DistributedMatrix::RenumberColumns(*M, localEntity, nCols, blockSize)));
+			return ghosts;
+		}
+
 		void CheckVectorSize(std::int64_t size, std::int64_t expected, const string& vector, const string& of)
 		{
 			if (size != expected)
@@ -883,6 +993,39 @@ namespace fhhos4
 		HybridBlocks ExtractBlocksNonSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 		{
 			return ExtractBlocks(M, cells, faces, false);
+		}
+
+		DistributedBlocks LocalColumns(const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF, std::int64_t firstFace, std::int64_t firstCell, int faceBlockSize, int cellBlockSize)
+		{
+			CallScope scope(0, 0);
+			string function = string("fhhos4::") + (A_FT ? "LocalColumnsNonSym()" : "LocalColumnsSym()");
+			int fbs = faceBlockSize, cbs = cellBlockSize;
+			if (fbs < 1 || (A_FT && cbs < 1))
+				Utils::FatalError(function + ": the block sizes must be >= 1, got " + to_string(fbs) + (A_FT ? " and " + to_string(cbs) : "") + ".");
+			if (firstFace < 0 || (A_FT && firstCell < 0))
+				Utils::FatalError(function + ": the global numbers of the first face and cell of the process must be >= 0, got " + to_string(firstFace) + (A_FT ? " and " + to_string(firstCell) : "") + ".");
+			unique_ptr<BorrowedSparseMatrix> a_TF = Borrow(A_TF, "A_TF"), a_FF = Borrow(A_FF, "A_FF");
+			unique_ptr<BorrowedSparseMatrix> a_FT = A_FT ? Borrow(*A_FT, "A_FT") : nullptr;
+			auto size = [](const SparseMatrix& M) { return to_string(M.rows()) + " x " + to_string(M.cols()); };
+			BigNumber nFaces = a_FF->rows() / fbs;
+			if (a_FF->rows() % fbs != 0 || a_TF->cols() != a_FF->cols() || a_FF->cols() % fbs != 0 || (firstFace + nFaces) * fbs > a_FF->cols())
+				Utils::FatalError(function + ": A_FF (" + size(*a_FF) + ") has the rows of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_FF and A_TF (" + size(*a_TF) + ") the columns of the DoFs of all the faces, among which those of the faces of the process, from the face " + to_string(firstFace) + ".");
+			BigNumber nCells = A_FT ? a_TF->rows() / cbs : 0;
+			if (a_FT && (a_TF->rows() % cbs != 0 || a_FT->rows() != a_FF->rows() || a_FT->cols() % cbs != 0 || (firstCell + nCells) * cbs > a_FT->cols()))
+				Utils::FatalError(function + ": A_FT (" + size(*a_FT) + ") has the rows of A_FF (" + size(*a_FF) + "), and the columns of the DoFs of all the cells (" + to_string(cbs) + " per cell), among which those of the cells of the process (the rows of A_TF, " + size(*a_TF) + "), from the cell " + to_string(firstCell) + ".");
+
+			DistributedBlocks blocks;
+			vector<CSRMatrix> faceColumns;
+			blocks.FaceGhosts = OwnNumbers(ToLocalColumns({ a_TF.get(), a_FF.get() }, firstFace, nFaces, fbs, faceColumns));
+			blocks.A_TF = std::move(faceColumns[0]);
+			blocks.A_FF = std::move(faceColumns[1]);
+			if (a_FT)
+			{
+				vector<CSRMatrix> cellColumns;
+				blocks.CellGhosts = OwnNumbers(ToLocalColumns({ a_FT.get() }, firstCell, nCells, cbs, cellColumns));
+				blocks.A_FT = std::move(cellColumns[0]);
+			}
+			return blocks;
 		}
 
 		template <typename RowPointer, typename Column>

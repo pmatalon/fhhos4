@@ -76,6 +76,7 @@ struct MultigridArguments
 	SmootherType PostSmoother = SmootherType::Default;
 	int PreSmoothingIterations = 1;
 	int PostSmoothingIterations = 1;
+	double L1Theta = 0.5; // -gs-l1: the theta of the l1 Gauss-Seidel smoothers (Multigrid::L1Theta)
 	int CoarseLevelChangeSmoothingCoeff = 0;
 	SmoothingChangeOperator CoarseLevelChangeSmoothingOperator = SmoothingChangeOperator::Add;
 	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;

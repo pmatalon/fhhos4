@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <type_traits>
+#include <vector>
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 #include "fhhos4_error.h"
@@ -29,8 +30,9 @@
 // The Krylov method preconditioned by the AMG is part of the library (Solver::Krylov): with the default K-cycle, the AMG
 // is a non-linear preconditioner (it solves the coarse levels with inner FCG or GCR iterations), which requires a
 // flexible Krylov method: the flexible conjugate gradient (FCG, the default for a symmetric matrix) or GCR. It can also
-// precondition a Krylov method of the calling code on the condensed system (CondensedMatrix(), CondenseRHS(), then
-// SolveCellUnknowns()): Krylov::None, MaxIterations = 1, and Solve(r, z) with z zero, one cycle. With the K-cycle, that
+// precondition a Krylov method of the calling code on the condensed system (CondenseRHS(), the products by
+// ApplyCondensedMatrix(), then SolveCellUnknowns()): Krylov::None, MaxIterations = 1, and Solve(r, z) with z zero, one
+// cycle. With the K-cycle, that
 // method must be flexible (FCG, FGMRES); V- and W-cycles allow any method (CG, GMRES), but perform poorly.
 //
 // The inputs are Eigen objects, read in place, never copied nor converted: the sparse matrices in the format of the
@@ -122,6 +124,20 @@ namespace fhhos4
 			if (!M.isCompressed())
 				throw Error("fhhos4: the Eigen matrix is not compressed: call its makeCompressed() first.");
 			return BasicCSRView<Index, Index>(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr());
+		}
+
+		// The arrays of a matrix given to a setup (or to LocalColumnsSym()...): an Eigen sparse matrix in the format of the
+		// library, read in place
+		template <typename Derived>
+		CSRView LibraryView(const Eigen::SparseCompressedBase<Derived>& M)
+		{
+			constexpr bool format = Derived::IsRowMajor && std::is_same<typename Derived::StorageIndex, SparseIndex>::value;
+			static_assert(format, "fhhos4: the matrices are given in the format of the library: fhhos4::SparseMatrix (row-major, with the index type fhhos4::SparseIndex), or an Eigen::Map of one. Convert this one by Eigen (a copy): fhhos4::SparseMatrix B = A; or, if it is symmetric and column-major, view it with fhhos4::TransposedView(A) (no copy).");
+			static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
+			if constexpr (format)
+				return View<SparseIndex>(M);
+			else
+				return CSRView();
 		}
 
 		// A sparse matrix in the CSR format of the library, owned by the library (allocated and freed by it): the result of
@@ -237,10 +253,10 @@ namespace fhhos4
 		                                // thread: BlockGaussSeidel
 		HybridBackwardBlockGaussSeidel, // hrbgs
 		L1HybridBlockGaussSeidel,       // l1hbgs: HybridBlockGaussSeidel in l1 Gauss-Seidel (Baker et al., SISC 2011): the
-		                                // diagonal of the rows coupled to other threads or processes increased by half
-		                                // the sum of the |a_ij| of these couplings, which keeps it convergent whatever the
-		                                // partition (also at degree 0, the scalar blocks). On 1 thread and 1 process:
-		                                // BlockGaussSeidel
+		                                // diagonal of the rows coupled to other threads or processes increased by
+		                                // Solver::L1Theta (1/2) times the sum of the |a_ij| of these couplings, which keeps
+		                                // it convergent whatever the partition (also at degree 0, the scalar blocks). On 1
+		                                // thread and 1 process: BlockGaussSeidel
 		L1HybridBackwardBlockGaussSeidel, // l1hrbgs
 		DampedBlockJacobi,              // bj23: block Jacobi damped by 2/3. Parallel
 		BlockChebyshevFirstKind,        // bcheb: block Chebyshev, a polynomial in D^-1 A (D: the block diagonal) whose
@@ -338,6 +354,11 @@ namespace fhhos4
 		// (backward and symmetric ones included) follow the downwind order of the level. Jacobi ignores it.
 		fhhos4::Smoother PreSmoother = fhhos4::Smoother::Default;
 		fhhos4::Smoother PostSmoother = fhhos4::Smoother::Default;
+		// The l1 Gauss-Seidel smoothers (L1HybridBlockGaussSeidel, L1HybridBackwardBlockGaussSeidel): the diagonal of the
+		// rows coupled to other threads or processes increased by L1Theta (>= 0) times the sum of the |a_ij| of these
+		// couplings. From 1/2 (the default), convergent for a symmetric matrix whatever the threads and processes;
+		// smaller values may take fewer iterations where the plain hybrid sweeps converge (0: HybridBlockGaussSeidel).
+		double L1Theta = 0.5;
 		// The prolongation of the h-coarsening: from the faces of the boundary of each aggregate to its interior faces
 		fhhos4::Prolongation Prolongation = fhhos4::Prolongation::HarmonicExtension;
 		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
@@ -407,31 +428,31 @@ namespace fhhos4
 		// Solve(b_T, b_F, x_T, x_F) needs: the blocks may be freed after the setup.
 		// A_TT (cells x cells), A_TF (cells x faces), A_FF (faces x faces): the DoFs of each cell (resp. face) are
 		// contiguous, in the order of the rows (resp. columns) of A_TF. A_TT and A_FF are read from their lower triangular
-		// part (full or lower-only matrices). The blocks of A_TT (one per cell) must be positive definite: they are
-		// factorized by Cholesky (fhhos4::Error otherwise).
+		// part (full or lower-only matrices; an upper triangular one is refused). The blocks of A_TT (one per cell) must be
+		// positive definite: they are factorized by Cholesky (fhhos4::Error otherwise).
 		// On several processes (Comm), each one gives the rows of its own cells and faces: A_TT and A_TF the rows of its
-		// cells, A_FF those of its faces, in full (both triangles); the columns of A_TF and A_FF are numbered locally,
-		// in one numbering of the faces of the process: its own faces (those of the rows of A_FF, in their order), then
-		// its ghosts, the other faces of its rows (of its cells, and those coupled to its faces in A_FF through the cells
-		// of other processes), whose global numbers are faceGhosts; the interpolations of 1 on its cells and faces. Each
-		// face belongs to a process that owns one of its cells (e.g. the one of the smaller rank); a process may own no
-		// cell nor face. Then Solve() with the vectors of the cells and faces of the process. On one process, faceGhosts
-		// is empty.
+		// cells, A_FF those of its faces, in full (both triangles: a triangular one is refused); the columns of A_TF and
+		// A_FF are numbered locally, in one numbering of the faces of the process: its own faces (those of the rows of A_FF,
+		// in their order), then its ghosts, the other faces of its rows (of its cells, and those coupled to its faces in A_FF
+		// through the cells of other processes), whose global numbers are faceGhosts; the interpolations of 1 on its cells
+		// and faces. Each face belongs to a process that owns one of its cells (e.g. the one of the smaller rank); a process
+		// may own no cell nor face. Then Solve() with the vectors of the cells and faces of the process. On one process,
+		// faceGhosts is empty. Blocks with global columns: LocalColumnsSym() numbers them locally.
 		template <typename TT, typename TF, typename FF>
 		void SetupSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
 		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
 		                    const GhostNumbers& faceGhosts = GhostNumbers())
 		{
-			Setup(true, View(A_TT), View(A_TF), nullptr, View(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts);
+			Setup(true, detail::LibraryView(A_TT), detail::LibraryView(A_TF), nullptr, detail::LibraryView(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts);
 		}
 
 		// Setup for a non-symmetric system (e.g. convection-diffusion), whose symmetric part is positive definite: as
-		// SetupSym(), with the block A_FT (faces x cells) and all the blocks read in full: the same
-		// algorithm runs on the matrix itself. The couplings of the aggregation are computed from the averaged traces of
-		// the blocks of A_TF and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG: Y. Notay, "An
-		// aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the downwind
-		// order of each level (convection), in the pre- and post-smoothing; the K-cycle iterates with GCR. Krylov must not
-		// be FCG, nor CoarseSolver Cholesky, nor the smoothers Chebyshev.
+		// SetupSym(), with the block A_FT (faces x cells) and all the blocks read in full (a triangular A_TT or A_FF is
+		// refused): the same algorithm runs on the matrix itself. The couplings of the aggregation are computed from the
+		// averaged traces of the blocks of A_TF and A_FT; the coarse operators are the Galerkin products P^T A P (as AGMG:
+		// Y. Notay, "An aggregation-based algebraic multigrid method", ETNA 37, 2010); the Gauss-Seidel smoothers follow the
+		// downwind order of each level (convection), in the pre- and post-smoothing; the K-cycle iterates with GCR. Krylov
+		// must not be FCG, nor CoarseSolver Cholesky, nor the smoothers Chebyshev.
 		// The solver keeps a reference to A_FT, read by each Solve(b_T, b_F, x_T, x_F) (b_F - A_FT A_TT^{-1} b_T): A_FT must
 		// stay alive and unchanged until the next setup or the destruction of the solver (not a temporary matrix). The
 		// other blocks may be freed after the setup.
@@ -446,8 +467,8 @@ namespace fhhos4
 		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
 		                       const GhostNumbers& faceGhosts = GhostNumbers(), const GhostNumbers& cellGhosts = GhostNumbers())
 		{
-			detail::CSRView a_FT = View(A_FT);
-			Setup(false, View(A_TT), View(A_TF), &a_FT, View(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts, cellGhosts);
+			detail::CSRView a_FT = detail::LibraryView(A_FT);
+			Setup(false, detail::LibraryView(A_TT), detail::LibraryView(A_TF), &a_FT, detail::LibraryView(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts, cellGhosts);
 		}
 
 		template <typename TT, typename TF, typename FF, int Options, typename Index>
@@ -490,10 +511,19 @@ namespace fhhos4
 			SolveCellUnknownsView(In(b_T), In(x_F), Out(x_T));
 		}
 
+		// y = A x, the product by the condensed matrix A = A_FF - A_FT A_TT^{-1} A_TF, after a setup: for a Krylov method of
+		// the calling code on the condensed system, on any number of processes (on several: x and y on the faces of the
+		// process). y: output.
+		void ApplyCondensedMatrix(const Eigen::Ref<const Eigen::VectorXd>& x, Eigen::Ref<Eigen::VectorXd> y)
+		{
+			ApplyCondensedMatrixView(In(x), Out(y));
+		}
+
 		//------------------------------------------------------------------//
 
 		// The condensed matrix A of the last setup, both triangles, computed by SetupSym() or SetupNonSym().
-		// Valid until the next setup or the destruction of the solver. On one process only.
+		// Valid until the next setup or the destruction of the solver. On one process only (its products on any number:
+		// ApplyCondensedMatrix()).
 		SparseMatrixMap CondensedMatrix() const
 		{
 			detail::CSRView A = CondensedMatrixView();
@@ -525,19 +555,6 @@ namespace fhhos4
 		struct Impl;
 		std::unique_ptr<Impl> _impl;
 
-		// The arrays of a matrix given to a setup: an Eigen sparse matrix in the format of the library, read in place
-		template <typename Derived>
-		static detail::CSRView View(const Eigen::SparseCompressedBase<Derived>& M)
-		{
-			constexpr bool format = Derived::IsRowMajor && std::is_same<typename Derived::StorageIndex, SparseIndex>::value;
-			static_assert(format, "fhhos4: the matrices are given in the format of the library: fhhos4::SparseMatrix (row-major, with the index type fhhos4::SparseIndex), or an Eigen::Map of one. Convert this one by Eigen (a copy): fhhos4::SparseMatrix B = A; or, if it is symmetric and column-major, view it with fhhos4::TransposedView(A) (no copy).");
-			static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
-			if constexpr (format)
-				return detail::View<SparseIndex>(M);
-			else
-				return detail::CSRView();
-		}
-
 		void SetupDistributed(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
 		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhosts,
 		                      const GhostNumbers& cellGhosts);
@@ -545,6 +562,7 @@ namespace fhhos4
 		Result SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F);
 		void CondenseRHSView(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView b);
 		void SolveCellUnknownsView(detail::ConstVectorView b_T, detail::ConstVectorView x_F, detail::VectorView x_T);
+		void ApplyCondensedMatrixView(detail::ConstVectorView x, detail::VectorView y);
 	};
 
 	//------------------------------------------------------------------------------------------------------------------//
@@ -569,6 +587,13 @@ namespace fhhos4
 		SparseMatrix A_TT, A_TF, A_FT, A_FF; // A_FT: empty (0 x 0) for a symmetric system
 	};
 
+	// The blocks of the rows of a process with their columns numbered locally, and its ghosts: see LocalColumnsSym()
+	struct DistributedBlocks
+	{
+		SparseMatrix A_TF, A_FT, A_FF;                    // A_FT: empty (0 x 0) for a symmetric system
+		std::vector<std::int64_t> FaceGhosts, CellGhosts; // CellGhosts (of A_FT): empty for a symmetric system
+	};
+
 	namespace detail
 	{
 		// The blocks in the arrays of the library
@@ -576,6 +601,38 @@ namespace fhhos4
 		{
 			CSRMatrix A_TT, A_TF, A_FT, A_FF;
 		};
+
+		// An array of global numbers owned by the library (allocated and freed by it)
+		class FHHOS4_API IndexArray
+		{
+		public:
+			struct Impl; // defined in the library
+
+			IndexArray();
+			explicit IndexArray(std::unique_ptr<Impl> impl);
+			~IndexArray();
+			IndexArray(IndexArray&&) noexcept;
+			IndexArray& operator=(IndexArray&&) noexcept;
+			IndexArray(const IndexArray&) = delete;
+			IndexArray& operator=(const IndexArray&) = delete;
+
+			GhostNumbers View() const&; // empty if empty
+			GhostNumbers View() const&& = delete;
+
+		private:
+			std::unique_ptr<Impl> _impl;
+		};
+
+		// The distributed blocks in the arrays of the library
+		struct DistributedBlocks
+		{
+			CSRMatrix A_TF, A_FT, A_FF;
+			IndexArray FaceGhosts, CellGhosts;
+		};
+
+		// A_FT: null for a symmetric system (firstCell and cellBlockSize then ignored)
+		FHHOS4_API DistributedBlocks LocalColumns(const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF, std::int64_t firstFace, std::int64_t firstCell,
+		                                          int faceBlockSize, int cellBlockSize);
 
 		template <typename RowPointer, typename Column, typename Index>
 		FHHOS4_API HybridBlocks ExtractBlocksSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
@@ -596,6 +653,17 @@ namespace fhhos4
 		inline fhhos4::HybridBlocks ToEigen(const HybridBlocks& blocks)
 		{
 			return { ToEigen(blocks.A_TT), ToEigen(blocks.A_TF), ToEigen(blocks.A_FT), ToEigen(blocks.A_FF) };
+		}
+
+		inline std::vector<std::int64_t> ToVector(const IndexArray& numbers)
+		{
+			GhostNumbers v = numbers.View();
+			return std::vector<std::int64_t>(v.Numbers, v.Numbers + v.Count);
+		}
+
+		inline fhhos4::DistributedBlocks ToEigen(const DistributedBlocks& blocks)
+		{
+			return { ToEigen(blocks.A_TF), ToEigen(blocks.A_FT), ToEigen(blocks.A_FF), ToVector(blocks.FaceGhosts), ToVector(blocks.CellGhosts) };
 		}
 
 		// The arrays of the global matrix M of the helpers: compressed, row-major, of doubles, with the indices
@@ -646,6 +714,34 @@ namespace fhhos4
 	             Eigen::Ref<Eigen::VectorXd> x)
 	{
 		detail::Scatter<Index>({ x_T.data(), (std::int64_t)x_T.size() }, { x_F.data(), (std::int64_t)x_F.size() }, cells, faces, { x.data(), (std::int64_t)x.size() });
+	}
+
+	// A copy: the blocks of the rows of a process of a distributed system (see SetupSym()) whose columns are global, with
+	// their columns numbered locally as SetupSym() reads them, and its ghost faces (FaceGhosts): for
+	// SetupSym(A_TT, b.A_TF, b.A_FF, cellInterpOfOne, faceInterpOfOne, GhostNumbers(b.FaceGhosts.size(), b.FaceGhosts.data())).
+	// The global columns of A_TF and A_FF: the DoF k of the face of global number f is the column f * faceBlockSize + k,
+	// the faces numbered as the GhostNumbers (the faces of the process of rank 0 first, then those of rank 1...). firstFace:
+	// the global number of the first face of the process; its faces: firstFace, ..., firstFace + A_FF.rows() /
+	// faceBlockSize - 1, the rows of A_FF in this order. The local columns: the faces of the process, in this order, then
+	// its ghosts (all the other faces of the columns of A_TF and A_FF) by increasing global number. The matrices: in the
+	// format of the library (as the setups'), A_TF and A_FF with the same columns (the global face DoFs). One parallel
+	// pass on the non-zeros to find the ghosts, one to renumber. No communication.
+	template <typename TF, typename FF>
+	DistributedBlocks LocalColumnsSym(const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF, std::int64_t firstFace, int faceBlockSize)
+	{
+		return detail::ToEigen(detail::LocalColumns(detail::LibraryView(A_TF), nullptr, detail::LibraryView(A_FF), firstFace, 0, faceBlockSize, 1));
+	}
+
+	// A copy: as LocalColumnsSym(), with A_FT (the rows of the faces of the process), for SetupNonSym(): its global
+	// columns, the DoF k of the cell of global number c is the column c * cellBlockSize + k, the cells numbered as the
+	// faces; the cells of the process: firstCell, ..., firstCell + A_TF.rows() / cellBlockSize - 1 (the rows of A_TF). Its
+	// local columns: the cells of the process, then its ghost cells (CellGhosts) by increasing global number.
+	template <typename TF, typename FT, typename FF>
+	DistributedBlocks LocalColumnsNonSym(const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT, const Eigen::SparseCompressedBase<FF>& A_FF,
+	                                     std::int64_t firstFace, std::int64_t firstCell, int faceBlockSize, int cellBlockSize)
+	{
+		detail::CSRView a_FT = detail::LibraryView(A_FT);
+		return detail::ToEigen(detail::LocalColumns(detail::LibraryView(A_TF), &a_FT, detail::LibraryView(A_FF), firstFace, firstCell, faceBlockSize, cellBlockSize));
 	}
 
 	// No copy: A^T in the format of the library, a map of the arrays of a column-major matrix A (compressed, with the

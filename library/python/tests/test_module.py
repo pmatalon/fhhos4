@@ -160,6 +160,10 @@ def test_condensed_system():
         solver.Solve(system.b_T, system.b_F, x_T, x_F)
         solver.SolveCellUnknowns(system.b_T, x_F, y_T)
         assert RelativeError(y_T, x_T) < 1e-14
+        # ApplyCondensedMatrix(): y = A x
+        y = np.empty(system.b.size)
+        solver.ApplyCondensedMatrix(x_F, y)
+        assert RelativeError(y, system.A @ x_F) < 1e-12
 
 
 def test_failed_setup_keeps_the_previous_one():
@@ -267,13 +271,41 @@ def test_blocks_of_the_global_matrix():
         assert (values == system.A_TF.data).all()
 
 
+def test_local_columns():
+    # LocalColumnsSym(), LocalColumnsNonSym() on one process: all the faces and cells its own (from 0), no ghosts, the
+    # blocks unchanged; their result for the setups
+    for asymmetry in (0.0, 0.3):
+        system = HybridSystem(16, asymmetry)
+        if asymmetry == 0:
+            blocks = fhhos4.LocalColumnsSym(system.A_TF, system.A_FF, 0, 1)
+        else:
+            blocks = fhhos4.LocalColumnsNonSym(system.A_TF, system.A_FT, system.A_FF, 0, 0, 1, 1)
+        assert blocks.FaceGhosts.dtype == np.int64 and blocks.FaceGhosts.size == 0 and blocks.CellGhosts.size == 0
+        assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0 and abs(ToSciPy(blocks.A_FF) - system.A_FF).max() == 0
+        if asymmetry != 0:
+            assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
+        solver = ToySolver()
+        if asymmetry == 0:
+            solver.SetupSym(system.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhosts)
+        else:
+            solver.SetupNonSym(system.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhosts, blocks.CellGhosts)
+        assert solver.IsSetUp()
+    try:
+        fhhos4.LocalColumnsSym(system.A_TF, system.A_FF, 1, 1)  # the faces of the process beyond the columns
+        assert False, "faces beyond the columns accepted"
+    except fhhos4.Error:
+        pass
+
+
 def test_parameters():
     solver = fhhos4.Solver()
     assert solver.Krylov == fhhos4.Krylov.Default and solver.Cycle == fhhos4.Cycle.K
     assert solver.PCoarsening == fhhos4.PCoarsening.Minus2 and solver.Tolerance == 1e-8
     assert solver.Prolongation == fhhos4.Prolongation.HarmonicExtension
     assert solver.PolynomialSpace == fhhos4.PolynomialSpace.P and not solver.SingularMatrix and solver.VectorComponents == 1
-    assert solver.Restart == -1
+    assert solver.Restart == -1 and solver.L1Theta == 0.5
+    solver.L1Theta = 1.0
+    assert solver.L1Theta == 1.0
     solver.Restart = 5
     assert solver.Restart == 5
     solver.PCoarsening = fhhos4.PCoarsening.ToZero

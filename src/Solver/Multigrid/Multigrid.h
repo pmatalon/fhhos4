@@ -38,6 +38,7 @@ public:
 	SmoothingChangeOperator CoarseLevelChangeSmoothingOperator = SmoothingChangeOperator::Add;
 	int BlockSizeForBlockSmoothers = -1;
 	double RelaxationParameter = 1;
+	double L1Theta = 0.5; // the theta of the l1 Gauss-Seidel smoothers (see IterativeSolver::L1Terms())
 	HP_CoarsStgy HP_CS = HP_CoarsStgy::H_only;
 	H_CoarsStgy H_CS = H_CoarsStgy::StandardCoarsening;
 	P_CoarsStgy P_CS = P_CoarsStgy::Minus2;
@@ -125,8 +126,8 @@ private:
 
 		this->_fineLevel->OperatorMatrix = &A;
 		this->_fineLevel->DistributedOperator = distributedA;
-		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmoother, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmoother, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		this->_fineLevel->PreSmoother = this->_fineLevel->CreateSmoother(PreSmoother, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter, L1Theta);
+		this->_fineLevel->PostSmoother = this->_fineLevel->CreateSmoother(PostSmoother, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter, L1Theta);
 		this->_fineLevel->ExportComponents = ExportComponents;
 		this->_fineLevel->SetExportModule(this->Out);
 
@@ -270,8 +271,8 @@ private:
 
 
 			int blockSize = this->HP_CS == HP_CoarsStgy::H_only ? BlockSizeForBlockSmoothers : coarseLevel->BlockSizeForBlockSmoothers();
-			coarseLevel->PreSmoother  = coarseLevel->CreateSmoother( PreSmoother,  preSmoothingIterations, blockSize, RelaxationParameter);
-			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmoother, postSmoothingIterations, blockSize, RelaxationParameter);
+			coarseLevel->PreSmoother  = coarseLevel->CreateSmoother( PreSmoother,  preSmoothingIterations, blockSize, RelaxationParameter, L1Theta);
+			coarseLevel->PostSmoother = coarseLevel->CreateSmoother(PostSmoother, postSmoothingIterations, blockSize, RelaxationParameter, L1Theta);
 
 			coarseLevel->UseGalerkinOperator = UseGalerkinOperator;
 			coarseLevel->ExportComponents = ExportComponents;
@@ -888,8 +889,8 @@ public:
 		}
 
 		//Level* level = this->CreateFineLevel();
-		Smoother* preSmoother = SmootherFactory::Create(PreSmoother, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
-		Smoother* postSmoother = SmootherFactory::Create(PostSmoother, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter);
+		Smoother* preSmoother = SmootherFactory::Create(PreSmoother, PreSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter, L1Theta);
+		Smoother* postSmoother = SmootherFactory::Create(PostSmoother, PostSmoothingIterations, BlockSizeForBlockSmoothers, RelaxationParameter, L1Theta);
 		os << "\t" << "Pre-smoothing           : " << *preSmoother << endl;
 		os << "\t" << "Post-smoothing          : " << *postSmoother;
 		os.flush();

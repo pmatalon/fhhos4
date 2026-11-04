@@ -50,6 +50,8 @@ jobs:
             eigen=5.0.1
             cgal-cpp=5.6.1
             cxx-compiler=1.11.0
+            mpich=5.0.1
+            mumps-mpi=5.8.2
           cache-environment: true
 
       - name: Build
@@ -78,6 +80,14 @@ jobs:
             -Dfhhos4_DIR="$PWD/build-library" -DEXPECTED_VERSION="$VERSION"
           cmake --build build-client
           ./build-client/fhhos4_client
+
+      # The library on several processes (docs/mpi.md): its MPI tests on 1 to 4 processes (MPI_np*). BLIS_NUM_THREADS=1:
+      # MUMPS's BLAS on one thread (README_library.md).
+      - name: Library with MPI (ENABLE_MPI=ON)
+        run: |
+          cmake -B build-mpi-lib -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF -DENABLE_MPI=ON
+          cmake --build build-mpi-lib
+          cd build-mpi-lib && BLIS_NUM_THREADS=1 ctest -R MPI_np --output-on-failure
 
   # The conda package of the library (conda/recipe), with its tests: rattler-build pinned to the version the recipe was
   # validated with

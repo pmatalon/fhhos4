@@ -622,25 +622,33 @@ TEST(UAMGLibrary, SingularMatrix)
 	EXPECT_THROW(uamg.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 }
 
-// CondensedMatrix(): the condensed matrix computed from the blocks
+// CondensedMatrix(): the condensed matrix computed from the blocks; ApplyCondensedMatrix(): its products (x and y may be
+// the same vector)
 TEST(UAMGLibrary, CondensedMatrix)
 {
 	for (double asymmetry : { 0.0, 0.3 })
 	{
 		HybridSystem system = NonsymmetricSystem(16, asymmetry);
 		fhhos4::Solver uamg = ToySolver();
+		Eigen::VectorXd x = Eigen::VectorXd::LinSpaced(system.A.rows(), -1, 2), y(x.size());
 		EXPECT_THROW(uamg.CondensedMatrix(), fhhos4::Error); // before the setup
+		EXPECT_THROW(uamg.ApplyCondensedMatrix(x, y), fhhos4::Error);
 		if (system.Symmetric)
 			uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		else
 			uamg.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 		EXPECT_LT((uamg.CondensedMatrix() - system.A).norm(), 1e-14 * system.A.norm()) << asymmetry;
+		uamg.ApplyCondensedMatrix(x, y);
+		EXPECT_LT((y - system.A * x).norm(), 1e-12 * y.norm()) << asymmetry;
+		uamg.ApplyCondensedMatrix(x, x);
+		EXPECT_EQ(x, y) << asymmetry;
 	}
 }
 
 // The AMG as the preconditioner of a Krylov method of the calling code on the condensed system: CondenseRHS(), one
 // K-cycle per iteration (Krylov::None, MaxIterations 1, zero initial guess) in a flexible conjugate gradient
-// (Polak-Ribiere), then SolveCellUnknowns(): the solution of Solve(b_T, b_F, x_T, x_F)
+// (Polak-Ribiere) whose products are ApplyCondensedMatrix(), then SolveCellUnknowns(): the solution of Solve(b_T, b_F,
+// x_T, x_F)
 TEST(UAMGLibrary, PreconditionerOfAnExternalKrylovMethod)
 {
 	HybridSystem system(64);
@@ -658,7 +666,6 @@ TEST(UAMGLibrary, PreconditionerOfAnExternalKrylovMethod)
 	preconditioner.CondenseRHS(b_T, b_F, b);
 	EXPECT_LT((b - (b_F - system.A_FT * system.A_TT.diagonal().cwiseInverse().cwiseProduct(b_T))).norm(), 1e-14 * b.norm());
 
-	fhhos4::SparseMatrixMap A = preconditioner.CondensedMatrix();
 	auto precondition = [&](const Eigen::VectorXd& r)
 	{
 		Eigen::VectorXd z = Eigen::VectorXd::Zero(nF);
@@ -670,7 +677,8 @@ TEST(UAMGLibrary, PreconditionerOfAnExternalKrylovMethod)
 	int iterations = 0;
 	for (; r.norm() > 1e-10 * b.norm() && iterations < 30; iterations++)
 	{
-		Eigen::VectorXd Ap = A * p, previousR = r;
+		Eigen::VectorXd Ap(nF), previousR = r;
+		preconditioner.ApplyCondensedMatrix(p, Ap);
 		double alpha = rz / p.dot(Ap);
 		y_F += alpha * p;
 		r -= alpha * Ap;
@@ -1267,6 +1275,90 @@ TEST(UAMGLibrary, DefaultPostSmoother)
 	}
 }
 
+// LocalColumnsSym(), LocalColumnsNonSym() on the rows of a process (no MPI needed): global columns, the faces of 2 DoFs
+// numbered 0-7 (the process owns 3 and 4), the cells of 1 DoF numbered 0-3 (it owns 1 and 2). The ghost faces 0, 5, 7,
+// the ghost cells 0, 3, numbered locally after the own ones by increasing global number.
+TEST(UAMGLibrary, LocalColumns)
+{
+	auto matrix = [](int rows, int cols, std::vector<Eigen::Triplet<double>> entries)
+	{
+		fhhos4::SparseMatrix M(rows, cols);
+		M.setFromTriplets(entries.begin(), entries.end());
+		M.makeCompressed();
+		return M;
+	};
+	// Global columns: the DoF k of the face f is 2 f + k
+	fhhos4::SparseMatrix A_FF = matrix(4, 16, { { 0, 6, 1 }, { 0, 7, 2 }, { 0, 14, 3 }, { 1, 6, 4 }, { 1, 7, 5 }, { 2, 0, 6 }, { 2, 8, 7 }, { 3, 9, 8 } });
+	fhhos4::SparseMatrix A_TF = matrix(2, 16, { { 0, 1, 9 }, { 0, 6, 10 }, { 0, 15, 11 }, { 1, 9, 12 }, { 1, 10, 13 } });
+	fhhos4::SparseMatrix A_FT = matrix(4, 4, { { 0, 0, 14 }, { 0, 1, 15 }, { 2, 3, 16 } });
+	// Local columns: the faces 3, 4, then 0, 5, 7; the cells 1, 2, then 0, 3
+	fhhos4::SparseMatrix localA_FF = matrix(4, 10, { { 0, 0, 1 }, { 0, 1, 2 }, { 0, 8, 3 }, { 1, 0, 4 }, { 1, 1, 5 }, { 2, 4, 6 }, { 2, 2, 7 }, { 3, 3, 8 } });
+	fhhos4::SparseMatrix localA_TF = matrix(2, 10, { { 0, 5, 9 }, { 0, 0, 10 }, { 0, 9, 11 }, { 1, 3, 12 }, { 1, 6, 13 } });
+	fhhos4::SparseMatrix localA_FT = matrix(4, 4, { { 0, 2, 14 }, { 0, 0, 15 }, { 2, 3, 16 } });
+
+	fhhos4::DistributedBlocks sym = fhhos4::LocalColumnsSym(A_TF, A_FF, 3, 2);
+	EXPECT_EQ(sym.FaceGhosts, (std::vector<std::int64_t>{ 0, 5, 7 }));
+	EXPECT_TRUE(sym.CellGhosts.empty());
+	EXPECT_EQ(sym.A_FF.cols(), 10);
+	EXPECT_EQ(fhhos4::SparseMatrix(sym.A_FF - localA_FF).norm(), 0);
+	EXPECT_EQ(fhhos4::SparseMatrix(sym.A_TF - localA_TF).norm(), 0);
+	EXPECT_EQ(sym.A_FT.rows(), 0);
+
+	fhhos4::DistributedBlocks nonsym = fhhos4::LocalColumnsNonSym(A_TF, A_FT, A_FF, 3, 1, 2, 1);
+	EXPECT_EQ(nonsym.FaceGhosts, sym.FaceGhosts);
+	EXPECT_EQ(nonsym.CellGhosts, (std::vector<std::int64_t>{ 0, 3 }));
+	EXPECT_EQ(fhhos4::SparseMatrix(nonsym.A_FF - localA_FF).norm(), 0);
+	EXPECT_EQ(fhhos4::SparseMatrix(nonsym.A_FT - localA_FT).norm(), 0);
+
+	// The faces of the process beyond the columns, rows not a multiple of the block size, A_TF and A_FF with different
+	// columns, a block size < 1
+	EXPECT_THROW(fhhos4::LocalColumnsSym(A_TF, A_FF, 7, 2), fhhos4::Error);
+	EXPECT_THROW(fhhos4::LocalColumnsSym(A_TF, A_FF, 3, 3), fhhos4::Error);
+	EXPECT_THROW(fhhos4::LocalColumnsSym(matrix(2, 18, {}), A_FF, 3, 2), fhhos4::Error);
+	EXPECT_THROW(fhhos4::LocalColumnsNonSym(A_TF, A_FT, A_FF, 3, 1, 2, 0), fhhos4::Error);
+	EXPECT_THROW(fhhos4::LocalColumnsNonSym(A_TF, A_FT, A_FF, 3, 3, 2, 1), fhhos4::Error); // cells 3, 4 of 4
+}
+
+// L1Theta: the theta of the l1 Gauss-Seidel smoothers, here on 4 threads (the rows coupled to other chunks have l1
+// terms): other values, other iterates; 0, the hybrid block Gauss-Seidel's
+TEST(UAMGLibrary, L1Theta)
+{
+	HybridSystem system = NonsymmetricSystem(64, 0.3);
+	auto solve = [&](fhhos4::Smoother smoother, double theta, std::string* output = nullptr)
+	{
+		fhhos4::Solver uamg = ToySolver();
+		uamg.PreSmoother = smoother;
+		uamg.PostSmoother = fhhos4::Smoother::Default;
+		uamg.L1Theta = theta;
+		uamg.Threads = 4;
+		uamg.Tolerance = 1e-30; // never reached
+		uamg.MaxIterations = 3;
+		uamg.Verbosity = output ? 2 : 0; // prints the smoothers
+		if (output)
+			::testing::internal::CaptureStdout();
+		uamg.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+		uamg.Solve(system.b, x);
+		if (output)
+			*output = ::testing::internal::GetCapturedStdout();
+		return x;
+	};
+	std::string withL1, withoutL1;
+	Eigen::VectorXd half = solve(fhhos4::Smoother::L1HybridBlockGaussSeidel, 0.5, &withL1);
+	Eigen::VectorXd one = solve(fhhos4::Smoother::L1HybridBlockGaussSeidel, 1);
+	Eigen::VectorXd zero = solve(fhhos4::Smoother::L1HybridBlockGaussSeidel, 0, &withoutL1);
+	Eigen::VectorXd hybrid = solve(fhhos4::Smoother::HybridBlockGaussSeidel, 0.5);
+	EXPECT_NE(withL1.find("l1 Hybrid Gauss-Seidel (forward)"), std::string::npos) << withL1;
+	EXPECT_EQ(withoutL1.find("l1 Hybrid"), std::string::npos) << withoutL1;
+	EXPECT_NE(withoutL1.find("Hybrid Gauss-Seidel (forward)"), std::string::npos) << withoutL1;
+	EXPECT_GT((one - half).norm(), 1e-6 * half.norm());
+	EXPECT_TRUE((zero.array() == hybrid.array()).all());
+
+	fhhos4::Solver negative = ToySolver();
+	negative.L1Theta = -0.5;
+	EXPECT_THROW(negative.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+}
+
 // U-AMG alone (no FCG)
 TEST(UAMGLibrary, MultigridAlone)
 {
@@ -1492,10 +1584,32 @@ TEST(UAMGLibrary, Errors)
 	A_TT.makeCompressed();
 	EXPECT_THROW(uamg.SetupSym(A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
+	// Triangular blocks where the setup reads the other triangle too: A_FF upper triangular for SetupSym() (its lower
+	// part read), lower triangular for SetupNonSym() (read in full). The toy A_FF is diagonal: one coupling added.
+	for (bool upper : { true, false })
+	{
+		HybridSystem::Matrix triangular = system.A_FF;
+		triangular.coeffRef(upper ? 0 : 1, upper ? 1 : 0) = -0.1;
+		triangular.makeCompressed();
+		try
+		{
+			if (upper)
+				uamg.SetupSym(system.A_TT, system.A_TF, triangular, system.CellInterpOfOne, system.FaceInterpOfOne);
+			else
+				uamg.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, triangular, system.CellInterpOfOne, system.FaceInterpOfOne);
+			ADD_FAILURE() << "a triangular A_FF accepted (upper: " << upper << ")";
+		}
+		catch (const fhhos4::Error& e)
+		{
+			EXPECT_NE(std::string(e.what()).find(upper ? "upper triangular" : "lower triangular"), std::string::npos) << e.what();
+		}
+	}
+
 	// Vector of the wrong size
 	uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	Eigen::VectorXd wrongSize = Eigen::VectorXd::Zero(3);
 	EXPECT_THROW(uamg.Solve(system.b, wrongSize), fhhos4::Error);
+	EXPECT_THROW(uamg.ApplyCondensedMatrix(system.b, wrongSize), fhhos4::Error);
 }
 
 // Verbosity 0: nothing printed. The number of threads and the format of cout are restored after each call.
