@@ -82,12 +82,13 @@ jobs:
           ./build-client/fhhos4_client
 
       # The library on several processes (docs/mpi.md): its MPI tests on 1 to 4 processes (MPI_np*). BLIS_NUM_THREADS=1:
-      # MUMPS's BLAS on one thread (README_library.md).
+      # MUMPS's BLAS on one thread (README_library.md). UCX_TLS: MPICH's UCX on shared memory, otherwise it opens the
+      # RDMA adapter of the Azure runner (mana_0) and MPI_Init fails ("uct_iface_open(ud_verbs/mana_0:1) failed").
       - name: Library with MPI (ENABLE_MPI=ON)
         run: |
           cmake -B build-mpi-lib -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF -DENABLE_MPI=ON
           cmake --build build-mpi-lib
-          cd build-mpi-lib && BLIS_NUM_THREADS=1 ctest -R MPI_np --output-on-failure
+          cd build-mpi-lib && BLIS_NUM_THREADS=1 UCX_TLS=self,sm,tcp ctest -R MPI_np --output-on-failure
 
   # The conda package of the library (conda/recipe), with its tests: rattler-build pinned to the version the recipe was
   # validated with
