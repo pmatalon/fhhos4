@@ -42,6 +42,8 @@ cmake --install build --prefix <prefix>    # lib/, include/ and the CMake packag
 
 `v1.4.0` is the latest release. Between releases, this README file on `master` describes the development version; the release's is [README_library.md at v1.4.0](https://github.com/pmatalon/fhhos4/blob/v1.4.0/README_library.md).
 
+To update to a later release `vX.Y.Z`, run `git fetch --tags && git checkout vX.Y.Z` in the clone, then build and install again. `git pull` does nothing in this clone: it follows the tag only.
+
 Without installing, the library is `build/lib/libfhhos4.so`.
 
 Build options (`cmake -D<OPTION>=<value>`):
