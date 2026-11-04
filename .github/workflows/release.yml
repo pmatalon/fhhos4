@@ -19,7 +19,7 @@ jobs:
       run:
         shell: bash -el {0} # login shell: activates the conda environment
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the history and the tags, for git describe (fhhos4::Version())
 
@@ -42,7 +42,7 @@ jobs:
 
       # The versions the tests were validated with: the iteration counts with GMSH meshes depend on the version of GMSH
       # (tests/README.md). Update them with the local environment (conda list -n fhhos4).
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: conda/environment.yml
           create-args: >-
@@ -98,11 +98,11 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: mamba-org/setup-micromamba@v3
         with:
           environment-name: rattler
           create-args: >-
@@ -119,7 +119,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
