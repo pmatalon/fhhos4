@@ -75,16 +75,15 @@ public:
 		IterativeSolver::Setup(_condensedMatrix);
 	}
 
-	void SetupFromDistributedBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const vector<int64_t>& faceGhosts, const vector<int64_t>& cellGhosts, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
+	void SetupFromDistributedBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const vector<int64_t>& faceGhostGlobalNumbers, const vector<int64_t>& cellGhostGlobalNumbers, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 #ifdef MPI_ENABLED
 		_solver.Comm = Communicator::Current().Comm();
 #endif
-		fhhos4::GhostNumbers faces(faceGhosts.size(), faceGhosts.data()), cells(cellGhosts.size(), cellGhosts.data());
 		if (Communicator::Current().All(A_F_T.rows() == 0 && A_F_T.cols() == 0))
-			_solver.SetupSym(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne, faces);
+			_solver.SetupSym(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
 		else
-			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne, faces, cells);
+			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override

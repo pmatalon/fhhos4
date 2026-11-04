@@ -280,15 +280,15 @@ def test_local_columns():
             blocks = fhhos4.LocalColumnsSym(system.A_TF, system.A_FF, 0, 1)
         else:
             blocks = fhhos4.LocalColumnsNonSym(system.A_TF, system.A_FT, system.A_FF, 0, 0, 1, 1)
-        assert blocks.FaceGhosts.dtype == np.int64 and blocks.FaceGhosts.size == 0 and blocks.CellGhosts.size == 0
+        assert blocks.FaceGhostGlobalNumbers.dtype == np.int64 and blocks.FaceGhostGlobalNumbers.size == 0 and blocks.CellGhostGlobalNumbers.size == 0
         assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0 and abs(ToSciPy(blocks.A_FF) - system.A_FF).max() == 0
         if asymmetry != 0:
             assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
         solver = ToySolver()
         if asymmetry == 0:
-            solver.SetupSym(system.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhosts)
+            solver.SetupSym(system.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers)
         else:
-            solver.SetupNonSym(system.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhosts, blocks.CellGhosts)
+            solver.SetupNonSym(system.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers, blocks.CellGhostGlobalNumbers)
         assert solver.IsSetUp()
     try:
         fhhos4.LocalColumnsSym(system.A_TF, system.A_FF, 1, 1)  # the faces of the process beyond the columns

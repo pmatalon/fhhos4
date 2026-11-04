@@ -206,9 +206,9 @@ namespace
 		// The setups of the library on the views of the arrays (fhhos4::Solver::Setup())
 		void SetupViews(bool symmetric, const fhhos4::detail::CSRView& A_TT, const fhhos4::detail::CSRView& A_TF, const fhhos4::detail::CSRView* A_FT,
 		                const fhhos4::detail::CSRView& A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne,
-		                const fhhos4::GhostNumbers& faceGhosts = fhhos4::GhostNumbers(), const fhhos4::GhostNumbers& cellGhosts = fhhos4::GhostNumbers())
+		                const fhhos4::GhostNumbers& faceGhostGlobalNumbers = fhhos4::GhostNumbers(), const fhhos4::GhostNumbers& cellGhostGlobalNumbers = fhhos4::GhostNumbers())
 		{
-			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhosts, cellGhosts);
+			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 		}
 
 		fhhos4::detail::CSRView CondensedView() const
@@ -361,8 +361,8 @@ NB_MODULE(fhhos4, m)
 		.def_prop_ro("A_TF", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_TF; }, nb::rv_policy::reference_internal)
 		.def_prop_ro("A_FT", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FT; }, nb::rv_policy::reference_internal)
 		.def_prop_ro("A_FF", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FF; }, nb::rv_policy::reference_internal)
-		.def_prop_ro("FaceGhosts", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).FaceGhosts); })
-		.def_prop_ro("CellGhosts", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).CellGhosts); });
+		.def_prop_ro("FaceGhostGlobalNumbers", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).FaceGhostGlobalNumbers); })
+		.def_prop_ro("CellGhostGlobalNumbers", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).CellGhostGlobalNumbers); });
 
 	//------------------------------------------------ Helpers -----------------------------------------------//
 
@@ -387,7 +387,7 @@ NB_MODULE(fhhos4, m)
 			nb::gil_scoped_release release;
 			return fhhos4::detail::LocalColumns(tf, nullptr, ff, firstFace, 0, faceBlockSize, 1);
 		}, "A_TF"_a, "A_FF"_a, "firstFace"_a, "faceBlockSize"_a,
-		"A copy: the blocks of a process with global columns (the DoF k of the face f: f * faceBlockSize + k), their columns numbered locally (its faces from firstFace, then its ghosts FaceGhosts), for SetupSym()");
+		"A copy: the blocks of a process with global columns (the DoF k of the face f: f * faceBlockSize + k), their columns numbered locally (its faces from firstFace, then its ghosts FaceGhostGlobalNumbers), for SetupSym()");
 
 	m.def("LocalColumnsNonSym", [](nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, std::int64_t firstFace, std::int64_t firstCell, int faceBlockSize, int cellBlockSize)
 		{
@@ -396,7 +396,7 @@ NB_MODULE(fhhos4, m)
 			nb::gil_scoped_release release;
 			return fhhos4::detail::LocalColumns(tf, &ft, ff, firstFace, firstCell, faceBlockSize, cellBlockSize);
 		}, "A_TF"_a, "A_FT"_a, "A_FF"_a, "firstFace"_a, "firstCell"_a, "faceBlockSize"_a, "cellBlockSize"_a,
-		"A copy: as LocalColumnsSym(), with A_FT (the DoF k of the cell c: the column c * cellBlockSize + k; its ghost cells CellGhosts), for SetupNonSym()");
+		"A copy: as LocalColumnsSym(), with A_FT (the DoF k of the cell c: the column c * cellBlockSize + k; its ghost cells CellGhostGlobalNumbers), for SetupNonSym()");
 
 	m.def("Gather", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
 		{
@@ -474,24 +474,24 @@ NB_MODULE(fhhos4, m)
 			[](PySolver& s, nb::handle comm) { s.Comm = ToComm(comm); s.CommObject = nb::borrow(comm); })
 #endif
 
-		// Setups from the blocks of the system. faceGhosts, cellGhosts: on several processes, the global numbers of the ghost
-		// faces and cells (int64 arrays)
-		.def("SetupSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts)
+		// Setups from the blocks of the system. faceGhostGlobalNumbers, cellGhostGlobalNumbers: on several processes,
+		// the global numbers of the ghost faces and cells (int64 arrays)
+		.def("SetupSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhostGlobalNumbers)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
-				fhhos4::GhostNumbers ghosts = ToGhostNumbers(faceGhosts, "faceGhosts");
+				fhhos4::GhostNumbers ghosts = ToGhostNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers");
 				s.Run([&] { s.SetupViews(true, tt, tf, nullptr, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
 			},
-			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhosts"_a = nb::none())
-		.def("SetupNonSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhosts, nb::handle cellGhosts)
+			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none())
+		.def("SetupNonSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhostGlobalNumbers, nb::handle cellGhostGlobalNumbers)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
-				fhhos4::GhostNumbers fGhosts = ToGhostNumbers(faceGhosts, "faceGhosts"), cGhosts = ToGhostNumbers(cellGhosts, "cellGhosts");
+				fhhos4::GhostNumbers fGhosts = ToGhostNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers"), cGhosts = ToGhostNumbers(cellGhostGlobalNumbers, "cellGhostGlobalNumbers");
 				s.Run([&] { s.SetupViews(false, tt, tf, &ft, ff, cellInterpOfOne, faceInterpOfOne, fGhosts, cGhosts); }, { a_FT });
 			},
-			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhosts"_a = nb::none(), "cellGhosts"_a = nb::none())
+			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none(), "cellGhostGlobalNumbers"_a = nb::none())
 		// x_T, x_F: NumPy vectors of float64, written in place (x_F: the initial guess on input)
 		.def("Solve", [](PySolver& s, const ConstVector& b_T, const ConstVector& b_F, Vector x_T, Vector x_F)
 			{ return s.Solve(b_T, b_F, x_T, x_F); },

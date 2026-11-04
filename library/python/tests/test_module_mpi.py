@@ -74,23 +74,23 @@ def DistributedSystem(emptyRank0, asymmetry=0.0, helpers=False):
         return M
 
     ghosts = ghostsOf(np.concatenate([rowsTF.indices, rowsFF.indices]), faceBegin, nOwnFaces)
-    cellGhosts = ghostsOf(rowsFT.indices, cellBegin, nOwnCells)
+    cellGhostGlobalNumbers = ghostsOf(rowsFT.indices, cellBegin, nOwnCells)
     if helpers:
-        ghosts, cellGhosts = np.sort(ghosts), np.sort(cellGhosts)
+        ghosts, cellGhostGlobalNumbers = np.sort(ghosts), np.sort(cellGhostGlobalNumbers)
     faceColumns = lambda rows: localColumns(rows, ghosts, faceBegin, nOwnFaces)
-    localA_TF, localA_FF, localA_FT = faceColumns(rowsTF), faceColumns(rowsFF), localColumns(rowsFT, cellGhosts, cellBegin, nOwnCells)
+    localA_TF, localA_FF, localA_FT = faceColumns(rowsTF), faceColumns(rowsFF), localColumns(rowsFT, cellGhostGlobalNumbers, cellBegin, nOwnCells)
     if helpers:
         tf, ft, ff = (M.sorted_indices() for M in (rowsTF, rowsFT, rowsFF))
         if asymmetry == 0:
             blocks = fhhos4.LocalColumnsSym(tf, ff, faceBegin, 1)
         else:
             blocks = fhhos4.LocalColumnsNonSym(tf, ft, ff, faceBegin, cellBegin, 1, 1)
-        assert np.array_equal(blocks.FaceGhosts, ghosts) and np.array_equal(blocks.CellGhosts, cellGhosts if asymmetry != 0 else [])
+        assert np.array_equal(blocks.FaceGhostGlobalNumbers, ghosts) and np.array_equal(blocks.CellGhostGlobalNumbers, cellGhostGlobalNumbers if asymmetry != 0 else [])
         assert (ToSciPy(blocks.A_TF) != localA_TF).nnz == 0 and (ToSciPy(blocks.A_FF) != localA_FF).nnz == 0
         if asymmetry != 0:
             assert (ToSciPy(blocks.A_FT) != localA_FT).nnz == 0
-            localA_FT, cellGhosts = blocks.A_FT, blocks.CellGhosts
-        localA_TF, localA_FF, ghosts = blocks.A_TF, blocks.A_FF, blocks.FaceGhosts
+            localA_FT, cellGhostGlobalNumbers = blocks.A_FT, blocks.CellGhostGlobalNumbers
+        localA_TF, localA_FF, ghosts = blocks.A_TF, blocks.A_FF, blocks.FaceGhostGlobalNumbers
 
     solver = fhhos4.Solver()
     solver.Comm = comm
@@ -103,7 +103,7 @@ def DistributedSystem(emptyRank0, asymmetry=0.0, helpers=False):
     if asymmetry == 0:
         solver.SetupSym(localA_TT, localA_TF, localA_FF, np.ones(nOwnCells), np.ones(nOwnFaces), ghosts)
     else:
-        solver.SetupNonSym(localA_TT, localA_TF, localA_FT, localA_FF, np.ones(nOwnCells), np.ones(nOwnFaces), ghosts, cellGhosts)
+        solver.SetupNonSym(localA_TT, localA_TF, localA_FT, localA_FF, np.ones(nOwnCells), np.ones(nOwnFaces), ghosts, cellGhostGlobalNumbers)
     assert solver.IsSetUp() and solver.NumberOfLevels() > 1
     x_T, x_F = np.zeros(nOwnCells), np.zeros(nOwnFaces)
     result = solver.Solve(b_T[ownCells].copy(), b_F[ownFaces].copy(), x_T, x_F)
@@ -153,7 +153,7 @@ def test_empty_process():
 
 
 def test_nonsymmetric_system():
-    """SetupNonSym(): A_FT with the ghost cells of its rows (cellGhosts)"""
+    """SetupNonSym(): A_FT with the ghost cells of its rows (cellGhostGlobalNumbers)"""
     DistributedSystem(emptyRank0=False, asymmetry=0.3)
     DistributedSystem(emptyRank0=True, asymmetry=0.3)
 

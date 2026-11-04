@@ -27,7 +27,8 @@ NumPy arrays read in place (`nb::try_cast` without conversion; the vectors `noco
   successful setup: the checks of a setup run before it resets the previous one, which still reads them;
 - `CondensedMatrix()`: a copy (`ToCSR()`); the setups, solves and helpers release the GIL.
 - `LocalColumnsSym()`/`LocalColumnsNonSym()` return the `detail::DistributedBlocks` (`CSRMatrix` blocks; the ghosts as
-  read-only int64 NumPy views of its `IndexArray`s, which keep it alive: the `faceGhosts`/`cellGhosts` of the setups).
+  read-only int64 NumPy views of its `IndexArray`s, which keep it alive: the
+  `faceGhostGlobalNumbers`/`cellGhostGlobalNumbers` of the setups).
 
 Built with `-DENABLE_PYTHON=ON` (in the library section of `CMakeLists.txt`, also with `ENABLE_PROGRAM=OFF`) into
 `<build>/python`, not installed. Test: `ctest -R Python` (`PythonModule`: `library/python/tests/test_module.py`, the
@@ -36,14 +37,14 @@ toy system of `UAMGLibraryTest.cpp` against SciPy's direct solver).
 ## With MPI (`FHHOS4_MPI`)
 
 `Solver.Comm` from an mpi4py communicator (`py2f()`, `MPI_Comm_f2c`; refused if MPI is not initialized; the getter
-returns the Python object), not set: one process, as in C++; `SetupSym(..., faceGhosts=None)`,
-`SetupNonSym(..., faceGhosts=None, cellGhosts=None)` (int64 arrays read in place, `ToGhostNumbers()`);
-`fhhos4.WithMPI`. Tests: `PythonModule` without `Comm` nor mpi4py (MPI not initialized: `CoarseSolver.MUMPS` refused);
-`PythonModuleMPI_np2`/`_np4` (`test_module_mpi.py`, under `mpiexec`: the toy system distributed by strips, also with an
-empty rank 0, symmetric or not, the blocks also by `LocalColumnsSym()`/`NonSym()`, the condensed system's functions,
-against SciPy; an input error on one process raised on all, a lower triangular `A_FF` refused). Not collective: the
-type errors of the arguments (nanobind's, `ToView()`), raised before the setup on their process only (the others then
-wait in the setup).
+returns the Python object), not set: one process, as in C++; `SetupSym(..., faceGhostGlobalNumbers=None)`,
+`SetupNonSym(..., faceGhostGlobalNumbers=None, cellGhostGlobalNumbers=None)` (int64 arrays read in place,
+`ToGhostNumbers()`); `fhhos4.WithMPI`. Tests: `PythonModule` without `Comm` nor mpi4py (MPI not initialized:
+`CoarseSolver.MUMPS` refused); `PythonModuleMPI_np2`/`_np4` (`test_module_mpi.py`, under `mpiexec`: the toy system
+distributed by strips, also with an empty rank 0, symmetric or not, the blocks also by `LocalColumnsSym()`/`NonSym()`,
+the condensed system's functions, against SciPy; an input error on one process raised on all, a lower triangular `A_FF`
+refused). Not collective: the type errors of the arguments (nanobind's, `ToView()`), raised before the setup on their
+process only (the others then wait in the setup).
 
 ## Environments and build directories
 

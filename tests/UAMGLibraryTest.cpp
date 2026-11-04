@@ -1297,18 +1297,26 @@ TEST(UAMGLibrary, LocalColumns)
 	fhhos4::SparseMatrix localA_FT = matrix(4, 4, { { 0, 2, 14 }, { 0, 0, 15 }, { 2, 3, 16 } });
 
 	fhhos4::DistributedBlocks sym = fhhos4::LocalColumnsSym(A_TF, A_FF, 3, 2);
-	EXPECT_EQ(sym.FaceGhosts, (std::vector<std::int64_t>{ 0, 5, 7 }));
-	EXPECT_TRUE(sym.CellGhosts.empty());
+	EXPECT_EQ(sym.FaceGhostGlobalNumbers, (std::vector<std::int64_t>{ 0, 5, 7 }));
+	EXPECT_TRUE(sym.CellGhostGlobalNumbers.empty());
 	EXPECT_EQ(sym.A_FF.cols(), 10);
 	EXPECT_EQ(fhhos4::SparseMatrix(sym.A_FF - localA_FF).norm(), 0);
 	EXPECT_EQ(fhhos4::SparseMatrix(sym.A_TF - localA_TF).norm(), 0);
 	EXPECT_EQ(sym.A_FT.rows(), 0);
 
 	fhhos4::DistributedBlocks nonsym = fhhos4::LocalColumnsNonSym(A_TF, A_FT, A_FF, 3, 1, 2, 1);
-	EXPECT_EQ(nonsym.FaceGhosts, sym.FaceGhosts);
-	EXPECT_EQ(nonsym.CellGhosts, (std::vector<std::int64_t>{ 0, 3 }));
+	EXPECT_EQ(nonsym.FaceGhostGlobalNumbers, sym.FaceGhostGlobalNumbers);
+	EXPECT_EQ(nonsym.CellGhostGlobalNumbers, (std::vector<std::int64_t>{ 0, 3 }));
 	EXPECT_EQ(fhhos4::SparseMatrix(nonsym.A_FF - localA_FF).norm(), 0);
 	EXPECT_EQ(fhhos4::SparseMatrix(nonsym.A_FT - localA_FT).norm(), 0);
+
+	// GhostNumbers from a container, read in place; int32 numbers refused
+	fhhos4::GhostNumbers fromVector = sym.FaceGhostGlobalNumbers;
+	EXPECT_EQ(fromVector.Count, 3);
+	EXPECT_EQ(fromVector.Numbers, sym.FaceGhostGlobalNumbers.data());
+	Eigen::Matrix<std::int64_t, Eigen::Dynamic, 1> eigenNumbers(2);
+	EXPECT_EQ(fhhos4::GhostNumbers(eigenNumbers).Count, 2);
+	static_assert(!std::is_convertible_v<std::vector<int>, fhhos4::GhostNumbers>);
 
 	// The faces of the process beyond the columns, rows not a multiple of the block size, A_TF and A_FF with different
 	// columns, a block size < 1

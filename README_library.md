@@ -214,10 +214,13 @@ process of rank 0 first, then those of rank 1...; the same for the faces), and g
 
 ```cpp
 solver.Comm = MPI_COMM_WORLD;
-// A_TT, A_TF: the rows of the cells of the process; A_FF: the rows of its faces, in full (both triangles).
-// The columns of A_TF and A_FF: the faces of the process, then its ghosts (the faces of other processes that its rows
-// reference), whose global numbers are faceGhosts, in their local order.
-solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, fhhos4::GhostNumbers(nGhosts, faceGhosts));
+// A_TT, A_TF: the rows of the cells of the process; A_FF: the rows of its faces, in full (both triangles). The columns
+// of A_TF and A_FF: the nOwn faces of the process, then its ghosts (the faces of other processes that its rows
+// reference). faceGhostGlobalNumbers[i]: the global number of the ghost of local number nOwn + i (faces, not DoFs).
+// E.g. rank 0 owns the faces 0 to 9 and its rows reference the faces 15 and 12 of rank 1, its local faces 10 and 11:
+// faceGhostGlobalNumbers = {15, 12}.
+std::vector<std::int64_t> faceGhostGlobalNumbers = ...; // or a std::span, an Eigen vector..., GhostNumbers(n, pointer)
+solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the cells and faces of the process
 ```
 
@@ -228,11 +231,12 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   local numbering of DOLFINx's index maps, and of the columns of PETSc's and hypre's distributed matrices.
 - **Each face belongs to a process that owns one of its cells**, e.g. the one of the smaller rank; a face has at most
   two cells. A process may own no cell nor face (empty matrices and vectors): it still calls the setups and solves.
-- **Non-symmetric**: `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
-  cellGhosts)`, with `A_TT` and `A_FF` in full; `A_FT`: the rows of the faces of the process, its columns the cells of
-  the process (in the order of the rows of `A_TT`), then its ghost cells, in any order (the cells of other processes
-  in these rows), whose global numbers are `cellGhosts` (numbered as the faces: those of rank 0 first...). On each
-  process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
+- **Non-symmetric**: `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers,
+  cellGhostGlobalNumbers)`, with `A_TT` and `A_FF` in full; `A_FT`: the rows of the faces of the process, its columns
+  the cells of the process (in the order of the rows of `A_TT`), then its ghost cells, in any order (the cells of other
+  processes in these rows), whose global numbers are `cellGhostGlobalNumbers` (numbered as the faces: those of rank 0
+  first...). `A_FT` is the only block whose columns reach the cells of other processes: `SetupSym()` has no cell
+  ghosts. On each process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
 - The vectors (`b_T`, `b_F`, `x_T`, `x_F`, the interpolations of 1): the cells and faces of the process. `Result`: of
   the whole system.
 - The algorithm: each process aggregates its own cells (the faces between processes are kept); the coarsest level is
@@ -247,10 +251,9 @@ fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the 
   ```cpp
   // A_TF, A_FF: the rows of the process; the DoF k of the face f is the column f * faceBlockSize + k
   fhhos4::DistributedBlocks blocks = fhhos4::LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize);
-  solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne,
-                  fhhos4::GhostNumbers(blocks.FaceGhosts.size(), blocks.FaceGhosts.data()));
+  solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne, blocks.FaceGhostGlobalNumbers);
   // Non-symmetric: LocalColumnsNonSym(A_TF, A_FT, A_FF, firstFace, firstCell, faceBlockSize, cellBlockSize), whose
-  // CellGhosts are the cellGhosts of SetupNonSym()
+  // CellGhostGlobalNumbers are the cellGhostGlobalNumbers of SetupNonSym()
   ```
   `firstFace`: the global number of the first face of the process (`firstCell`, of its first cell); the ghosts by
   increasing global number.
@@ -304,8 +307,9 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.
 - The helpers have the same names: `ExtractBlocksSym(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
   dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`,
-  `LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize)` and `LocalColumnsNonSym()` (their `FaceGhosts` and
-  `CellGhosts`: read-only `int64` NumPy arrays, the `faceGhosts` and `cellGhosts` of the setups).
+  `LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize)` and `LocalColumnsNonSym()` (their `FaceGhostGlobalNumbers` and
+  `CellGhostGlobalNumbers`: read-only `int64` NumPy arrays, the `faceGhostGlobalNumbers` and `cellGhostGlobalNumbers` of
+  the setups).
 - The errors raise `fhhos4.Error`, a `RuntimeError`.
 - The setups, solves and helpers release the GIL.
 - Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), `solver.Comm` not set: one process, as
@@ -313,9 +317,9 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   [mpi4py](https://mpi4py.readthedocs.io), built with the same MPI as the library, and imported first (it initializes
   MPI). `solver.Comm`: an mpi4py communicator (`MPI.COMM_SELF`, `MPI.COMM_WORLD`, or its Fortran handle
   `comm.py2f()`). On several processes, `SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne,
-  faceGhosts)`: `faceGhosts`, the global numbers of the ghost faces, a NumPy array of `int64` read in place (`None` by
-  default: no ghosts); `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts,
-  cellGhosts)`, `cellGhosts` likewise.
+  faceGhostGlobalNumbers)`: `faceGhostGlobalNumbers`, the global numbers of the ghost faces, a NumPy array of `int64`
+  read in place (`None` by default: no ghosts); `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne,
+  faceGhostGlobalNumbers, cellGhostGlobalNumbers)`, `cellGhostGlobalNumbers` likewise.
 
   ```python
   from mpi4py import MPI  # first: initializes MPI
@@ -324,7 +328,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   solver = fhhos4.Solver()
   solver.Comm = MPI.COMM_WORLD
   ...
-  solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhosts)  # the rows of the process
+  solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers)  # the rows of the process
   result = solver.Solve(b_T, b_F, x_T, x_F)  # the vectors of the cells and faces of the process
   ```
 

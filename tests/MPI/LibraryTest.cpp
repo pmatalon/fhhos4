@@ -109,7 +109,7 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	vector<BigNumber> ghostFaces = ReversedGhosts({ &ownA_TF, &ownA_FF }, faces), ghostCells = ReversedGhosts({ &ownA_FT }, cells);
 	fhhos4::SparseMatrix A_TT = OnEachComponent(system.A_TT, c), A_TF = OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c);
 	fhhos4::SparseMatrix A_FF = OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c), A_FT = OnEachComponent(LocalColumns(ownA_FT, cells, ghostCells), c);
-	vector<int64_t> faceGhosts(ghostFaces.begin(), ghostFaces.end()), cellGhosts(ghostCells.begin(), ghostCells.end());
+	vector<int64_t> faceGhostGlobalNumbers(ghostFaces.begin(), ghostFaces.end()), cellGhostGlobalNumbers(ghostCells.begin(), ghostCells.end());
 	if (localColumnsHelpers)
 	{
 		fhhos4::SparseMatrix rowsTF = OnEachComponent(ownA_TF, c), rowsFF = OnEachComponent(ownA_FF, c), rowsFT = OnEachComponent(ownA_FT, c);
@@ -117,10 +117,10 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 		                                                  : fhhos4::LocalColumnsNonSym(rowsTF, rowsFT, rowsFF, faces.Begin, cells.Begin, c, c);
 		sort(ghostFaces.begin(), ghostFaces.end());
 		sort(ghostCells.begin(), ghostCells.end());
-		faceGhosts.assign(ghostFaces.begin(), ghostFaces.end());
-		cellGhosts = asymmetry == 0 ? vector<int64_t>() : vector<int64_t>(ghostCells.begin(), ghostCells.end());
-		EXPECT_EQ(blocks.FaceGhosts, faceGhosts);
-		EXPECT_EQ(blocks.CellGhosts, cellGhosts);
+		faceGhostGlobalNumbers.assign(ghostFaces.begin(), ghostFaces.end());
+		cellGhostGlobalNumbers = asymmetry == 0 ? vector<int64_t>() : vector<int64_t>(ghostCells.begin(), ghostCells.end());
+		EXPECT_EQ(blocks.FaceGhostGlobalNumbers, faceGhostGlobalNumbers);
+		EXPECT_EQ(blocks.CellGhostGlobalNumbers, cellGhostGlobalNumbers);
 		EXPECT_EQ(SparseMatrix(blocks.A_TF - OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c)).norm(), 0);
 		EXPECT_EQ(SparseMatrix(blocks.A_FF - OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c)).norm(), 0);
 		if (asymmetry == 0)
@@ -145,9 +145,9 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 		testing::internal::CaptureStdout();
 	}
 	if (asymmetry == 0)
-		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()));
+		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, faceGhostGlobalNumbers);
 	else
-		solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(faceGhosts.size(), faceGhosts.data()), fhhos4::GhostNumbers(cellGhosts.size(), cellGhosts.data()));
+		solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 	if (setupLog)
 	{
 		*setupLog = testing::internal::GetCapturedStdout();
@@ -285,7 +285,7 @@ TEST(DistributedLibrary, CollectiveErrors)
 	if (World().Rank() == World().Size() - 1)
 		faceOnes = Vector::Ones(system.Faces->NOwned + 1);
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
-	EXPECT_THROW(solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data())), fhhos4::Error);
+	EXPECT_THROW(solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, ghosts), fhhos4::Error);
 	// A_FF lower triangular on the last process (as SetupSym() reads it on one process; here diagonal: one coupling
 	// added), read in full on several processes
 	faceOnes = Vector::Ones(system.Faces->NOwned);
@@ -295,7 +295,7 @@ TEST(DistributedLibrary, CollectiveErrors)
 	lowerA_FF.makeCompressed();
 	try
 	{
-		solver.SetupSym(A_TT, A_TF, lowerA_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
+		solver.SetupSym(A_TT, A_TF, lowerA_FF, cellOnes, faceOnes, ghosts);
 		ADD_FAILURE() << "a lower triangular A_FF accepted on several processes";
 	}
 	catch (const fhhos4::Error& e)
@@ -313,7 +313,7 @@ TEST(DistributedLibrary, CollectiveErrors)
 			try
 			{
 				if (withGhosts)
-					noComm.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, fhhos4::GhostNumbers(ghosts.size(), ghosts.data()));
+					noComm.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, ghosts);
 				else
 					noComm.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes);
 				ADD_FAILURE() << "a distributed system accepted without Comm";

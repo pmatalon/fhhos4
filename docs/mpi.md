@@ -61,9 +61,9 @@ program too: `-DENABLE_PROGRAM=ON`).
   `SweepRhs()` (`b - Offd x`, in the precision of the level); the float copies of the finest and p-levels'
   operators without `Diag` (`Cast<float>(false)`), the h-levels' keep theirs (assembled).
 - Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
-  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostNumbers faceGhosts)` (local columns: own faces then
+  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostNumbers faceGhostGlobalNumbers)` (local columns: own faces then
   ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full: a triangular one refused, `CheckTriangles()`),
-  `SetupNonSym(..., faceGhosts, cellGhosts)`
+  `SetupNonSym(..., faceGhostGlobalNumbers, cellGhostGlobalNumbers)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
@@ -71,7 +71,7 @@ program too: `-DENABLE_PROGRAM=ON`).
   global, the pinned DoF of the coarsest level (one per component) on one process (`docs/uamg.md`).
   `ApplyCondensedMatrix()`: `DistributedA * x`. `LocalColumnsSym()`/`NonSym()`: the blocks of a process from their
   global columns, no communication (`docs/library.md`). Not yet: `CondensedMatrix()` (its columns may reach beyond
-  `faceGhosts`: those of the received rows). Python: `docs/python.md`.
+  `faceGhostGlobalNumbers`: those of the received rows). Python: `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only. The mesh of each
   process is its part (`GMSHMesh`, built when `Communicator::Current()` is distributed). The partition (`OpenPart()`:
   METIS, `Mesh.PartitionCreateGhostCells`, GMSH's split files `part_<rank + 1>.msh`) is kept in the cache directory
