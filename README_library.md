@@ -100,30 +100,26 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 
 ## Applicability
 
-The solver typically applies to symmetric positive definite systems (e.g. diffusion)
-and non-symmetric ones (e.g. convection-diffusion, both diffusion- and convection-dominated).
-Boundary conditions: Dirichlet (their faces out of the system), Neumann and Robin (their faces in the system), mixed;
-the pure Neumann problem (singular: `SingularMatrix`, symmetric systems).
-Vector-valued unknowns (`VectorComponents`), e.g. the vector Laplacian: the coarse levels keep the constants of each
-component (the translations), not the rotations, which elasticity problems need on their coarse levels (not validated
-there).
-The polynomial bases used for the discretization **must be hierarchical** and ordered by degree for the p-multigrid part to work.
-The polynomial spaces are P^k (simplices, polytopes), or Q^k (quadrilaterals, hexahedra: `PolynomialSpace::Q`), in the
-cells and on the faces.
-Bases not ordered by degree, but whose first function is constant, work with the p-coarsening straight to the lowest
-order (`PCoarsening::ToZero`), or better, reordered by degree: e.g. in the DoF lists of `ExtractBlocksSym()`
-(see [Other matrix formats](#other-matrix-formats-provided-helpers)), at no extra cost.
+- [x] Symmetric positive definite systems (e.g. diffusion)
+- [x] Non-symmetric, indefinite systems (e.g. convection-diffusion, both diffusion- and convection-dominated)
+- [x] Vector-valued unknown
+- [x] Singular, symmetric systems
+   - [x] with translation kernel (e.g. pure Neumann diffusion)
+   - [ ] user kernel vectors (e.g. for elasticity problems)
+- [x] `P` and `Q` polynomial spaces in the cells and faces
+- [x] Arbitrary degree
+   - [x] Hierarchical bases **ordered by degree**
+   - [x] If not ordered by degree: the degree 0 must at least be first. Then OK up to degree 2.
+   - [x] Helper to reorder the bases
+   - [ ] Non-hierarchical bases not managed
 
 # 3. How to use
 
 Pass the blocks of the uncondensed matrix, `A_TT, A_TF, A_FF` for a symmetric system (and `A_FT` for a non-symmetric
-one), and the two blocks of the right-hand side `b_T, b_F`. The library condenses the system and solves it for both the
-cell and face unknowns `x_T, x_F`: your code has nothing to do with static condensation, nor with the recovery of the
-cell unknowns.
-
-Symmetric positive definite systems, and non-symmetric ones with a positive definite symmetric part
-(convection-diffusion). Krylov method included (FCG, GCR). Parallel (OpenMP), and on several processes (MPI,
-see [Several processes](#several-processes-mpi)).
+one), and the two blocks of the right-hand side `b_T, b_F`. The library condenses the system internally and solves it for both the
+cell and face unknowns `x_T, x_F`. This way, your code doesn't have to implement any static condensation process, and gets the complete
+hybrid solution directly.
+Krylov methods is included: `fhhos4` is meant to be used directly as a solver. It can also be used as a preconditioner for an outer Krylov method.
 
 ### Symmetric systems
 
