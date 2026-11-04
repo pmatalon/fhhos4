@@ -1,12 +1,9 @@
 # The fhhos4 multigrid solver as an external library
 
 1. [Installation](#1-installation)
-   - [Install from source](#install-from-source)
-   - [Conda and Spack packages](#conda-and-spack-packages)
-   - [Link](#link)
-2. [The algorithm in a nutshell](#2-the-algorithm-in-a-nutshell)
-   - [Applicability](#applicability)
-3. [How to use](#3-how-to-use)
+2. [Applicability](#2-applicability)
+3. [The algorithm in a nutshell](#3-the-algorithm-in-a-nutshell)
+4. [How to use](#3-how-to-use)
    - [Symmetric systems](#symmetric-systems)
    - [Non-symmetric systems](#non-symmetric-systems)
    - [Use as a preconditioner](#use-as-a-preconditioner)
@@ -16,8 +13,8 @@
    - [Other matrix formats](#other-matrix-formats)
    - [Parameters](#parameters)
    - [Constraints](#constraints)
-4. [License](#license)
-5. [Version](#version)
+5. [License](#license)
+6. [Version](#version)
 
 # 1. Installation
 
@@ -73,7 +70,23 @@ and `-DCMAKE_PREFIX_PATH=<prefix>` (installation), or `-Dfhhos4_DIR=<fhhos4>/bui
 directory of the library in the RPATH of the executable. A library compiled with MPI brings MPI along
 (`MPI::MPI_CXX`).
 
-# 2. The algorithm in a nutshell
+# 2. Applicability
+
+- [x] Linear systems:
+   - [x] Symmetric positive definite (e.g. diffusion)
+   - [x] Non-symmetric, indefinite systems (e.g. convection-diffusion, both diffusion- and convection-dominated)
+   - [x] Singular, symmetric systems
+      - [x] with translation kernel (e.g. pure Neumann diffusion)
+      - [ ] user-defined kernel vectors (e.g. for elasticity problems)
+- [x] Vector-valued unknowns
+- [x] `P` and `Q` polynomial spaces in the cells and faces
+- [x] Arbitrary polynomial degree:
+   - [x] Hierarchical bases **ordered by degree**
+   - [x] If not ordered by degree: the degree 0 must at least be first. Then OK up to degree 2.
+   - [x] Helper to reorder the bases
+   - [ ] Non-hierarchical bases not managed
+
+# 3. The algorithm in a nutshell
 
 The shared library `fhhos4` offers an algebraic multigrid method for the solution of linear systems 
 arising from hybrid discretizations (HHO, HDG...) of diffusion and convection-diffusion problems, scalar or
@@ -98,28 +111,14 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 > D. A. Di Pietro, F. Hülsemann, P. Matalon, P. Mycek, U. Rüde, *Algebraic multigrid preconditioner for statically
 > condensed systems arising from lowest-order hybrid discretizations*, SIAM J. Sci. Comput., 2023.
 
-## Applicability
-
-- [x] Symmetric positive definite systems (e.g. diffusion)
-- [x] Non-symmetric, indefinite systems (e.g. convection-diffusion, both diffusion- and convection-dominated)
-- [x] Vector-valued unknown
-- [x] Singular, symmetric systems
-   - [x] with translation kernel (e.g. pure Neumann diffusion)
-   - [ ] user kernel vectors (e.g. for elasticity problems)
-- [x] `P` and `Q` polynomial spaces in the cells and faces
-- [x] Arbitrary degree
-   - [x] Hierarchical bases **ordered by degree**
-   - [x] If not ordered by degree: the degree 0 must at least be first. Then OK up to degree 2.
-   - [x] Helper to reorder the bases
-   - [ ] Non-hierarchical bases not managed
-
 # 3. How to use
 
 Pass the blocks of the uncondensed matrix, `A_TT, A_TF, A_FF` for a symmetric system (and `A_FT` for a non-symmetric
 one), and the two blocks of the right-hand side `b_T, b_F`. The library condenses the system internally and solves it for both the
 cell and face unknowns `x_T, x_F`. This way, your code doesn't have to implement any static condensation process, and gets the complete
 hybrid solution directly.
-Krylov methods is included: `fhhos4` is meant to be used directly as a solver. It can also be used as a preconditioner for an outer Krylov method.
+
+Krylov methods are included: `fhhos4` is meant to be used directly as a solver. It can also be used as a preconditioner for an outer Krylov method.
 
 ### Symmetric systems
 
