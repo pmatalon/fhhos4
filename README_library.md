@@ -49,7 +49,7 @@ Build options (`cmake -D<OPTION>=<value>`):
 |---|---|---|
 | `ENABLE_OPENMP` | `ON` | Parallel (OpenMP) |
 | `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
-| `SMALL_INDEX` | `ON` | `int` indices in `fhhos4::SparseMatrix` (`int64_t` otherwise) |
+| `ENABLE_64BIT_INDEX` | `OFF` | 64-bit indices (`int64_t`) in `fhhos4::SparseMatrix` (`int` otherwise) |
 | `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#python) |
 | `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#several-processes-mpi). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |
@@ -332,7 +332,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   otherwise in full (`A_FF` on several processes, all the blocks of a non-symmetric system). A triangular block where
   both triangles are read (or an upper triangular one where the lower is) is refused.
 - **The format of the matrices**: Eigen sparse matrices, compressed, row-major, with the index type of the library
-  (`fhhos4::SparseIndex`: `int`, or 64 bits with `-DSMALL_INDEX=OFF`): `fhhos4::SparseMatrix`, or an Eigen map of your
+  (`fhhos4::SparseIndex`: `int`, or 64 bits with `-DENABLE_64BIT_INDEX=ON`): `fhhos4::SparseMatrix`, or an Eigen map of your
   own CSR arrays, `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)`, the columns
   strictly increasing in each row (sorted, no duplicates; checked). **The matrices are read in place, never copied nor
   converted**: assemble them in this format. Any other Eigen sparse matrix converts by Eigen, in one line, a copy that

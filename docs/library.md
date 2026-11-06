@@ -27,8 +27,8 @@ For the library's users: `README_library.md`. This file is for changing the libr
   caller on the condensed system, preconditioned by one cycle (`Krylov::None`, `MaxIterations = 1`), on any number of
   processes.
 - Matrices: `fhhos4::SparseMatrix` (Eigen row-major, of the library's index type `SparseIndex`, generated into
-  `fhhos4_version.h` from `SMALL_INDEX`) or an Eigen map of one (`fhhos4::SparseMatrixMap`). The setups are templates on
-  `Eigen::SparseCompressedBase<Derived>`: a wrong format is a `static_assert` naming the Eigen conversion
+  `fhhos4_version.h` from `ENABLE_64BIT_INDEX`) or an Eigen map of one (`fhhos4::SparseMatrixMap`). The setups are
+  templates on `Eigen::SparseCompressedBase<Derived>`: a wrong format is a `static_assert` naming the Eigen conversion
   `fhhos4::SparseMatrix B = A;`; a temporary `Eigen::SparseMatrix` is refused by a deleted overload where the solver
   keeps it (`A_FT`). Checked by one parallel pass, `CheckCSR()`; `A_TT` block diagonal (`CheckBlockDiagonal()`), and
   the triangles the setup reads present (`CheckTriangles()`: a lower-only `A_FF` where it is read in full, on several

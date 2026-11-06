@@ -55,7 +55,7 @@
 namespace fhhos4
 {
 	// The index type of the sparse matrices of the library: int (32 bits), or 64 bits if fhhos4 is compiled with
-	// -DSMALL_INDEX=OFF
+	// -DENABLE_64BIT_INDEX=ON
 	using SparseIndex = FHHOS4_SPARSE_INDEX;
 
 	// The sparse matrices of the library: Eigen's, row-major, with the index type SparseIndex, compressed. The setups

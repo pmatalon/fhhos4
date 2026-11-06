@@ -19,7 +19,7 @@ option(ENABLE_PROGRAM "Build the program fhhos4 and its tests. OFF (default, for
 option(ENABLE_GMSH "Build with the GMSH interface" ON)
 option(ENABLE_AGMG "Build with AGMG" OFF)
 option(ENABLE_CGAL "Build with CGAL" ON)
-option(SMALL_INDEX "Use type 'int' for the indexes" ON)
+option(ENABLE_64BIT_INDEX "64-bit indices (int64_t) in the sparse matrices. OFF: int" OFF)
 option(ENABLE_1D "Enable 1D" OFF)
 option(ENABLE_2D "Enable 2D" ON)
 option(ENABLE_3D "Enable 3D" ON)
@@ -71,11 +71,12 @@ target_include_directories(fhhos4_lib
 # Version, used by the library and the program: the public header fhhos4_version.h, and the definition of
 # fhhos4::Version(), which adds the commit (git describe). The commit changes without CMake running again: Version.cpp
 # is regenerated at each build, but rewritten only when it changes, so a new commit recompiles this small file alone.
-# fhhos4_version.h also gives the index type of the sparse matrices (SMALL_INDEX, src/Utils/Types.h): fhhos4::SparseMatrix.
-if(SMALL_INDEX)
-	set(FHHOS4_SPARSE_INDEX int)
-else()
+# fhhos4_version.h also gives the index type of the sparse matrices (ENABLE_64BIT_INDEX, src/Utils/Types.h):
+# fhhos4::SparseMatrix.
+if(ENABLE_64BIT_INDEX)
 	set(FHHOS4_SPARSE_INDEX int64_t)
+else()
+	set(FHHOS4_SPARSE_INDEX int)
 endif()
 # fhhos4_version.h also says whether the library is compiled with MPI (FHHOS4_MPI): its public header then includes mpi.h
 if(ENABLE_MPI)
@@ -96,11 +97,11 @@ add_custom_target(fhhos4_git_version
 	VERBATIM)
 add_dependencies(fhhos4_lib fhhos4_git_version)
 
-if(SMALL_INDEX)
-	target_compile_definitions(fhhos4_lib PRIVATE SMALL_INDEX)
-	message(STATUS "SMALL_INDEX: ON (int)")
+if(ENABLE_64BIT_INDEX)
+	target_compile_definitions(fhhos4_lib PRIVATE ENABLE_64BIT_INDEX)
+	message(STATUS "ENABLE_64BIT_INDEX: ON (int64_t)")
 else()
-	message(STATUS "SMALL_INDEX: OFF (int64_t)")
+	message(STATUS "ENABLE_64BIT_INDEX: OFF (int)")
 endif()
 
 # Include Eigen
@@ -212,8 +213,8 @@ if(ENABLE_MPI AND ENABLE_TESTS)
 	add_executable(fhhos4_mpi_tests ${mpi_test_source_files})
 	target_include_directories(fhhos4_mpi_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 	target_compile_definitions(fhhos4_mpi_tests PRIVATE MPI_ENABLED)
-	if(SMALL_INDEX)
-		target_compile_definitions(fhhos4_mpi_tests PRIVATE SMALL_INDEX)
+	if(ENABLE_64BIT_INDEX)
+		target_compile_definitions(fhhos4_mpi_tests PRIVATE ENABLE_64BIT_INDEX)
 	endif()
 	target_link_libraries(fhhos4_mpi_tests PRIVATE fhhos4_lib MUMPS::MUMPS GTest::gtest Threads::Threads)
 	if(ENABLE_OPENMP)
@@ -280,8 +281,8 @@ set_target_properties(fhhos4 PROPERTIES INSTALL_RPATH "$ORIGIN/${lib_dir_from_bi
 install(TARGETS fhhos4 RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT program)
 install(DIRECTORY data/meshes DESTINATION ${CMAKE_INSTALL_DATADIR}/fhhos4 COMPONENT program)
 
-if(SMALL_INDEX)
-	target_compile_definitions(fhhos4_core PUBLIC SMALL_INDEX)
+if(ENABLE_64BIT_INDEX)
+	target_compile_definitions(fhhos4_core PUBLIC ENABLE_64BIT_INDEX)
 endif()
 
 if(ENABLE_1D)

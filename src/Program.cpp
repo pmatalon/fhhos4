@@ -37,10 +37,10 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 	Timer totalTimer;
 	totalTimer.Start();
 
-#ifdef SMALL_INDEX
-	cout << "Index type: int" << endl;
-#else
+#ifdef ENABLE_64BIT_INDEX
 	cout << "Index type: int64_t" << endl;
+#else
+	cout << "Index type: int" << endl;
 #endif
 	cout << "Shared memory parallelism: " << (Parallelism::NThreads() == 1 ? "sequential execution" : to_string(Parallelism::NThreads()) + " threads") << endl;
 	const Communicator& world = Communicator::Current();

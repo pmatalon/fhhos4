@@ -313,7 +313,7 @@ TEST(DistributedLibrary, CollectiveErrors)
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	EXPECT_THROW(solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, ghosts), fhhos4::Error);
 	faceOnes = Vector::Ones(system.Faces->NOwned);
-	// A ghost beyond 32 bits on the last process, whose low 32 bits are a valid ghost: refused whatever SMALL_INDEX
+	// A ghost beyond 32 bits on the last process, whose low 32 bits are a valid ghost: refused whatever the index type
 	vector<int64_t> farGhosts = ghosts;
 	if (World().Rank() == World().Size() - 1 && !farGhosts.empty())
 		farGhosts[0] += (int64_t)1 << 32;

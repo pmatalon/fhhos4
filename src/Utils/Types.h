@@ -10,16 +10,16 @@
 #include <Eigen/Dense>
 
 // BigNumber is signed in both cases: the code encodes states as negative numbers (e.g. -1: not aggregated yet)
-#ifdef SMALL_INDEX
-using BigNumber = int;
-using SparseMatrixIndex = int;
-#else
+#ifdef ENABLE_64BIT_INDEX
 // int64_t, not intmax_t: on macOS intmax_t is long and int64_t long long, and the public header accepts std::int64_t
 using BigNumber = int64_t;
 using SparseMatrixIndex = int64_t; // in Eigen, default value is int, but it is not sufficient for big matrices
-#endif // SMALL_INDEX
+#else
+using BigNumber = int;
+using SparseMatrixIndex = int;
+#endif // ENABLE_64BIT_INDEX
 
-// The global numbers of a distribution over processes (IndexMap: cells, faces, DoFs): 64 bits whatever SMALL_INDEX,
+// The global numbers of a distribution over processes (IndexMap: cells, faces, DoFs): 64 bits whatever the index type,
 // since the processes together may number more than one of them does; BigNumber and SparseMatrixIndex number the
 // entities of a process
 using GlobalNumber = int64_t;

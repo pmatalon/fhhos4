@@ -8,11 +8,12 @@ Read before a release or a change of the conda recipe, the release workflow or t
 Change the version in `project()` and the release in "Install from source" of `README_library.md` (the clone command,
 the text and the link below it), commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are
 `Release_X.Y.Z`). `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the
-installation and the library alone with 64-bit indices (`SMALL_INDEX=OFF`) and the conda test client, the library
+installation and the library alone with 64-bit indices (`ENABLE_64BIT_INDEX=ON`) and the conda test client, the library
 with MPI (`ENABLE_MPI`) and its tests on 1-4 processes (`MPI_np*`), and in parallel jobs the conda package with its
-tests and the library alone on macOS (`library-macos`: both index types, each with the conda test client), then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag, which must not mention
-HArDCore3D). It pins GMSH, Eigen, CGAL, the compiler, MPICH, MUMPS and rattler-build to the versions the tests were
-validated with: update them with the local environment (envs `fhhos4` and `rattler`). After a change of
+tests and the library alone on macOS (`library-macos`: both index types, each with the conda test client), then
+creates the GitHub release "Release X.Y.Z" (notes: the message of the tag, which must not mention HArDCore3D). It pins
+GMSH, Eigen, CGAL, the compiler, MPICH, MUMPS and rattler-build to the versions the tests were validated with: update
+them with the local environment (envs `fhhos4` and `rattler`). After a change of
 `release.yml` or of its pins, run it by hand on master (Actions > Release > Run workflow: no release) before pushing
 the tag; otherwise push the tag directly. After the release, conda-forge's bot updates the feedstock; the Spack package
 needs a PR to spack-packages (`spack checksum --add-to-package fhhos4 X.Y.Z`, then `spack install --test=root` and
@@ -46,6 +47,6 @@ feedstock too.
 The library alone too, in Spack's builtin repository (`spack/spack-packages`,
 `repos/spack_repo/builtin/packages/fhhos4/package.py`; PR 7139), not in this repository. `CMakePackage`,
 `ENABLE_PROGRAM=OFF`, `ENABLE_NATIVE_ARCH=OFF` (Spack sets the target's flags), variant `openmp` (default on),
-`eigen@3.4:`. No variant for the index type: `SMALL_INDEX=OFF` does not compile in 1.4.0 (fixed after it). Its
-stand-alone test (`spack test run fhhos4`) builds and runs the conda test client `conda/recipe/test`, cached from the
-sources: moving it changes the package too (per version).
+`eigen@3.4:`. No variant for the index type: 64-bit indices (`SMALL_INDEX=OFF` then, `ENABLE_64BIT_INDEX=ON` from
+1.5.0) do not compile in 1.4.0. Its stand-alone test (`spack test run fhhos4`) builds and runs the conda test client
+`conda/recipe/test`, cached from the sources: moving it changes the package too (per version).

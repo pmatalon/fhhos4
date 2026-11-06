@@ -78,7 +78,7 @@ iteration counts of the papers in `reproducibility/` — see `tests/README.md`. 
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, the full Neumann problem (`FullNeumann*`, 2D), and the library (`UAMGLibrary*`,
 ~15 s). Not covered: DG/FEM programs (disabled by default), `lu`/`cg`/`agmg`/`p_mg` solvers,
-1D, anisotropic cases, `SMALL_INDEX=OFF` (64-bit indices; the release workflow only builds the library with it and
+1D, anisotropic cases, `ENABLE_64BIT_INDEX=ON` (64-bit indices; the release workflow only builds the library with it and
 runs the conda test client: after a change of index or state handling, build it apart with `-Wtype-limits` and run
 the tests there). MPI tests: `docs/mpi.md`; Python: `docs/python.md`.
 

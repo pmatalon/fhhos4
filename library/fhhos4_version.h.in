@@ -12,7 +12,7 @@
 #define FHHOS4_VERSION "@PROJECT_VERSION@"
 
 // The index type of the sparse matrices of fhhos4 (fhhos4::SparseMatrix): int, or int64_t if fhhos4 is compiled with
-// -DSMALL_INDEX=OFF
+// -DENABLE_64BIT_INDEX=ON
 #define FHHOS4_SPARSE_INDEX @FHHOS4_SPARSE_INDEX@
 
 // 1 if fhhos4 is compiled with MPI (-DENABLE_MPI=ON): fhhos4::Solver then works on the processes of an MPI communicator

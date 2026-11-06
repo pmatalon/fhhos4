@@ -74,7 +74,7 @@ TEST(IndexMap, Ownership)
 	}
 }
 
-// Global numbers beyond 32 bits whatever SMALL_INDEX: 2^31 - 1 entities per process (an IndexMap stores no values), a
+// Global numbers beyond 32 bits whatever the index type: 2^31 - 1 entities per process (an IndexMap stores no values), a
 // ghost of the next process (beyond 2^32 on 3 processes), and the halo of the owner
 TEST(IndexMap, GlobalNumbersBeyond32Bits)
 {

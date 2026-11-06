@@ -84,7 +84,7 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_PYTHON` | OFF | The Python module of the library (see `README_library.md`); needs Python, nanobind and NumPy (SciPy for its tests); with `ENABLE_MPI`, mpi4py too |
 | `ENABLE_MPI` | OFF | Distributed-memory parallelism: the program and the library on several processes (see [Several processes](#7-optional-several-processes-mpi)); needs MPI and MUMPS (the coarse solver) |
 | `ENABLE_MUMPS` | OFF | MUMPS's factorizations on one process too (`-coarse-solver mumpsch\|mumpslu`, `-s mumpsch\|mumpslu`); always with `ENABLE_MPI`; without it, needs MUMPS's sequential version (e.g. `conda install -n fhhos4 -c conda-forge mumps-seq`) |
-| `SMALL_INDEX` | ON | `int` indices in the sparse matrices (`int64_t` otherwise) |
+| `ENABLE_64BIT_INDEX` | OFF | 64-bit indices (`int64_t`) in the sparse matrices (`int` otherwise) |
 
 If you built GMSH from source instead of using the conda package, pass its location explicitly:
 

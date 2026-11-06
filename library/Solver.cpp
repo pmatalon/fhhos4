@@ -108,7 +108,7 @@ namespace fhhos4
 				Utils::FatalError(matrix + " has non-zeros, but no ColumnIndices or Values.");
 			constexpr std::int64_t maxIndex = numeric_limits<SparseMatrixIndex>::max();
 			if (M.Rows > maxIndex || M.Cols > maxIndex || nnz > maxIndex)
-				Utils::FatalError(matrix + " has too many rows, columns or non-zeros (" + to_string(nnz) + ") for the index type of the library (compile fhhos4 with -DSMALL_INDEX=OFF).");
+				Utils::FatalError(matrix + " has too many rows, columns or non-zeros (" + to_string(nnz) + ") for the index type of the library (compile fhhos4 with -DENABLE_64BIT_INDEX=ON).");
 			std::int64_t firstInvalidRow = M.Rows;
 			#pragma omp parallel for reduction(min:firstInvalidRow) schedule(static)
 			for (std::int64_t i = 0; i < M.Rows; ++i)
@@ -865,7 +865,7 @@ namespace fhhos4
 			if (nDoFs > 0 && !lists.DoFs)
 				Utils::FatalError(error + " have no DoFs.");
 			if (nDoFs > numeric_limits<SparseMatrixIndex>::max())
-				Utils::FatalError(error + " have too many DoFs (" + to_string(nDoFs) + ") for the index type of the library (compile fhhos4 with -DSMALL_INDEX=OFF).");
+				Utils::FatalError(error + " have too many DoFs (" + to_string(nDoFs) + ") for the index type of the library (compile fhhos4 with -DENABLE_64BIT_INDEX=ON).");
 			std::int64_t firstInvalid = nDoFs;
 			#pragma omp parallel for reduction(min:firstInvalid) schedule(static)
 			for (std::int64_t p = 0; p < nDoFs; ++p)

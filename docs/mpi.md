@@ -28,7 +28,7 @@ program too: `-DENABLE_PROGRAM=ON`).
   `AddGhostsToOwners`, `Forward/ReverseExchange`), `Utils/DistributedMatrix.h` (rows owned, `Diag` + `Offd` (ghost
   columns): the smoothers work on `Diag`; `MultiplyTransposed` for the restriction; `FetchGhostRows`, `RowsWithGhosts` (the rows of the ghosts fetched, the columns of another map),
   `AssembleFromLocalRows`: the rows of the ghosts added to their owners').
-- Global numbers: `GlobalNumber` (`int64_t` whatever `SMALL_INDEX`, ADR-0022), local ones `BigNumber`. The rows with
+- Global numbers: `GlobalNumber` (`int64_t` whatever the index type, ADR-0022), local ones `BigNumber`. The rows with
   global columns are `GlobalColumnsMatrix` (`FromGlobalColumns()`, `GlobalColumns()`, `FetchGhostRows()`, MUMPS's
   input, the program's `DistributedHybridSystem::GlobalRows()`), built by `SparseMatrixOps::BuildByRows<T, Index>()`.
 - Solvers: `Solver::Distributed`, `Setup(const DistributedMatrix&)` (FatalError unless overridden: FCG, GCR, Multigrid,
