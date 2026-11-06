@@ -52,7 +52,10 @@ program too: `-DENABLE_PROGRAM=ON`).
   default options (flat passes, chained prolongation, no `A_F_F`). Non-symmetric: `A_F_T` on the rows of all the local
   faces and the columns of the cells of the process (what its cells read: couplings, `P^T A_F_T Q_T`), the downwind
   order of the faces of each process (`Diag`; Jacobi between the processes). Ghost faces may belong to no local cell
-  (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced.
+  (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced. The
+  coarsening stops at `MatrixMaxSizeForCoarsestLevel` rows in total or `MinRowsPerProcess` per process on average
+  (`Multigrid::CoarseLevelNeeded()`; the library's `CoarseMatrixMaxSize`, `MinRowsPerProcess`): the aggregates stay
+  within each process and the faces between processes are kept, so on many processes the total is out of reach.
   Mixed precision as on one process: `DistributedMatrixOf<float>` (`Cast<float>()`; the constructions in double
   but `AssembleFromLocalRows<T>()`, its sums in double), `Level::SingleDistributedOperator`/`SingleDistributedP`; the
   finest level's float copy of the caller's matrix, the p-levels' operators in double until the end of the setup, the

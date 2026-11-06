@@ -60,6 +60,7 @@ struct MultigridArguments
 	UAMGProlongation UAMGMultigridProlong = UAMGProlongation::ReconstructTraceOrInject;
 	int NumberOfMeshes = 0;
 	int MatrixMaxSizeForCoarsestLevel = 1000;
+	int MinRowsPerProcess = 50; // -min-rows-per-proc: on several processes (Multigrid::MinRowsPerProcess)
 	CycleType Cycle = CycleType::V;
 	int WLoops = 1;
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // GCR under -s gcr (ApplyProgramArgumentDefaults)

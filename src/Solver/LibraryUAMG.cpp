@@ -39,6 +39,9 @@ public:
 		_solver.PostSmoother = LibraryParameters::LibrarySmoother(mg.PostSmoother);
 		_solver.CoarseningFactor = mg.CoarseningFactor;
 		_solver.CoarseMatrixMaxSize = mg.MatrixMaxSizeForCoarsestLevel;
+#if FHHOS4_MPI
+		_solver.MinRowsPerProcess = mg.MinRowsPerProcess;
+#endif
 		_solver.CoarseSolver = LibraryParameters::LibraryCoarseSolver(mg.CoarseSolverCode);
 		_solver.MixedPrecision = mg.UAMGMixedPrecision; // the program's default: double (the papers)
 		_solver.BlockCSRStorage = mg.UAMGBlockCSRStorage;

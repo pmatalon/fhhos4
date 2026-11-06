@@ -29,6 +29,9 @@ public:
 	// precision doesn't support (see UncondensedAMG::MixedPrecisionApplies()), the levels are in double.
 	bool MixedPrecision = false;
 	int MatrixMaxSizeForCoarsestLevel;
+	// On several processes, the coarsening also stops at this many rows per process on average (0: no such stop): the
+	// aggregation stays within each process, so MatrixMaxSizeForCoarsestLevel may be out of reach on many of them
+	int MinRowsPerProcess = 0;
 	bool UseGalerkinOperator = false;
 	SmootherType PreSmoother = SmootherType::BlockGaussSeidel;
 	SmootherType PostSmoother = SmootherType::BackwardBlockGaussSeidel;
@@ -464,7 +467,10 @@ private:
 
 	bool CoarseLevelNeeded(Level* currentLevel, int levelNumber)
 	{
-		bool stillNeedToCoarsen = (_automaticNumberOfLevels && currentLevel->NUnknowns() > MatrixMaxSizeForCoarsestLevel) || (levelNumber < _nLevels - 1);
+		GlobalNumber maxSize = MatrixMaxSizeForCoarsestLevel;
+		if (this->Distributed)
+			maxSize = max(maxSize, (GlobalNumber)MinRowsPerProcess * this->Distributed->Comm().Size());
+		bool stillNeedToCoarsen = (_automaticNumberOfLevels && currentLevel->NUnknowns() > maxSize) || (levelNumber < _nLevels - 1);
 		if (!stillNeedToCoarsen)
 			return false;
 		if (this->HP_CS == HP_CoarsStgy::P_only && currentLevel->PolynomialDegree() == CoarsePolyDegree)

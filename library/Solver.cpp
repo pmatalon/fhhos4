@@ -409,6 +409,9 @@ namespace fhhos4
 			mg.L1Theta = s.L1Theta;
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
+#if FHHOS4_MPI
+			mg.MinRowsPerProcess = s.MinRowsPerProcess;
+#endif
 			mg.CoarseSolverCode = LibraryParameters::ProgramCoarseSolver(CoarseSolver, Symmetric);
 			mg.UAMGMixedPrecision = s.MixedPrecision;
 			mg.UAMGBlockCSRStorage = s.BlockCSRStorage;

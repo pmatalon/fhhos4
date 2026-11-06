@@ -204,6 +204,7 @@ public:
 	{
 		mg->Out = ExportModule(out);
 		mg->MatrixMaxSizeForCoarsestLevel = args.Solver.MG.MatrixMaxSizeForCoarsestLevel;
+		mg->MinRowsPerProcess = args.Solver.MG.MinRowsPerProcess;
 		mg->Cycle = args.Solver.MG.Cycle;
 		mg->WLoops = args.Solver.MG.WLoops;
 		mg->KCycleKrylov = args.Solver.MG.KCycleKrylov;

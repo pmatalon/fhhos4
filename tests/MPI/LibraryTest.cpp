@@ -269,6 +269,32 @@ TEST(DistributedLibrary, LocalColumnsHelpers)
 			ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, components, true, nullptr, false, true);
 }
 
+// MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxSize at MinRowsPerProcess * P rows (on
+// 2 and 4 processes, a level earlier than at 1000); at the fine level with the number of faces
+TEST(DistributedLibrary, MinRowsPerProcess)
+{
+	if (World().Size() == 1)
+		GTEST_SKIP() << "several processes";
+	int n = 60;
+	CartesianHybridSystem global(n, 0);
+	PartitionedSystem system(global, n, PartitionShape::Blocks, World());
+	fhhos4::SparseMatrix A_TT = system.A_TT, A_TF = system.A_TF.LocalColumns();
+	fhhos4::SparseMatrix A_FF = DistributedMatrix::RenumberColumns(SparseMatrix(system.Global.A_FF.middleRows(system.Faces->Begin, system.Faces->NOwned)), [&](BigNumber f) { return system.A_TF.ColMap->Local(f); }, system.A_TF.ColMap->NLocal(), 1);
+	vector<int64_t> ghosts(system.A_TF.ColMap->Ghosts.begin(), system.A_TF.ColMap->Ghosts.end());
+	Vector cellOnes = Vector::Ones(system.Cells->NOwned), faceOnes = Vector::Ones(system.Faces->NOwned);
+	auto levels = [&](int coarseMatrixMaxSize, int minRowsPerProcess)
+	{
+		fhhos4::Solver solver = CartesianSolver(World().Comm());
+		solver.CoarseMatrixMaxSize = coarseMatrixMaxSize;
+		solver.MinRowsPerProcess = minRowsPerProcess;
+		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, ghosts);
+		return solver.NumberOfLevels();
+	};
+	int perProcess = 1500;
+	EXPECT_EQ(levels(1000, perProcess), levels(perProcess * World().Size(), 0));
+	EXPECT_EQ(levels(1000, (int)system.Faces->GlobalSize), 1);
+}
+
 // The inputs are checked on all the processes: an error on one of them is an error on all of them
 TEST(DistributedLibrary, CollectiveErrors)
 {

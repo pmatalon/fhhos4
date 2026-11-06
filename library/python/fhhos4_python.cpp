@@ -462,6 +462,9 @@ NB_MODULE(fhhos4, m)
 		.def_rw("Prolongation", &fhhos4::Solver::Prolongation)
 		.def_rw("CoarseningFactor", &fhhos4::Solver::CoarseningFactor)
 		.def_rw("CoarseMatrixMaxSize", &fhhos4::Solver::CoarseMatrixMaxSize)
+#if FHHOS4_MPI
+		.def_rw("MinRowsPerProcess", &fhhos4::Solver::MinRowsPerProcess)
+#endif
 		.def_rw("CoarseSolver", &fhhos4::Solver::CoarseSolver)
 		.def_rw("MixedPrecision", &fhhos4::Solver::MixedPrecision)
 		.def_rw("BlockCSRStorage", &fhhos4::Solver::BlockCSRStorage)

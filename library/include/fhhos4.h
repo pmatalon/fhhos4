@@ -369,7 +369,14 @@ namespace fhhos4
 		// The prolongation of the h-coarsening: from the faces of the boundary of each aggregate to its interior faces
 		fhhos4::Prolongation Prolongation = fhhos4::Prolongation::HarmonicExtension;
 		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
-		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows
+		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows (on several
+		                                   // processes, in total)
+#if FHHOS4_MPI
+		// On several processes (Comm), the coarsening also stops when the matrix has at most this many rows per process
+		// on average (0: only CoarseMatrixMaxSize): the aggregates stay within each process, so on many processes the
+		// coarsest matrix cannot reach CoarseMatrixMaxSize, and the last levels would have a few rows per process.
+		int MinRowsPerProcess = 50;
+#endif
 		// Solver of the coarsest level. Default: Cholesky for a symmetric matrix, LU otherwise.
 		fhhos4::CoarseSolver CoarseSolver = fhhos4::CoarseSolver::Default;
 		// Mixed precision: the matrices of the levels of the AMG (operators, transfers, smoothers) stored and its cycles

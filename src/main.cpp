@@ -372,6 +372,11 @@ void print_usage() {
 	cout << endl;
 	cout << "-coarse-size NUM" << endl;
 	cout << "      Matrix size limit below which the automatic coarsening stops and a direct solver is used (default: 1000)." << endl;
+	cout << "      On several processes: the rows of all of them." << endl;
+	cout << endl;
+	cout << "-min-rows-per-proc NUM" << endl;
+	cout << "      On several processes, the automatic coarsening also stops when the matrix has at most NUM rows per process on" << endl;
+	cout << "      average (0: only -coarse-size). Default: 50." << endl;
 	cout << endl;
 	cout << "-g {0|1}" << endl;
 	cout << "      Coarse grid operator for the multigrid." << endl;
@@ -815,6 +820,7 @@ int Run(int argc, char* argv[])
 		OPT_CoarseningProlongationCode,
 		OPT_FaceProlongationCode,
 		OPT_CoarseMatrixSize,
+		OPT_MinRowsPerProcess,
 		OPT_Smoothers,
 		OPT_HP_CS,
 		OPT_H_CS,
@@ -922,6 +928,7 @@ int Run(int argc, char* argv[])
 		 { "coarsening-prolong", required_argument, NULL, OPT_CoarseningProlongationCode },
 		 { "face-prolong", required_argument, NULL, OPT_FaceProlongationCode },
 		 { "coarse-size", required_argument, NULL, OPT_CoarseMatrixSize },
+		 { "min-rows-per-proc", required_argument, NULL, OPT_MinRowsPerProcess },
 		 { "smoothers", required_argument, NULL, OPT_Smoothers },
 		 { "hp-cs", required_argument, NULL, OPT_HP_CS },
 		 { "cs", required_argument, NULL, OPT_H_CS },
@@ -1431,6 +1438,9 @@ int Run(int argc, char* argv[])
 				break;
 			case OPT_CoarseMatrixSize:
 				args.Solver.MG.MatrixMaxSizeForCoarsestLevel = atoi(optarg);
+				break;
+			case OPT_MinRowsPerProcess:
+				args.Solver.MG.MinRowsPerProcess = atoi(optarg);
 				break;
 			case 'w': 
 				wLoops = atoi(optarg);
