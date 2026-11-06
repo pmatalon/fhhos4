@@ -48,12 +48,12 @@ Build options (`cmake -D<OPTION>=<value>`):
 | Option | Default | Effect |
 |---|---|---|
 | `ENABLE_OPENMP` | `ON` | Parallel (OpenMP) |
-| `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
-| `ENABLE_64BIT_INDEX` | `OFF` | 64-bit indices (`int64_t`) in `fhhos4::SparseMatrix` (`int` otherwise) |
-| `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#python) |
 | `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#several-processes-mpi). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
+| `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#python) |
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |
 | `MUMPS_INCLUDE_DIR`, `MUMPS_LIBRARY` | found | MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by `-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so` |
+| `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
+| `ENABLE_64BIT_INDEX` | `OFF` | 64-bit indices (`int64_t`) in `fhhos4::SparseMatrix` (`int` otherwise) |
 
 ## Conda and Spack packages
 
@@ -121,8 +121,6 @@ That's it, no static condensation.
 The library condenses the system internally and solves it for both the
 cell and face unknowns `(x_T, x_F)`.
 
-Krylov methods are included: `fhhos4` is meant to be used directly as a solver. It can also be used as a preconditioner for an outer Krylov method.
-
 ### Symmetric systems
 
 ```cpp
@@ -134,7 +132,15 @@ solver.FaceDegree = k; // polynomial degree in the faces
 solver.CellDegree = k; // polynomial degree in the cells
 // solver.PolynomialSpace = fhhos4::PolynomialSpace::Q; // bases of Q^k instead of P^k
 // solver.VectorComponents = 3; // a vector-valued unknown of 3 components (see Inputs)
+
+#ifdef WITH_MPI
+solver.Comm = MPI_COMM_WORLD;
+std::vector<std::int64_t> faceGhostGlobalNumbers = ...; // or a std::span, an Eigen vector..., GhostNumbers(n, pointer)
+solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
+#else
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
+#endif
+
 Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size());
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
