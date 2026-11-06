@@ -922,7 +922,8 @@ TEST(UAMGLibrary, CoupledComponents)
 TEST(UAMGLibrary, OtherFormats)
 {
 	HybridSystem system(64);
-	ColMajorMatrix colMajorA_TT = system.A_TT, colMajorA_TF = system.A_TF, colMajorA_FF = system.A_FF;
+	using ColMajorLibraryMatrix = Eigen::SparseMatrix<double, Eigen::ColMajor, fhhos4::SparseIndex>; // TransposedView(): the index type of the library
+	ColMajorLibraryMatrix colMajorA_TT = system.A_TT, colMajorA_TF = system.A_TF, colMajorA_FF = system.A_FF;
 	fhhos4::SparseMatrix A_TT = colMajorA_TT, A_TF = colMajorA_TF;
 	using LongMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>;
 	LongMatrix longA_FF = system.A_FF;
@@ -951,7 +952,7 @@ TEST(UAMGLibrary, OtherFormats)
 
 	HybridSystem::Matrix uncompressed = system.A_FF;
 	uncompressed.uncompress();
-	ColMajorMatrix uncompressedColMajor = colMajorA_FF;
+	ColMajorLibraryMatrix uncompressedColMajor = colMajorA_FF;
 	uncompressedColMajor.uncompress();
 	fhhos4::Solver solver = ToySolver();
 	EXPECT_THROW(solver.SetupSym(system.A_TT, system.A_TF, uncompressed, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
@@ -1075,15 +1076,15 @@ TEST(UAMGLibrary, CSRFormat)
 	uamg.Solve(system.b, x);
 
 	const HybridSystem::Matrix& A_TF = system.A_TF;
-	std::vector<int> rowPointers(A_TF.outerIndexPtr(), A_TF.outerIndexPtr() + A_TF.rows() + 1);
-	std::vector<int> columns(A_TF.innerIndexPtr(), A_TF.innerIndexPtr() + A_TF.nonZeros());
-	auto setupWith = [&](const std::vector<int>& p, const std::vector<int>& c)
+	std::vector<fhhos4::SparseIndex> rowPointers(A_TF.outerIndexPtr(), A_TF.outerIndexPtr() + A_TF.rows() + 1);
+	std::vector<fhhos4::SparseIndex> columns(A_TF.innerIndexPtr(), A_TF.innerIndexPtr() + A_TF.nonZeros());
+	auto setupWith = [&](const std::vector<fhhos4::SparseIndex>& p, const std::vector<fhhos4::SparseIndex>& c)
 	{
 		fhhos4::SparseMatrixMap view(A_TF.rows(), A_TF.cols(), A_TF.nonZeros(), p.data(), c.data(), A_TF.valuePtr());
 		uamg.SetupSym(system.A_TT, view, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 	};
 	EXPECT_NO_THROW(setupWith(rowPointers, columns));
-	std::vector<int> unsorted = columns, duplicate = columns, outside = columns, shifted = rowPointers;
+	std::vector<fhhos4::SparseIndex> unsorted = columns, duplicate = columns, outside = columns, shifted = rowPointers;
 	std::swap(unsorted[0], unsorted[1]);
 	duplicate[1] = duplicate[0];
 	outside[5] = A_TF.cols();

@@ -75,7 +75,7 @@ target_include_directories(fhhos4_lib
 if(SMALL_INDEX)
 	set(FHHOS4_SPARSE_INDEX int)
 else()
-	set(FHHOS4_SPARSE_INDEX intmax_t)
+	set(FHHOS4_SPARSE_INDEX int64_t)
 endif()
 # fhhos4_version.h also says whether the library is compiled with MPI (FHHOS4_MPI): its public header then includes mpi.h
 if(ENABLE_MPI)
@@ -100,7 +100,7 @@ if(SMALL_INDEX)
 	target_compile_definitions(fhhos4_lib PRIVATE SMALL_INDEX)
 	message(STATUS "SMALL_INDEX: ON (int)")
 else()
-	message(STATUS "SMALL_INDEX: OFF (intmax_t)")
+	message(STATUS "SMALL_INDEX: OFF (int64_t)")
 endif()
 
 # Include Eigen

@@ -1,6 +1,6 @@
 # Release: on the push of an annotated tag vX.Y.Z, where X.Y.Z is the version of project() in CMakeLists.txt, checks the
-# version, builds and tests fhhos4 and its conda package, then creates the GitHub release "Release X.Y.Z", whose notes
-# are the message of the tag. Run it by hand (Actions > Release > Run workflow) to check the build and the tests without
+# version, builds and tests fhhos4, its conda package and the library on macOS, then creates the GitHub release
+# "Release X.Y.Z", whose notes are the message of the tag. Run it by hand (Actions > Release > Run workflow) to check the build and the tests without
 # releasing.
 name: Release
 
@@ -112,8 +112,46 @@ jobs:
       - name: Build and test
         run: rattler-build build -r conda/recipe -c conda-forge --experimental --output-dir "$RUNNER_TEMP/conda"
 
+  # The library alone on macOS (Apple Silicon, conda's clang and libc++, OpenMP from llvm-openmp), where int64_t is long
+  # long, not long as on Linux: both index types (SMALL_INDEX), each with the test client of the conda package
+  library-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Version
+        run: echo "VERSION=$(sed -nE 's/^project\(fhhos4 VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)" >> "$GITHUB_ENV"
+
+      - uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-name: fhhos4
+          create-args: >-
+            -c conda-forge
+            eigen=5.0.1
+            cxx-compiler=1.11.0
+            llvm-openmp
+            cmake
+            ninja
+          cache-environment: true
+
+      - name: Library alone (ENABLE_PROGRAM=OFF), int and 64-bit indices, and the test client
+        run: |
+          for small_index in ON OFF; do
+            cmake -B build-$small_index -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF -DSMALL_INDEX=$small_index
+            cmake --build build-$small_index
+            cmake -S conda/recipe/test -B client-$small_index -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -Dfhhos4_DIR="$PWD/build-$small_index" -DEXPECTED_VERSION="$VERSION"
+            cmake --build client-$small_index
+            ./client-$small_index/fhhos4_client
+          done
+
   release:
-    needs: [build-and-test, conda-package]
+    needs: [build-and-test, conda-package, library-macos]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:

@@ -9,8 +9,8 @@ Change the version in `project()` and the release in "Install from source" of `R
 the text and the link below it), commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are
 `Release_X.Y.Z`). `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the
 installation and the library alone with 64-bit indices (`SMALL_INDEX=OFF`) and the conda test client, the library
-with MPI (`ENABLE_MPI`) and its tests on 1-4 processes (`MPI_np*`), and in a parallel job the conda package with its
-tests, then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag, which must not mention
+with MPI (`ENABLE_MPI`) and its tests on 1-4 processes (`MPI_np*`), and in parallel jobs the conda package with its
+tests and the library alone on macOS (`library-macos`: both index types, each with the conda test client), then creates the GitHub release "Release X.Y.Z" (notes: the message of the tag, which must not mention
 HArDCore3D). It pins GMSH, Eigen, CGAL, the compiler, MPICH, MUMPS and rattler-build to the versions the tests were
 validated with: update them with the local environment (envs `fhhos4` and `rattler`). After a change of
 `release.yml` or of its pins, run it by hand on master (Actions > Release > Run workflow: no release) before pushing
@@ -26,7 +26,8 @@ conda-forge --experimental`, ~1 min; rattler-build is in the conda env `rattler`
   packaged: the name `fhhos4` is the library's, the clients install it.
 - Run dependencies: Eigen >= 3.4 (ADR-0013) and the compiler's runtime (`libstdcxx`, `libgcc`; the overlinking warning
   on `libgomp` is normal on conda-forge). `run_exports` pinned to major.minor, the SOVERSION.
-- Linux only: not tested elsewhere (macOS would need llvm-openmp, Windows MSVC untested).
+- Linux only. The library itself builds on macOS (release job `library-macos`, with llvm-openmp), but no package is
+  built there; Windows MSVC untested.
 - Its tests: `conda/recipe/test`, a CMake client (version, a solve on a lowest-order hybrid system), compiled as is,
   with `-march=native` (a client with other alignment settings than conda-forge's baseline) and with Eigen 3.4.
 - The source is the clone (`path: ../..`, without the gitignored files). The version is read from `project()` with

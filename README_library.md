@@ -49,7 +49,7 @@ Build options (`cmake -D<OPTION>=<value>`):
 |---|---|---|
 | `ENABLE_OPENMP` | `ON` | Parallel (OpenMP) |
 | `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
-| `SMALL_INDEX` | `ON` | `int` indices in `fhhos4::SparseMatrix` (`intmax_t` otherwise) |
+| `SMALL_INDEX` | `ON` | `int` indices in `fhhos4::SparseMatrix` (`int64_t` otherwise) |
 | `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#python) |
 | `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#several-processes-mpi). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |

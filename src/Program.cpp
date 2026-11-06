@@ -40,7 +40,7 @@ void ProgramDim<Dim>::Start(ProgramArguments& args)
 #ifdef SMALL_INDEX
 	cout << "Index type: int" << endl;
 #else
-	cout << "Index type: intmax_t" << endl;
+	cout << "Index type: int64_t" << endl;
 #endif
 	cout << "Shared memory parallelism: " << (Parallelism::NThreads() == 1 ? "sequential execution" : to_string(Parallelism::NThreads()) + " threads") << endl;
 	const Communicator& world = Communicator::Current();

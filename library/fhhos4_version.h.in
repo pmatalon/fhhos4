@@ -11,7 +11,7 @@
 #define FHHOS4_VERSION_PATCH @PROJECT_VERSION_PATCH@
 #define FHHOS4_VERSION "@PROJECT_VERSION@"
 
-// The index type of the sparse matrices of fhhos4 (fhhos4::SparseMatrix): int, or intmax_t if fhhos4 is compiled with
+// The index type of the sparse matrices of fhhos4 (fhhos4::SparseMatrix): int, or int64_t if fhhos4 is compiled with
 // -DSMALL_INDEX=OFF
 #define FHHOS4_SPARSE_INDEX @FHHOS4_SPARSE_INDEX@
 

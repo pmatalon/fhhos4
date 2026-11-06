@@ -14,8 +14,9 @@
 using BigNumber = int;
 using SparseMatrixIndex = int;
 #else
-using BigNumber = intmax_t;
-using SparseMatrixIndex = intmax_t; // in Eigen, default value is int, but it is not sufficient for big matrices
+// int64_t, not intmax_t: on macOS intmax_t is long and int64_t long long, and the public header accepts std::int64_t
+using BigNumber = int64_t;
+using SparseMatrixIndex = int64_t; // in Eigen, default value is int, but it is not sufficient for big matrices
 #endif // SMALL_INDEX
 
 // The global numbers of a distribution over processes (IndexMap: cells, faces, DoFs): 64 bits whatever SMALL_INDEX,
