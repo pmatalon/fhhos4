@@ -5,9 +5,9 @@
 3. [The algorithm in a nutshell](#3-the-algorithm-in-a-nutshell)
 4. [How to use](#3-how-to-use)
    - [Symmetric systems](#symmetric-systems)
+     - [With MPI](#with-mpi)
    - [Non-symmetric systems](#non-symmetric-systems)
    - [Use as a preconditioner](#use-as-a-preconditioner)
-   - [With MPI](#with-mpi)
    - [The Python interface](#the-python-interface)
    - [Inputs](#inputs)
    - [Other matrix formats](#other-matrix-formats)
@@ -48,8 +48,8 @@ Build options (`cmake -D<OPTION>=<value>`):
 | Option | Default | Effect |
 |---|---|---|
 | `ENABLE_OPENMP` | `ON` | Parallel (OpenMP) |
-| `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#several-processes-mpi). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
-| `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#python) |
+| `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#with-mpi). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
+| `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#the-python-interface) |
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |
 | `MUMPS_INCLUDE_DIR`, `MUMPS_LIBRARY` | found | MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by `-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so` |
 | `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
@@ -133,15 +133,16 @@ solver.CellDegree = k; // polynomial degree in the cells
 // solver.PolynomialSpace = fhhos4::PolynomialSpace::Q; // bases of Q^k instead of P^k
 // solver.VectorComponents = 3; // a vector-valued unknown of 3 components (see Inputs)
 
-#ifdef WITH_MPI
+#if FHHOS4_MPI // 1 if the library is compiled with MPI (fhhos4_version.h)
 solver.Comm = MPI_COMM_WORLD;
+// The blocks: the rows of the cells and faces of this process, the columns of the faces numbered locally (see With MPI)
 std::vector<std::int64_t> faceGhostGlobalNumbers = ...; // or a std::span, an Eigen vector..., GhostNumbers(n, pointer)
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
 #else
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
 #endif
 
-Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size());
+Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size()); // with MPI: of the process
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
 
@@ -149,19 +150,96 @@ The blocks are Eigen matrices, read
 in place, in the format of the library: `fhhos4::SparseMatrix` (row-major, compressed), or an Eigen map of your own
 arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy).
 
+#### With MPI
+
+If the library is compiled with MPI (`-DENABLE_MPI=ON`), `solver.Comm` sets the processes that solve the system:
+
+- **Not set** (`MPI_COMM_NULL`, the default) or `MPI_COMM_SELF`: each process solves its own system alone, as without
+  MPI. If `Comm` is not set, the solver makes no MPI call: a code that doesn't use MPI needs no change, and doesn't even
+  have to initialize MPI (unless it uses `CoarseSolver::MUMPS`).
+- **A communicator of several processes**: the processes solve one system together, distributed by rows. Every setup
+  and solve is collective: all the processes of the communicator call it, with the same parameters.
+
+**Who owns what.** Each cell and each face belongs to one process. A face must belong to a process that owns one of
+its cells (a face has one or two cells), e.g. the one of smaller rank. A process may own no cell and no face: it then
+gives empty matrices and vectors, and still calls the setups and solves.
+
+**Global numbers.** The faces are numbered across the processes in rank order: first the faces of rank 0, then those
+of rank 1, etc., so that the faces of each process have consecutive numbers. These numbers count faces, not DoFs.
+
+**What each process gives** to `SetupSym()` (the `FHHOS4_MPI` branch of the example above):
+
+- `A_TT` and `A_TF`: the rows of its cells. `A_FF`: the rows of its faces, with both triangles (a triangular `A_FF` is
+  accepted on one process only).
+- The columns of `A_TF` and `A_FF` follow a local numbering of the faces: first the faces of the process, in the order
+  of the rows of `A_FF`, then its **ghost faces**, in any order. The ghost faces are the faces of other processes that
+  appear in these rows: the faces of its cells that other processes own, and the faces coupled to its own faces in
+  `A_FF` through the cells of other processes. This is the local numbering of DOLFINx's index maps, and of the columns
+  of PETSc's and hypre's distributed matrices.
+- `faceGhostGlobalNumbers`: the global numbers of its ghost faces, in the order of their local numbers.
+- The vectors `b_T`, `b_F`, `x_T`, `x_F` and the interpolations of 1: the values on its own cells and faces.
+
+For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the faces 10 to 19. If the rows of rank 0
+contain the faces 15 and 12 of rank 1, rank 0 numbers them locally 10 and 11 (or 11 and 10) and gives
+`faceGhostGlobalNumbers = {15, 12}` (or `{12, 15}`).
+
+If your blocks have the global numbers of the faces as columns, `LocalColumnsSym()` numbers them locally and finds the
+ghost faces (a copy, no communication; the ghosts by increasing global number):
+
+```cpp
+// A_TF, A_FF: the rows of the process; the DoF k of the face of global number f is the column f * faceBlockSize + k.
+// firstFace: the global number of the first face of the process.
+fhhos4::DistributedBlocks blocks = fhhos4::LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize);
+solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne, blocks.FaceGhostGlobalNumbers);
+```
+
+**What you get back.** `Solve()` writes `x_T` and `x_F` on the cells and faces of the process, and returns the `Result`
+of the whole system. An error in the inputs of one process is raised on all the processes, so that none is left
+waiting.
+
+**What changes in the solver.**
+
+- Each process aggregates its own cells; the faces between processes are kept. The coarsest level is factorized and
+  solved by MUMPS, distributed over all the processes. The number of iterations may change slightly with the number
+  of processes.
+- All the parameters work on several processes. The Gauss-Seidel smoothers are Gauss-Seidel within each process (the
+  hybrid ones: within each thread), and Jacobi between the processes, which can diverge (e.g. in 3D at degree 2 or
+  more), except the l1 smoothers (the default).
+- `CondensedMatrix()` works on one process only; `ApplyCondensedMatrix()` on any number.
+- With several threads per process, give MUMPS's BLAS one thread (`BLIS_NUM_THREADS=1` with conda-forge's MUMPS,
+  which uses BLIS; `OPENBLAS_NUM_THREADS=1` or `MKL_NUM_THREADS=1` with others): a threaded BLAS makes the many small
+  products of the coarsest solves much slower (BLIS starts its threads at each call). MUMPS itself runs on one thread
+  (its matrix is small). The same holds for `CoarseSolver::MUMPS` on one process.
+
+In Python: see [Python](#the-python-interface).
+
 ### Non-symmetric systems
 
-For a non-symmetric matrix (e.g. convection-diffusion), give also the block `A_FT` by using the `SetupNonSym` function.
-```cpp
-solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne);
-```
-The same algorithm runs, with GCR instead of FCG, and Gauss-Seidel smoothers that follow the direction of the flow (downwind
-order). The default smoother, `L1HybridBlockGaussSeidel`, converges whatever the numbers of threads and processes. For
-convection-dominated problems, `HybridBlockGaussSeidel` usually takes fewer iterations; keep the default if the
-iterations stall, e.g. in 3D at degree 2 or more, or on several processes:
-```cpp
-solver.PreSmoother = fhhos4::Smoother::HybridBlockGaussSeidel;
-```
+What changes for a non-symmetric matrix (e.g. convection-diffusion):
+
+- The block `A_FT` too, given to `SetupNonSym()`:
+  ```cpp
+  solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne);
+  ```
+- The same algorithm runs, with GCR instead of FCG, and Gauss-Seidel smoothers that follow the direction of the flow
+  (downwind order). The default smoother, `L1HybridBlockGaussSeidel`, converges whatever the numbers of threads and
+  processes. For convection-dominated problems, `HybridBlockGaussSeidel` usually takes fewer iterations; keep the
+  default if the iterations stall, e.g. in 3D at degree 2 or more, or on several processes:
+  ```cpp
+  solver.PreSmoother = fhhos4::Smoother::HybridBlockGaussSeidel;
+  ```
+- [With MPI](#with-mpi), each process gives the rows of its faces in `A_FT`. Its columns follow a local numbering of
+  the cells, as those of `A_TF` and `A_FF` for the faces: first the cells of the process, in the order of the rows of
+  `A_TT`, then its **ghost cells**, in any order (the cells of other processes that appear in these rows). `A_FT` is
+  the only block with ghost cells. Their global numbers, `cellGhostGlobalNumbers`, number the cells across the
+  processes in rank order, as the faces:
+  ```cpp
+  solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers,
+                     cellGhostGlobalNumbers);
+  ```
+  With global columns, `LocalColumnsNonSym(A_TF, A_FT, A_FF, firstFace, firstCell, faceBlockSize, cellBlockSize)`
+  (`firstCell`: the global number of the first cell of the process) also gives `blocks.CellGhostGlobalNumbers`. On each
+  process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
 
 ### Use as a preconditioner
 
@@ -196,71 +274,6 @@ method summed over the processes). On one process, `CondensedMatrix()` gives the
 
 The default K-cycle is non-linear, which means that your Krylov method **must be flexible** (FCG, FGMRES, GCR).
 V- and W-cycles work with any Krylov method (CG, GMRES), but are not recommended for performance reasons.
-
-### With MPI
-
-Compiled with MPI (`-DENABLE_MPI=ON`), the solver works on the processes of its communicator,
-`Comm`:
-
-- not set (`MPI_COMM_NULL`, the default) or `MPI_COMM_SELF`: the system of the calling process, solved by it alone, as
-  without MPI. Not set, the solver makes no MPI call: a code that doesn't use MPI needs no change, MPI not even
-  initialized (but for `CoarseSolver::MUMPS`, which needs it).
-- a communicator of several processes: the system is distributed by rows.
-
-The distributed system: each process owns cells and faces, numbered contiguously in rank order (the cells of the
-process of rank 0 first, then those of rank 1...; the same for the faces), and gives the rows of its own:
-
-```cpp
-solver.Comm = MPI_COMM_WORLD;
-// A_TT, A_TF: the rows of the cells of the process; A_FF: the rows of its faces, in full (both triangles). The columns
-// of A_TF and A_FF: the nOwn faces of the process, then its ghosts (the faces of other processes that its rows
-// reference). faceGhostGlobalNumbers[i]: the global number of the ghost of local number nOwn + i (faces, not DoFs).
-// E.g. rank 0 owns the faces 0 to 9 and its rows reference the faces 15 and 12 of rank 1, its local faces 10 and 11:
-// faceGhostGlobalNumbers = {15, 12}.
-std::vector<std::int64_t> faceGhostGlobalNumbers = ...; // or a std::span, an Eigen vector..., GhostNumbers(n, pointer)
-solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
-fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // the vectors of the cells and faces of the process
-```
-
-- **`A_FF` in full** on several processes (both triangles; a triangular one is refused).
-- **The faces of a process**: its own faces first, in the order of the rows of `A_FF`, then its ghosts, in any order:
-  one numbering for the columns of `A_TF` and `A_FF`, whose ghosts are all the faces of other processes in these rows
-  (those of its cells, and those coupled to its faces in `A_FF` through the cells of other processes). This is the
-  local numbering of DOLFINx's index maps, and of the columns of PETSc's and hypre's distributed matrices.
-- **Each face belongs to a process that owns one of its cells**, e.g. the one of the smaller rank; a face has at most
-  two cells. A process may own no cell nor face (empty matrices and vectors): it still calls the setups and solves.
-- **Non-symmetric**: `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers,
-  cellGhostGlobalNumbers)`, with `A_TT` and `A_FF` in full; `A_FT`: the rows of the faces of the process, its columns
-  the cells of the process (in the order of the rows of `A_TT`), then its ghost cells, in any order (the cells of other
-  processes in these rows), whose global numbers are `cellGhostGlobalNumbers` (numbered as the faces: those of rank 0
-  first...). `A_FT` is the only block whose columns reach the cells of other processes: `SetupSym()` has no cell
-  ghosts. On each process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
-- The vectors (`b_T`, `b_F`, `x_T`, `x_F`, the interpolations of 1): the cells and faces of the process. `Result`: of
-  the whole system.
-- The algorithm: each process aggregates its own cells (the faces between processes are kept); the coarsest level is
-  factorized and solved by MUMPS on all the processes, distributed. The number of iterations may change slightly with
-  the number of processes.
-- Available on several processes: the uncondensed system (`SetupSym()`, `SetupNonSym()`), with all the
-  parameters; the Gauss-Seidel smoothers are Gauss-Seidel in each process (the hybrid ones: in each thread), Jacobi
-  between the processes, which can diverge (e.g. in 3D at degree 2 or more), except in the l1 ones (the default).
-  `CondensedMatrix()`: one process only (its products: `ApplyCondensedMatrix()`).
-- **Global columns**: if your blocks have the global numbers of the faces (and cells) as columns, `LocalColumnsSym()`
-  and `LocalColumnsNonSym()` (copies, no communication) number them locally and give the ghosts:
-  ```cpp
-  // A_TF, A_FF: the rows of the process; the DoF k of the face f is the column f * faceBlockSize + k
-  fhhos4::DistributedBlocks blocks = fhhos4::LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize);
-  solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne, blocks.FaceGhostGlobalNumbers);
-  // Non-symmetric: LocalColumnsNonSym(A_TF, A_FT, A_FF, firstFace, firstCell, faceBlockSize, cellBlockSize), whose
-  // CellGhostGlobalNumbers are the cellGhostGlobalNumbers of SetupNonSym()
-  ```
-  `firstFace`: the global number of the first face of the process (`firstCell`, of its first cell); the ghosts by
-  increasing global number.
-- **Threads**: with several threads per process, give MUMPS's BLAS one thread (e.g. `BLIS_NUM_THREADS=1` with
-  conda-forge's MUMPS, which uses BLIS; `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1` for others): a threaded BLAS
-  (BLIS starts its threads at each call) makes the many small products of the coarsest solves much slower. MUMPS
-  itself runs on one thread (its matrix is small). The same for `CoarseSolver::MUMPS` on one process.
-- In Python: see [Python](#python).
-- The errors of the inputs are raised on all the processes.
 
 ### The Python interface
 
@@ -311,7 +324,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 - The errors raise `fhhos4.Error`, a `RuntimeError`.
 - The setups, solves and helpers release the GIL.
 - Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), `solver.Comm` not set: one process, as
-  in C++ (see [Several processes](#several-processes-mpi)). To set it, the module needs
+  in C++ (see [Several processes](#with-mpi)). To set it, the module needs
   [mpi4py](https://mpi4py.readthedocs.io), built with the same MPI as the library, and imported first (it initializes
   MPI). `solver.Comm`: an mpi4py communicator (`MPI.COMM_SELF`, `MPI.COMM_WORLD`, or its Fortran handle
   `comm.py2f()`). On several processes, `SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne,
@@ -401,7 +414,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `PolynomialSpace` | `PolynomialSpace::P` | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
 | `VectorComponents` | `1` | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `SingularMatrix` | `false` | `true`: the kernel is the interpolation of 1 of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
-| `Krylov` | `FCG` if symmetric, `GCR` if non-symmetric | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#as-a-preconditioner))</li></ul> |
+| `Krylov` | `FCG` if symmetric, `GCR` if non-symmetric | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#use-as-a-preconditioner))</li></ul> |
 | `Restart` | `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
 | `Tolerance` | `1e-8` | Relative residual of the condensed system at which `Solve()` stops |
 | `MaxIterations` | `200` | |
