@@ -11,14 +11,15 @@ using namespace std;
 // Each row is computed independently of the others, so the results do not depend on the number of threads.
 namespace SparseMatrixOps
 {
-	// Non-zeros of consecutive rows of a matrix under construction
-	struct RowChunk
+	// Non-zeros of consecutive rows of a matrix under construction, its indices of type Index
+	template <typename Index = SparseMatrixIndex>
+	struct RowChunkOf
 	{
-		vector<SparseMatrixIndex> RowEnds; // end of each row in Cols and Values
-		vector<SparseMatrixIndex> Cols;
+		vector<Index> RowEnds; // end of each row in Cols and Values
+		vector<Index> Cols;
 		vector<double> Values;
 
-		void Add(SparseMatrixIndex col, double value)
+		void Add(Index col, double value)
 		{
 			Cols.push_back(col);
 			Values.push_back(value);
@@ -29,19 +30,20 @@ namespace SparseMatrixOps
 			RowEnds.push_back(Cols.size());
 		}
 	};
+	using RowChunk = RowChunkOf<>;
 
 	// Builds the nRows x nCols matrix whose rows are computed by computeRows(firstRow, lastRow, chunk), which must add to
 	// the chunk the non-zeros of the rows firstRow, ..., lastRow - 1, in this order, sorted by column, and call
 	// chunk.EndRow() after each row. The rows are split into chunks processed in parallel. The chunk boundaries are
 	// multiples of rowBlockSize, so that computeRows can process whole blocks of rows. The values stored in precision T
-	// (float: rounded).
-	template <typename T = double, class ComputeRows>
-	SparseMatrixOf<T> BuildByRows(BigNumber nRows, BigNumber nCols, int rowBlockSize, ComputeRows computeRows)
+	// (float: rounded). The indices of type Index: GlobalNumber for global columns (GlobalColumnsMatrix).
+	template <typename T = double, typename Index = SparseMatrixIndex, class ComputeRows>
+	Eigen::SparseMatrix<T, Eigen::RowMajor, Index> BuildByRows(BigNumber nRows, GlobalNumber nCols, int rowBlockSize, ComputeRows computeRows)
 	{
 		assert(nRows % rowBlockSize == 0);
 		BigNumber nBlocks = nRows / rowBlockSize;
 		BigNumber nChunks = min(nBlocks, (BigNumber)(8 * Parallelism::NThreads())); // several chunks per thread, for load balancing
-		vector<RowChunk> chunks(nChunks);
+		vector<RowChunkOf<Index>> chunks(nChunks);
 		auto chunkFirstRow = [&](BigNumber c) { return (nBlocks * c / nChunks) * rowBlockSize; };
 
 		#pragma omp parallel for schedule(dynamic)
@@ -53,16 +55,16 @@ namespace SparseMatrixOps
 		}
 
 		// Concatenation of the chunks
-		vector<SparseMatrixIndex> chunkOffsets(nChunks + 1, 0);
+		vector<Index> chunkOffsets(nChunks + 1, 0);
 		for (BigNumber c = 0; c < nChunks; ++c)
 			chunkOffsets[c + 1] = chunkOffsets[c] + chunks[c].Cols.size();
 
-		SparseMatrixOf<T> M(nRows, nCols);
+		Eigen::SparseMatrix<T, Eigen::RowMajor, Index> M(nRows, nCols);
 		M.resizeNonZeros(chunkOffsets[nChunks]);
 		#pragma omp parallel for schedule(dynamic)
 		for (BigNumber c = 0; c < nChunks; ++c)
 		{
-			const RowChunk& chunk = chunks[c];
+			const RowChunkOf<Index>& chunk = chunks[c];
 			BigNumber firstRow = chunkFirstRow(c);
 			for (BigNumber r = 0; r < chunk.RowEnds.size(); ++r)
 				M.outerIndexPtr()[firstRow + r + 1] = chunkOffsets[c] + chunk.RowEnds[r];

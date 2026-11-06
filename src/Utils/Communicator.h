@@ -476,8 +476,8 @@ namespace Parallel
 	}
 
 	// The global number of rows of a vector distributed by rows
-	inline BigNumber Rows(const Vector& x)
+	inline GlobalNumber Rows(const Vector& x)
 	{
-		return Communicator::Current().Sum((BigNumber)x.rows());
+		return Communicator::Current().Sum((GlobalNumber)x.rows());
 	}
 }

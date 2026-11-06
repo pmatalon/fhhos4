@@ -286,9 +286,14 @@ TEST(DistributedLibrary, CollectiveErrors)
 		faceOnes = Vector::Ones(system.Faces->NOwned + 1);
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	EXPECT_THROW(solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, ghosts), fhhos4::Error);
+	faceOnes = Vector::Ones(system.Faces->NOwned);
+	// A ghost beyond 32 bits on the last process, whose low 32 bits are a valid ghost: refused whatever SMALL_INDEX
+	vector<int64_t> farGhosts = ghosts;
+	if (World().Rank() == World().Size() - 1 && !farGhosts.empty())
+		farGhosts[0] += (int64_t)1 << 32;
+	EXPECT_THROW(solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, farGhosts), fhhos4::Error);
 	// A_FF lower triangular on the last process (as SetupSym() reads it on one process; here diagonal: one coupling
 	// added), read in full on several processes
-	faceOnes = Vector::Ones(system.Faces->NOwned);
 	fhhos4::SparseMatrix lowerA_FF = A_FF;
 	if (World().Rank() == World().Size() - 1 && lowerA_FF.rows() > 1)
 		lowerA_FF.coeffRef(1, 0) = -0.1;

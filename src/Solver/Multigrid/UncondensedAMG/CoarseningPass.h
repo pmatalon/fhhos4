@@ -563,7 +563,7 @@ public:
 		// (HybridAlgebraicMesh::Coarsen() left faces without coarse face, and crashed)
 		if (comm.Any(faceOfMoreCells))
 			Utils::FatalError("UncondensedAMG: a face belongs to more than two cells: the coarsening by interface collapsing is not possible on this level.");
-		return comm.Sum(NCoarseFaces) == 0;
+		return comm.Sum((GlobalNumber)NCoarseFaces) == 0;
 	}
 
 	//-------------------------------------------------------------//

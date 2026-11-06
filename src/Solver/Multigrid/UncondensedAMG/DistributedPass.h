@@ -23,7 +23,7 @@ public:
 	shared_ptr<const IndexMap> CellMap;      // the same, with the remote cells of the faces between processes as ghosts
 	vector<BigNumber> FaceRemoteCell;        // for each local face, its cell on another process (local number in CellMap, >= NCells), -1 if none
 	IndexMap AggregateOwners;                // after AddRemoteAggregates()
-	vector<BigNumber> GhostAggregates;       // the aggregates of the remote cells (global numbers, increasing): numbered NAggregates + i in the pass
+	vector<GlobalNumber> GhostAggregates;    // the aggregates of the remote cells (global numbers, increasing): numbered NAggregates + i in the pass
 	shared_ptr<const IndexMap> CoarseFaceMap; // after NumberCoarseFaces(): the coarse faces of the aggregates of the process
 	vector<BigNumber> CoarseFacePosition;    // the local number in CoarseFaceMap of each coarse face of the pass
 
@@ -42,13 +42,13 @@ public:
 	{
 		const IndexMap& faces = FaceMap;
 		BigNumber nOwned = faces.NOwned, nGhosts = faces.NGhosts();
-		BigNumber cellBegin = CellOwners.Begin;
+		GlobalNumber cellBegin = CellOwners.Begin;
 		const IndexLists& faceCells = Pass.FaceCells;
 		bool invalid = false;
 
 		// The ghost faces: their (single) cell of this process, if any (a ghost face may belong to no cell of the
 		// process: a coupling of the operator, through a cell of another process)
-		vector<BigNumber> ghostCell(nGhosts, -1);
+		vector<GlobalNumber> ghostCell(nGhosts, -1);
 		for (BigNumber g = 0; g < nGhosts; g++)
 		{
 			BigNumber f = nOwned + g;
@@ -58,15 +58,15 @@ public:
 				ghostCell[g] = cellBegin + faceCells[f][0];
 		}
 		// The owners gather the cells of their faces on the other processes
-		vector<BigNumber> faceRemoteGlobal(faces.NLocal(), -1);
-		vector<vector<BigNumber>> received = faces.GatherGhostsOnOwners(ghostCell.data(), 1);
+		vector<GlobalNumber> faceRemoteGlobal(faces.NLocal(), -1);
+		vector<vector<GlobalNumber>> received = faces.GatherGhostsOnOwners(ghostCell.data(), 1);
 		vector<int> nRemote(nOwned, 0);
 		for (size_t k = 0; k < faces.SendRanks.size(); k++)
 		{
 			for (BigNumber s = faces.SendStart[k]; s < faces.SendStart[k + 1]; s++)
 			{
 				BigNumber f = faces.SendIndices[s];
-				BigNumber cell = received[k][s - faces.SendStart[k]];
+				GlobalNumber cell = received[k][s - faces.SendStart[k]];
 				if (cell < 0)
 					continue;
 				faceRemoteGlobal[f] = cell;
@@ -74,7 +74,7 @@ public:
 			}
 		}
 		// The owners send their cell back
-		vector<BigNumber> ownerCell(nOwned, -1), ghostOwnerCell(nGhosts, -1);
+		vector<GlobalNumber> ownerCell(nOwned, -1), ghostOwnerCell(nGhosts, -1);
 		for (BigNumber f = 0; f < nOwned; f++)
 		{
 			if (nRemote[f] == 0)
@@ -96,8 +96,8 @@ public:
 		if (Comm().Any(invalid))
 			Utils::FatalError("UncondensedAMG: on several processes, each face must belong to a process that owns one of its cells, and have at most two cells.");
 
-		vector<BigNumber> remoteCells;
-		for (BigNumber c : faceRemoteGlobal)
+		vector<GlobalNumber> remoteCells;
+		for (GlobalNumber c : faceRemoteGlobal)
 			if (c >= 0)
 				remoteCells.push_back(c);
 		CellMap = make_shared<const IndexMap>(CellOwners, std::move(remoteCells));
@@ -115,7 +115,7 @@ public:
 		CoarseningPass& pass = Pass;
 		const IndexMap& cells = *CellMap;
 		AggregateOwners = IndexMap(Comm(), pass.NAggregates);
-		vector<BigNumber> cellAggregate(pass.NCells), ghostCellAggregate(cells.NGhosts());
+		vector<GlobalNumber> cellAggregate(pass.NCells), ghostCellAggregate(cells.NGhosts());
 		for (BigNumber e = 0; e < pass.NCells; e++)
 			cellAggregate[e] = AggregateOwners.Begin + pass.CellAggregate[e];
 		cells.UpdateGhosts(cellAggregate.data(), ghostCellAggregate.data(), 1);
@@ -147,7 +147,7 @@ public:
 		CoarseningPass& pass = Pass;
 		const Communicator& comm = Comm();
 		BigNumber nAggregates = pass.NAggregates;
-		auto remoteAggregate = [&](BigNumber a) { return GhostAggregates[a - nAggregates]; };
+		auto remoteAggregate = [&](BigNumber a) -> GlobalNumber { return GhostAggregates[a - nAggregates]; };
 		vector<char> owned(pass.NCoarseFaces);
 		BigNumber nOwned = 0;
 		for (BigNumber cf = 0; cf < pass.NCoarseFaces; cf++)
@@ -157,14 +157,14 @@ public:
 			nOwned += owned[cf];
 		}
 		IndexMap coarseFaceOwners(comm, nOwned);
-		vector<BigNumber> global(pass.NCoarseFaces, -1);
-		BigNumber next = coarseFaceOwners.Begin;
+		vector<GlobalNumber> global(pass.NCoarseFaces, -1);
+		GlobalNumber next = coarseFaceOwners.Begin;
 		for (BigNumber cf = 0; cf < pass.NCoarseFaces; cf++)
 			if (owned[cf])
 				global[cf] = next++;
 
 		// Requests for the others: (aggregate of the owner, aggregate of this process)
-		vector<vector<BigNumber>> requests(comm.Size());
+		vector<vector<GlobalNumber>> requests(comm.Size());
 		vector<vector<BigNumber>> requested(comm.Size()); // the coarse faces of each request
 		for (BigNumber cf = 0; cf < pass.NCoarseFaces; cf++)
 		{
@@ -176,14 +176,14 @@ public:
 			requests[owner].push_back(AggregateOwners.Begin + a);
 			requested[owner].push_back(cf);
 		}
-		vector<vector<BigNumber>> received = comm.AllToAll(requests);
-		vector<vector<BigNumber>> replies(comm.Size());
+		vector<vector<GlobalNumber>> received = comm.AllToAll(requests);
+		vector<vector<GlobalNumber>> replies(comm.Size());
 		bool notFound = false;
 		for (int r = 0; r < comm.Size(); r++)
 		{
 			for (size_t q = 0; q < received[r].size(); q += 2)
 			{
-				BigNumber a = received[r][q] - AggregateOwners.Begin; // aggregate of this process
+				BigNumber a = (BigNumber)(received[r][q] - AggregateOwners.Begin); // aggregate of this process
 				BigNumber b = nAggregates + (lower_bound(GhostAggregates.begin(), GhostAggregates.end(), received[r][q + 1]) - GhostAggregates.begin());
 				// The coarse faces of a, by increasing second aggregate
 				const BigNumber* faces = pass.AggregateCoarseFaces[a];
@@ -206,10 +206,10 @@ public:
 					replies[r].push_back(global[cf]);
 			}
 		}
-		vector<vector<BigNumber>> answers = comm.AllToAll(replies);
+		vector<vector<GlobalNumber>> answers = comm.AllToAll(replies);
 		if (comm.Any(notFound))
 			Utils::FatalError("UncondensedAMG: a coarse face between two processes is unknown to its owner.");
-		vector<BigNumber> ghosts;
+		vector<GlobalNumber> ghosts;
 		for (int r = 0; r < comm.Size(); r++)
 		{
 			for (size_t q = 0; q < requested[r].size(); q++)

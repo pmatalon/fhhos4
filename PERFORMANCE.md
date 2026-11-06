@@ -1448,6 +1448,18 @@ iterations identical in 40 (the symmetric runs: Chebyshev; k = 0: the scalar Gau
 non-symmetric runs at k >= 1, none of which diverged without it: convection-dominated gcube16 k=1 4 -> 7 (3 runs), k=2
 8 -> 11 and 7 -> 11, tet4 k=1 9 -> 14; diffusion-dominated 25 -> 26, 16 -> 17, 15 -> 17, 14 -> 16.
 
+2026-11-04, the global numbers in 64 bits (ADR-0022: `IndexMap`, the rows with global columns of the setup) against
+`1a000870`, plugged in; `scaling_mpi.sh` (`-s fcglibuamg -smoothers bcheb4,bcheb4`) run twice, the two binaries in turn,
+best of the 4 runs, elapsed setup / solve (s), before -> after (`build/bench_globalnumber/`):
+
+| Case | 2 x 1 | 4 x 1 |
+|---|---|---|
+| Cube-tet k=0 n=32 (41 / 42 it) | 0.944 / 1.061 -> 0.944 / 1.119 | 0.553 / 0.873 -> 0.566 / 0.870 |
+| Cube-tet k=2 n=12 (52 it) | 0.221 / 0.687 -> 0.259 / 0.722 | 0.182 / 0.686 -> 0.182 / 0.678 |
+
+- The same iterations and L2 errors. Within the noise: the two rounds of the same binary differ as much (k=2 n=12,
+  2 x 1, before: setup 0.221 and 0.289 s); the solve's code is unchanged (local 32-bit indices).
+
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:
    - `A`, `Acons` and `Astab` of the cells: done (2026-10-29 above). What stays of the local matrices: `P` (1.25 KB per

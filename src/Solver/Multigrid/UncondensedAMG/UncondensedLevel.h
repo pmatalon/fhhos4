@@ -149,7 +149,7 @@ public:
 		this->_multigridProlong = mgProlong;
 	}
 
-	BigNumber NUnknowns() override
+	GlobalNumber NUnknowns() override
 	{
 		if (FaceMap)
 			return FaceMap->GlobalSize * _faceBlockSize; // of all the processes
@@ -1780,8 +1780,8 @@ public:
 	{
 		Utils::Log() << "\t\tk = " << this->PolynomialDegree() << endl;
 		// On several processes: the cells and faces of all of them
-		BigNumber nElements = Communicator::Current().Sum((BigNumber)this->A_T_F->rows() / _cellBlockSize);
-		BigNumber nFaces = this->NUnknowns() / _faceBlockSize;
+		GlobalNumber nElements = Communicator::Current().Sum((GlobalNumber)(this->A_T_F->rows() / _cellBlockSize));
+		GlobalNumber nFaces = this->NUnknowns() / _faceBlockSize;
 		Utils::Log() << "\t\tMesh                : " << nElements << " elements, " << nFaces << " faces";
 		if (!this->IsFinestLevel())
 		{

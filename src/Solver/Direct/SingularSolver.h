@@ -108,13 +108,13 @@ public:
 			Eigen::Index pin = comm.Rank() == owner ? localPin : -1;
 			if (pin >= 0)
 				_pins.push_back(pin);
-			BigNumber pinGlobal = comm.Sum<BigNumber>(pin >= 0 ? A.RowMap->Begin * A.RowBlockSize + pin : 0);
+			GlobalNumber pinGlobal = comm.Sum<GlobalNumber>(pin >= 0 ? A.RowMap->Begin * A.RowBlockSize + pin : 0);
 
 			BigNumber ghostColumn = -1;
-			const vector<BigNumber>& ghosts = A.ColMap->Ghosts;
+			const vector<GlobalNumber>& ghosts = A.ColMap->Ghosts;
 			auto ghost = find(ghosts.begin(), ghosts.end(), pinGlobal / A.ColBlockSize);
 			if (ghost != ghosts.end())
-				ghostColumn = (ghost - ghosts.begin()) * A.ColBlockSize + pinGlobal % A.ColBlockSize;
+				ghostColumn = (BigNumber)((ghost - ghosts.begin()) * A.ColBlockSize + pinGlobal % A.ColBlockSize);
 			Pin(_pinnedDistributedA.Diag, pin, pin);
 			Pin(_pinnedDistributedA.Offd, pin, ghostColumn);
 		}

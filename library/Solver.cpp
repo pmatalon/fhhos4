@@ -631,7 +631,7 @@ namespace fhhos4
 		});
 		// The faces of the process and its ghosts (collective, checks the ghosts on all the processes)
 		IndexMap owners(comm, a_FF->rows() / fbs);
-		faces = make_shared<const IndexMap>(IndexMap::InOrder(owners, vector<BigNumber>(faceGhostGlobalNumbers.Numbers, faceGhostGlobalNumbers.Numbers + faceGhostGlobalNumbers.Count)));
+		faces = make_shared<const IndexMap>(IndexMap::InOrder(owners, vector<GlobalNumber>(faceGhostGlobalNumbers.Numbers, faceGhostGlobalNumbers.Numbers + faceGhostGlobalNumbers.Count)));
 		// Non-symmetric: A_FT on the rows of all the faces of the process's cells (those of other processes fetched from
 		// them) and the columns of these cells, what the condensation of these cells and their aggregation read (collective,
 		// checks the ghost cells on all the processes)
@@ -639,7 +639,7 @@ namespace fhhos4
 		if (!symmetric)
 		{
 			IndexMap cellOwners(comm, a_TF->rows() / cbs);
-			auto cells = make_shared<const IndexMap>(IndexMap::InOrder(cellOwners, vector<BigNumber>(cellGhostGlobalNumbers.Numbers, cellGhostGlobalNumbers.Numbers + cellGhostGlobalNumbers.Count)));
+			auto cells = make_shared<const IndexMap>(IndexMap::InOrder(cellOwners, vector<GlobalNumber>(cellGhostGlobalNumbers.Numbers, cellGhostGlobalNumbers.Numbers + cellGhostGlobalNumbers.Count)));
 			localA_FT = DistributedMatrix::FromLocalColumns(make_shared<const IndexMap>(owners), cells, *a_FT, fbs, cbs).RowsWithGhosts(*faces, cellOwners);
 		}
 		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
@@ -942,7 +942,7 @@ namespace fhhos4
 			return blocks;
 		}
 
-		detail::IndexArray OwnNumbers(const vector<BigNumber>& numbers)
+		detail::IndexArray OwnNumbers(const vector<GlobalNumber>& numbers)
 		{
 			auto impl = make_unique<detail::IndexArray::Impl>();
 			impl->Numbers.assign(numbers.begin(), numbers.end());
@@ -952,20 +952,20 @@ namespace fhhos4
 		// The matrices whose columns are global (the DoF k of the entity e: the column e * blockSize + k) with their columns
 		// numbered locally (local): the entities first, ..., first + nOwned - 1, then the others of their columns, the
 		// ghosts (returned), by increasing global number. The matrices: after CheckCSR().
-		vector<BigNumber> ToLocalColumns(const vector<const SparseMatrix*>& matrices, BigNumber first, BigNumber nOwned, int blockSize, vector<CSRMatrix>& local)
+		vector<GlobalNumber> ToLocalColumns(const vector<const SparseMatrix*>& matrices, GlobalNumber first, BigNumber nOwned, int blockSize, vector<CSRMatrix>& local)
 		{
-			vector<BigNumber> ghosts;
+			vector<GlobalNumber> ghosts;
 			for (const SparseMatrix* M : matrices)
 			{
-				vector<BigNumber> g = DistributedMatrix::ColumnGhosts(*M, first * blockSize, (first + nOwned) * blockSize, blockSize);
+				vector<GlobalNumber> g = DistributedMatrix::ColumnGhosts(*M, first * blockSize, (first + nOwned) * blockSize, blockSize);
 				ghosts.insert(ghosts.end(), g.begin(), g.end());
 			}
 			sort(ghosts.begin(), ghosts.end());
 			ghosts.erase(unique(ghosts.begin(), ghosts.end()), ghosts.end());
-			auto localEntity = [&](BigNumber e) -> BigNumber
+			auto localEntity = [&](GlobalNumber e) -> BigNumber
 			{
 				if (e >= first && e < first + nOwned)
-					return e - first;
+					return (BigNumber)(e - first);
 				return nOwned + (lower_bound(ghosts.begin(), ghosts.end(), e) - ghosts.begin());
 			};
 			BigNumber nCols = (nOwned + (BigNumber)ghosts.size()) * blockSize;

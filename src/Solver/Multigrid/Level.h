@@ -406,7 +406,8 @@ public:
 	virtual void EnforceCompatibilityCondition(Vector& b) {}
 	virtual Flops EnforceCompatibilityConditionCost(Vector& b) { return 0; }
 
-	virtual BigNumber NUnknowns()
+	// Of all the processes on several of them
+	virtual GlobalNumber NUnknowns()
 	{
 		if (this->OperatorMatrix)
 			return this->OperatorMatrix->rows();

@@ -33,7 +33,7 @@ public:
 		this->_useHeterogeneousWeighting = useHeterogeneousWeighting;
 	}
 
-	BigNumber NUnknowns() override
+	GlobalNumber NUnknowns() override
 	{
 		return _problem->HHO->nTotalFaceUnknowns;
 	}

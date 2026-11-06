@@ -60,7 +60,7 @@ public:
 	// elements of their faces (the ghosts). The process of each element and its global number (contiguous by process, in
 	// rank order), by number. Empty on one process.
 	vector<int> ElementRanks;
-	vector<BigNumber> ElementGlobalNumbers;
+	vector<GlobalNumber> ElementGlobalNumbers;
 
 	GMSHMesh(TestCase<Dim>* testCase, string gmshFile, string description, string fileNamePart, BigNumber n = 0, bool buildMesh = true)
 		: PolyhedralMesh<Dim>()
@@ -198,7 +198,7 @@ public:
 	// its elements; nOwned: those of the process. The others are asked to their process: first the faces of its elements
 	// (both elements of such a face are in the part), then those of ghosts only, to the process of the ghost (which by
 	// then knows the numbers of all the faces of its elements). Collective.
-	vector<BigNumber> GlobalFaceNumbers(BigNumber nFaces, BigNumber& nOwned)
+	vector<GlobalNumber> GlobalFaceNumbers(BigNumber nFaces, BigNumber& nOwned)
 	{
 		const Communicator& comm = Communicator::Current();
 		int rank = comm.Rank();
@@ -219,8 +219,8 @@ public:
 				ofOwnElements.push_back(f);
 		}
 		nOwned = owned.size();
-		BigNumber begin = comm.ExclusiveScan(nOwned);
-		vector<BigNumber> global(nFaces, -1);
+		GlobalNumber begin = comm.ExclusiveScan((GlobalNumber)nOwned);
+		vector<GlobalNumber> global(nFaces, -1);
 		for (BigNumber i = 0; i < nOwned; i++)
 			global[owned[i]->Number] = begin + i;
 		AskFaceNumbers(comm, ofOwnElements, faceRank, global);
@@ -450,10 +450,10 @@ private:
 				ElementRanks[e->Number] = it->second;
 		}
 		BigNumber nOwned = count(ElementRanks.begin(), ElementRanks.end(), rank);
-		BigNumber next = comm.ExclusiveScan(nOwned);
+		GlobalNumber next = comm.ExclusiveScan((GlobalNumber)nOwned);
 		ElementGlobalNumbers.assign(this->Elements.size(), -1);
 		double sum_h = 0;
-		vector<vector<BigNumber>> requests(comm.Size());
+		vector<vector<GlobalNumber>> requests(comm.Size());
 		vector<vector<Element<Dim>*>> asked(comm.Size());
 		for (Element<Dim>* e : this->Elements)
 		{
@@ -474,12 +474,12 @@ private:
 
 		// Reply for each element asked: its number, its physical part, its number of faces on the boundary of the domain,
 		// then for each of them its key and its boundary part (-1: none)
-		vector<vector<BigNumber>> received = comm.AllToAll(requests);
-		vector<vector<BigNumber>> replies(comm.Size());
+		vector<vector<GlobalNumber>> received = comm.AllToAll(requests);
+		vector<vector<GlobalNumber>> replies(comm.Size());
 		for (int r = 0; r < comm.Size(); r++)
 		{
-			vector<BigNumber>& reply = replies[r];
-			for (BigNumber tag : received[r])
+			vector<GlobalNumber>& reply = replies[r];
+			for (GlobalNumber tag : received[r])
 			{
 				Element<Dim>* e = GetElementFromGMSHTag(tag);
 				reply.push_back(ElementGlobalNumbers[e->Number]);
@@ -497,15 +497,15 @@ private:
 				}
 			}
 		}
-		vector<vector<BigNumber>> answers = comm.AllToAll(replies);
+		vector<vector<GlobalNumber>> answers = comm.AllToAll(replies);
 		for (int r = 0; r < comm.Size(); r++)
 		{
-			const BigNumber* a = answers[r].data();
+			const GlobalNumber* a = answers[r].data();
 			for (Element<Dim>* e : asked[r])
 			{
 				ElementGlobalNumbers[e->Number] = *a++;
 				e->PhysicalPart = this->GetPhysicalGroup(*a++);
-				const BigNumber* boundaryFaces = a + 1;
+				const GlobalNumber* boundaryFaces = a + 1;
 				a = boundaryFaces + *a * (KeySize + 1);
 				for (Face<Dim>* f : e->Faces)
 				{
@@ -514,7 +514,7 @@ private:
 					FaceKey key = Key(f);
 					f->IsDomainBoundary = false;
 					f->BoundaryPart = nullptr;
-					for (const BigNumber* b = boundaryFaces; b < a; b += KeySize + 1)
+					for (const GlobalNumber* b = boundaryFaces; b < a; b += KeySize + 1)
 					{
 						if (equal(key.begin(), key.end(), b))
 						{
@@ -531,12 +531,12 @@ private:
 
 		_h = comm.Max(_h);
 		_regularity = comm.Min(_regularity);
-		_average_h = comm.Sum(sum_h) / comm.Sum(nOwned);
+		_average_h = comm.Sum(sum_h) / comm.Sum((GlobalNumber)nOwned);
 	}
 
 	// A face known by several processes: the GMSH tags of its vertices, sorted (then 0)
 	static constexpr int KeySize = 4;
-	using FaceKey = array<BigNumber, KeySize>;
+	using FaceKey = array<GlobalNumber, KeySize>;
 
 	static FaceKey Key(const size_t* nodeTags, int nNodes)
 	{
@@ -555,7 +555,7 @@ private:
 	}
 
 	// The face whose vertices have the GMSH tags of key (nullptr if none)
-	Face<Dim>* FaceWithKey(const BigNumber* key)
+	Face<Dim>* FaceWithKey(const GlobalNumber* key)
 	{
 		vector<MeshVertex<Dim>*> vertices;
 		for (int i = 0; i < KeySize && key[i] != 0; i++)
@@ -571,9 +571,9 @@ private:
 	// The global numbers (global, by face number) of faces, asked to the process owner(f) of each, which knows them.
 	// Collective.
 	template <class Owner>
-	void AskFaceNumbers(const Communicator& comm, const vector<Face<Dim>*>& faces, Owner owner, vector<BigNumber>& global)
+	void AskFaceNumbers(const Communicator& comm, const vector<Face<Dim>*>& faces, Owner owner, vector<GlobalNumber>& global)
 	{
-		vector<vector<BigNumber>> requests(comm.Size());
+		vector<vector<GlobalNumber>> requests(comm.Size());
 		vector<vector<Face<Dim>*>> asked(comm.Size());
 		for (Face<Dim>* f : faces)
 		{
@@ -582,8 +582,8 @@ private:
 			requests[r].insert(requests[r].end(), key.begin(), key.end());
 			asked[r].push_back(f);
 		}
-		vector<vector<BigNumber>> received = comm.AllToAll(requests);
-		vector<vector<BigNumber>> replies(comm.Size());
+		vector<vector<GlobalNumber>> received = comm.AllToAll(requests);
+		vector<vector<GlobalNumber>> replies(comm.Size());
 		for (int r = 0; r < comm.Size(); r++)
 		{
 			for (size_t q = 0; q < received[r].size(); q += KeySize)
@@ -592,7 +592,7 @@ private:
 				replies[r].push_back(f && f->Number < (BigNumber)global.size() ? global[f->Number] : -1);
 			}
 		}
-		vector<vector<BigNumber>> answers = comm.AllToAll(replies);
+		vector<vector<GlobalNumber>> answers = comm.AllToAll(replies);
 		bool unknown = false;
 		for (int r = 0; r < comm.Size(); r++)
 		{

@@ -37,8 +37,8 @@ namespace
 		return P;
 	}
 
-	// The rows [first, first + n) of M
-	SparseMatrix Rows(const SparseMatrix& M, BigNumber first, BigNumber n)
+	// The rows [first, first + n) of M, with global columns
+	GlobalColumnsMatrix Rows(const SparseMatrix& M, GlobalNumber first, BigNumber n)
 	{
 		return M.middleRows(first, n);
 	}
@@ -74,11 +74,32 @@ TEST(IndexMap, Ownership)
 	}
 }
 
+// Global numbers beyond 32 bits whatever SMALL_INDEX: 2^31 - 1 entities per process (an IndexMap stores no values), a
+// ghost of the next process (beyond 2^32 on 3 processes), and the halo of the owner
+TEST(IndexMap, GlobalNumbersBeyond32Bits)
+{
+	BigNumber nOwned = numeric_limits<int32_t>::max();
+	IndexMap owners(World(), nOwned);
+	EXPECT_EQ(owners.GlobalSize, (GlobalNumber)nOwned * World().Size());
+	EXPECT_EQ(owners.Begin, (GlobalNumber)nOwned * World().Rank());
+	if (World().Size() == 1)
+		return;
+	int next = (World().Rank() + 1) % World().Size();
+	GlobalNumber ghost = owners.Offsets[next + 1] - 1; // the last entity of the next process
+	IndexMap map(owners, { ghost });
+	EXPECT_EQ(map.Owner(ghost), next);
+	EXPECT_EQ(map.Local(ghost), nOwned);
+	EXPECT_EQ(map.Global(nOwned), ghost);
+	// Asked by the previous process: its last entity
+	EXPECT_EQ(map.SendIndices, vector<BigNumber>{ nOwned - 1 });
+	EXPECT_THROW(IndexMap(owners, { owners.GlobalSize }), fhhos4::Error);
+}
+
 TEST(IndexMap, HaloExchanges)
 {
 	IndexMap owners(World(), NOwned());
 	// Ghosts: the first entity of every other process, and the last one of the next process
-	vector<BigNumber> ghosts;
+	vector<GlobalNumber> ghosts;
 	for (int r = 0; r < World().Size(); r++)
 	{
 		if (r == World().Rank())
@@ -112,7 +133,7 @@ TEST(IndexMap, HaloExchanges)
 	map.AddGhostsToOwners(ones.data(), counts.data(), 1);
 	for (BigNumber i = 0; i < map.NOwned; i++)
 	{
-		BigNumber global = map.Begin + i;
+		GlobalNumber global = map.Begin + i;
 		BigNumber expected = 0;
 		if (i == 0)
 			expected += World().Size() - 1;
@@ -140,7 +161,7 @@ TEST(DistributedMatrix, Products)
 	SparseMatrix local = dA.LocalColumns();
 	EXPECT_EQ(local.rows(), owners.NOwned);
 	EXPECT_EQ(local.cols(), dA.ColMap->NLocal());
-	EXPECT_EQ((SparseMatrix(dA.GlobalColumns() - Rows(A, owners.Begin, owners.NOwned))).norm(), 0);
+	EXPECT_EQ((GlobalColumnsMatrix(dA.GlobalColumns() - Rows(A, owners.Begin, owners.NOwned))).norm(), 0);
 }
 
 TEST(DistributedMatrix, TransposedProductWithBlocks)

@@ -1,4 +1,5 @@
 #pragma once
+#include <limits>
 #include <numeric>
 #include "../Solver.h"
 using namespace std;
@@ -20,7 +21,7 @@ private:
 	bool _initialized = false;
 	Communicator _self; // the processes of a matrix that is not distributed: this one
 	const Communicator* _comm = nullptr;
-	BigNumber _firstRow = 0;
+	GlobalNumber _firstRow = 0;
 	// The entries of the rows of the process (1-based global numbers; the lower triangle if SPD), read by the setup
 	vector<MUMPS_INT> _irn, _jcn;
 	vector<double> _a;
@@ -71,10 +72,10 @@ public:
 		Run("the solve");
 		if (!_solutionMap)
 		{
-			vector<BigNumber> ghosts;
+			vector<GlobalNumber> ghosts;
 			for (MUMPS_INT p = 0; p < _nSolution; p++)
 			{
-				BigNumber row = _solutionRows[p] - 1;
+				GlobalNumber row = _solutionRows[p] - 1;
 				if (row < _firstRow || row >= _firstRow + n)
 					ghosts.push_back(row);
 			}
@@ -99,8 +100,11 @@ public:
 private:
 	// The matrix of size n, of which the process has the rows [firstRow, firstRow + rows.rows()) (global columns), on the
 	// processes of comm. Collective.
-	void Factorize(const SparseMatrix& rows, BigNumber firstRow, BigNumber n, const Communicator& comm)
+	template <class Matrix>
+	void Factorize(const Matrix& rows, GlobalNumber firstRow, GlobalNumber n, const Communicator& comm)
 	{
+		if (n > numeric_limits<MUMPS_INT>::max())
+			Utils::FatalError("MUMPS: " + to_string(n) + " rows, beyond its indices (MUMPS_INT, " + to_string(8 * sizeof(MUMPS_INT)) + " bits).");
 		Terminate();
 		_comm = &comm;
 		_firstRow = firstRow;
@@ -109,7 +113,7 @@ private:
 		_a.clear();
 		for (BigNumber i = 0; i < rows.rows(); i++)
 		{
-			for (SparseMatrix::InnerIterator it(rows, i); it; ++it)
+			for (typename Matrix::InnerIterator it(rows, i); it; ++it)
 			{
 				if (!SPD || it.col() <= firstRow + i)
 				{

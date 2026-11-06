@@ -1,5 +1,6 @@
 #pragma once
 #include <iomanip>
+#include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <vector>
@@ -17,6 +18,11 @@ using BigNumber = intmax_t;
 using SparseMatrixIndex = intmax_t; // in Eigen, default value is int, but it is not sufficient for big matrices
 #endif // SMALL_INDEX
 
+// The global numbers of a distribution over processes (IndexMap: cells, faces, DoFs): 64 bits whatever SMALL_INDEX,
+// since the processes together may number more than one of them does; BigNumber and SparseMatrixIndex number the
+// entities of a process
+using GlobalNumber = int64_t;
+
 using RowMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, SparseMatrixIndex>;
 using ColMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::ColMajor, SparseMatrixIndex>;
 
@@ -24,6 +30,8 @@ using ColMajorSparseMatrix = Eigen::SparseMatrix<double, Eigen::ColMajor, Sparse
 // Eigen's sparse direct solvers only support column-major matrices: they must be given a column-major
 // copy (see EigenSparseLU, EigenSparseCholesky and IterativeSolver).
 using SparseMatrix = RowMajorSparseMatrix;
+// The rows of a process with global columns (exchanged between the processes, or given to MUMPS)
+using GlobalColumnsMatrix = Eigen::SparseMatrix<double, Eigen::RowMajor, GlobalNumber>;
 
 
 using DenseMatrix = Eigen::MatrixXd;

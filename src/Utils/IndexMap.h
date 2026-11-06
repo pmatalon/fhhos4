@@ -20,10 +20,10 @@ class IndexMap
 public:
 	const Communicator* Comm = nullptr;
 	BigNumber NOwned = 0;
-	BigNumber Begin = 0;
-	BigNumber GlobalSize = 0;
-	vector<BigNumber> Offsets; // the first global number of each process, then GlobalSize (Size() + 1 values)
-	vector<BigNumber> Ghosts;  // global numbers, in the order of the local numbers
+	GlobalNumber Begin = 0;
+	GlobalNumber GlobalSize = 0;
+	vector<GlobalNumber> Offsets; // the first global number of each process, then GlobalSize (Size() + 1 values)
+	vector<GlobalNumber> Ghosts; // global numbers, in the order of the local numbers
 
 	// Halo. Receive: the ghosts RecvIndices[RecvStart[k]], ..., RecvIndices[RecvStart[k+1] - 1] (positions in Ghosts, by
 	// increasing global number) are owned by RecvRanks[k]. Send: the owned entities SendIndices[SendStart[k]], ...,
@@ -58,7 +58,7 @@ public:
 
 	// The ownership of owners, with the ghosts ghosts (global numbers of entities owned by other processes, in any
 	// order, possibly repeated), sorted. Collective.
-	IndexMap(const IndexMap& owners, vector<BigNumber> ghosts)
+	IndexMap(const IndexMap& owners, vector<GlobalNumber> ghosts)
 		: IndexMap(owners.WithoutGhosts())
 	{
 		sort(ghosts.begin(), ghosts.end());
@@ -68,7 +68,7 @@ public:
 
 	// The ownership of owners, with the ghosts in the given order (no repetition): the local numbers of the caller.
 	// Collective.
-	static IndexMap InOrder(const IndexMap& owners, vector<BigNumber> ghosts)
+	static IndexMap InOrder(const IndexMap& owners, vector<GlobalNumber> ghosts)
 	{
 		IndexMap map = owners.WithoutGhosts();
 		map.SetGhosts(std::move(ghosts));
@@ -92,25 +92,25 @@ public:
 	int Size() const { return Comm->Size(); }
 	BigNumber NGhosts() const { return Ghosts.size(); }
 	BigNumber NLocal() const { return NOwned + NGhosts(); }
-	bool IsOwned(BigNumber global) const { return global >= Begin && global < Begin + NOwned; }
+	bool IsOwned(GlobalNumber global) const { return global >= Begin && global < Begin + NOwned; }
 
 	// The process that owns the entity of global number global
-	int Owner(BigNumber global) const
+	int Owner(GlobalNumber global) const
 	{
 		assert(global >= 0 && global < GlobalSize);
 		return (int)(upper_bound(Offsets.begin(), Offsets.end(), global) - Offsets.begin()) - 1;
 	}
 
-	BigNumber Global(BigNumber local) const
+	GlobalNumber Global(BigNumber local) const
 	{
 		return local < NOwned ? Begin + local : Ghosts[local - NOwned];
 	}
 
 	// The local number of the entity global: owned or ghost; -1 if neither
-	BigNumber Local(BigNumber global) const
+	BigNumber Local(GlobalNumber global) const
 	{
 		if (IsOwned(global))
-			return global - Begin;
+			return (BigNumber)(global - Begin);
 		if (_sortedGhostPositions.empty())
 		{
 			auto it = lower_bound(Ghosts.begin(), Ghosts.end(), global);
@@ -118,7 +118,7 @@ public:
 				return NOwned + (it - Ghosts.begin());
 			return -1;
 		}
-		auto it = lower_bound(_sortedGhostPositions.begin(), _sortedGhostPositions.end(), global, [this](BigNumber position, BigNumber g) { return Ghosts[position] < g; });
+		auto it = lower_bound(_sortedGhostPositions.begin(), _sortedGhostPositions.end(), global, [this](BigNumber position, GlobalNumber g) { return Ghosts[position] < g; });
 		if (it != _sortedGhostPositions.end() && Ghosts[*it] == global)
 			return NOwned + *it;
 		return -1;
@@ -259,7 +259,7 @@ private:
 	}
 
 	// Ghosts given (unique global numbers of entities owned by other processes), in their local order
-	void SetGhosts(vector<BigNumber> ghosts)
+	void SetGhosts(vector<GlobalNumber> ghosts)
 	{
 		Ghosts = std::move(ghosts);
 		vector<BigNumber> sorted(Ghosts.size());
@@ -271,7 +271,7 @@ private:
 		bool invalid = false;
 		for (BigNumber q = 0; q < NGhosts(); q++)
 		{
-			BigNumber global = Ghosts[sorted[q]];
+			GlobalNumber global = Ghosts[sorted[q]];
 			if (global < 0 || global >= GlobalSize || IsOwned(global) || (q > 0 && global == Ghosts[sorted[q - 1]]))
 				invalid = true;
 		}
@@ -302,11 +302,11 @@ private:
 			RecvStart.push_back(NGhosts());
 
 		// The owners learn which of their entities are ghosts where
-		vector<vector<BigNumber>> requests(Size());
+		vector<vector<GlobalNumber>> requests(Size());
 		for (size_t k = 0; k < RecvRanks.size(); k++)
 			for (BigNumber q = RecvStart[k]; q < RecvStart[k + 1]; q++)
 				requests[RecvRanks[k]].push_back(Ghosts[RecvIndices[q]]);
-		vector<vector<BigNumber>> requested = Comm->AllToAll(requests);
+		vector<vector<GlobalNumber>> requested = Comm->AllToAll(requests);
 		SendRanks.clear();
 		SendStart = { 0 };
 		SendIndices.clear();
@@ -315,11 +315,11 @@ private:
 			if (requested[r].empty())
 				continue;
 			SendRanks.push_back(r);
-			for (BigNumber global : requested[r])
+			for (GlobalNumber global : requested[r])
 			{
 				if (!IsOwned(global))
 					Utils::FatalError("IndexMap: a process asks for the entity " + to_string(global) + ", not owned by the process " + to_string(Comm->Rank()) + ".");
-				SendIndices.push_back(global - Begin);
+				SendIndices.push_back((BigNumber)(global - Begin));
 			}
 			SendStart.push_back(SendIndices.size());
 		}

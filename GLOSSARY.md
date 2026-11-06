@@ -121,6 +121,12 @@ The process that holds a face's row in a distributed system: the smaller rank am
 **Ghost face**:
 A face that a process uses without owning it.
 
+**Global number**:
+The number of a cell or face among those of all the processes: those of each process contiguous, in rank order.
+
+**Local number**:
+The number of a cell or face on a process: its own ones first, then its ghosts.
+
 ## Project
 
 **Program**:

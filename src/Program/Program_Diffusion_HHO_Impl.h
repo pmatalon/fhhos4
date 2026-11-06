@@ -44,7 +44,7 @@ inline void CheckDistributedArguments(const ProgramArguments& args)
 // and of its cells (0 elsewhere). A: the condensed operator of the program's U-AMG, owned by the caller (the solver keeps
 // a pointer to it).
 template <int Dim>
-void SolveDistributed(Diffusion_HHO<Dim>& problem, const vector<BigNumber>& cellNumbers, const vector<BigNumber>& faceNumbers, BigNumber nOwnFaces, IterativeSolver* iterativeSolver, bool libraryCondenses, bool nonsymmetric, int faceBlockSize,
+void SolveDistributed(Diffusion_HHO<Dim>& problem, const vector<GlobalNumber>& cellNumbers, const vector<GlobalNumber>& faceNumbers, BigNumber nOwnFaces, IterativeSolver* iterativeSolver, bool libraryCondenses, bool nonsymmetric, int faceBlockSize,
                       Timer& setupTimer, Timer& solvingTimer, DistributedMatrix& A, Vector& systemSolution, Vector& cellSolution)
 {
 	const Communicator& world = Communicator::Current();
@@ -55,19 +55,19 @@ void SolveDistributed(Diffusion_HHO<Dim>& problem, const vector<BigNumber>& cell
 	cout << "Distributed system: " << system.Cells->GlobalSize << " cells and " << system.Faces->GlobalSize << " faces on " << world.Size() << " processes (" << world.Min(system.Faces->NOwned) << " to " << world.Max(system.Faces->NOwned) << " faces per process)" << endl;
 
 	SparseMatrix A_TT = system.CellBlocks(nonsymmetric ? SparseMatrixOps::FullFromLower(problem.A_T_T) : problem.A_T_T);
-	SparseMatrix A_TF = system.Rows(problem.A_T_ndF, true, true, true);
+	SparseMatrix A_TF = system.Rows(problem.A_T_ndF, true);
 	// A_F_T: the rows of the faces of the process, the columns of the cells (ghost cells: those of its faces)
 	DistributedMatrix A_FT;
 	if (nonsymmetric)
-		A_FT = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Cells, system.Rows(SparseMatrixOps::Transpose(problem.A_T_ndF), false, false, false), fbs, cbs);
+		A_FT = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Cells, system.GlobalRows(SparseMatrixOps::Transpose(problem.A_T_ndF), false, false), fbs, cbs);
 	Vector cellInterpOfOne = system.Own(problem.CellInterpOfOne(), true, 1);
 	Vector faceInterpOfOne = system.Own(problem.FaceInterpOfOne(), false, 1);
 	if (libraryCondenses)
 	{
 		LibraryUAMG* library = dynamic_cast<LibraryUAMG*>(iterativeSolver);
-		SparseMatrix A_FF = system.Rows(fullA_FF, false, true, true);
+		SparseMatrix A_FF = system.Rows(fullA_FF, false);
 		SparseMatrix localA_FT = nonsymmetric ? A_FT.LocalColumns() : SparseMatrix(); // kept alive until the solve
-		vector<int64_t> ghostCells = nonsymmetric ? vector<int64_t>(A_FT.ColMap->Ghosts.begin(), A_FT.ColMap->Ghosts.end()) : vector<int64_t>();
+		vector<GlobalNumber> ghostCells = nonsymmetric ? A_FT.ColMap->Ghosts : vector<GlobalNumber>();
 		setupTimer.Start();
 		library->SetupFromDistributedBlocks(A_TT, A_TF, localA_FT, A_FF, system.GhostFaces(), ghostCells, cellInterpOfOne, faceInterpOfOne);
 		setupTimer.Stop();
@@ -82,7 +82,7 @@ void SolveDistributed(Diffusion_HHO<Dim>& problem, const vector<BigNumber>& cell
 	}
 	else
 	{
-		A = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Faces, system.Rows(SparseMatrixOps::FullFromLower(problem.A), false, true, false), fbs, fbs);
+		A = DistributedMatrix::FromGlobalColumns(system.Faces, *system.Faces, system.GlobalRows(SparseMatrixOps::FullFromLower(problem.A), false, true), fbs, fbs);
 		setupTimer.Start();
 		SparseMatrix localA_FT = nonsymmetric ? A_FT.RowsWithGhosts(*system.FaceMap, *system.Cells) : SparseMatrix();
 		iterativeSolver->Setup(A, A_TT, A_TF, localA_FT, system.FaceMap, cellInterpOfOne, faceInterpOfOne);
@@ -300,7 +300,7 @@ void Program_Diffusion_HHO<Dim>::Execute(ProgramArguments& args, ProgramResults*
 
 	// On several processes: the post-processing on the cells of the process, the global numbers of the faces of the system
 	GMSHMesh<Dim>* part = distributed ? dynamic_cast<GMSHMesh<Dim>*>(mesh) : nullptr;
-	vector<BigNumber> faceNumbers;
+	vector<GlobalNumber> faceNumbers;
 	BigNumber nOwnFaces = 0;
 	if (distributed)
 	{
