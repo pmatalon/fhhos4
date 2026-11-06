@@ -164,9 +164,6 @@ If the library is compiled with MPI (`-DENABLE_MPI=ON`), `solver.Comm` sets the 
 its cells (a face has one or two cells), e.g. the one of smaller rank. A process may own no cell and no face: it then
 gives empty matrices and vectors, and still calls the setups and solves.
 
-**Global numbers.** The faces are numbered across the processes in rank order: first the faces of rank 0, then those
-of rank 1, etc., so that the faces of each process have consecutive numbers. These numbers count faces, not DoFs.
-
 **What each process gives** to `SetupSym()` (the `FHHOS4_MPI` branch of the example above):
 
 - `A_TT` and `A_TF`: the rows of its cells. `A_FF`: the rows of its faces, with both triangles (a triangular `A_FF` is
@@ -176,7 +173,9 @@ of rank 1, etc., so that the faces of each process have consecutive numbers. The
   appear in these rows: the faces of its cells that other processes own, and the faces coupled to its own faces in
   `A_FF` through the cells of other processes. This is the local numbering of DOLFINx's index maps, and of the columns
   of PETSc's and hypre's distributed matrices.
-- `faceGhostGlobalNumbers`: the global numbers of its ghost faces, in the order of their local numbers.
+- `faceGhostGlobalNumbers`: the global numbers of its ghost faces (faces, not DoFs), in the order of their local
+  numbers. The faces are numbered as PETSc and hypre require for their distributed matrices: those of each process
+  contiguously, in rank order.
 - The vectors `b_T`, `b_F`, `x_T`, `x_F` and the interpolations of 1: the values on its own cells and faces.
 
 For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the faces 10 to 19. If the rows of rank 0
@@ -231,8 +230,8 @@ What changes for a non-symmetric matrix (e.g. convection-diffusion):
 - [With MPI](#with-mpi), each process gives the rows of its faces in `A_FT`. Its columns follow a local numbering of
   the cells, as those of `A_TF` and `A_FF` for the faces: first the cells of the process, in the order of the rows of
   `A_TT`, then its **ghost cells**, in any order (the cells of other processes that appear in these rows). `A_FT` is
-  the only block with ghost cells. Their global numbers, `cellGhostGlobalNumbers`, number the cells across the
-  processes in rank order, as the faces:
+  the only block with ghost cells. Their global numbers, `cellGhostGlobalNumbers`, number the cells as
+  `faceGhostGlobalNumbers` the faces:
   ```cpp
   solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers,
                      cellGhostGlobalNumbers);
