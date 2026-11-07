@@ -5,11 +5,11 @@
 3. [The algorithm in a nutshell](#3-the-algorithm-in-a-nutshell)
 4. [How to use](#3-how-to-use)
    - [Symmetric systems](#symmetric-systems)
-     - [With MPI](#with-mpi)
+   - [Inputs](#inputs)
+   - [With MPI](#with-mpi)
    - [Non-symmetric systems](#non-symmetric-systems)
    - [Use as a preconditioner](#use-as-a-preconditioner)
    - [The Python interface](#the-python-interface)
-   - [Inputs](#inputs)
    - [Other matrix formats](#other-matrix-formats)
    - [Parameters](#parameters)
    - [Constraints](#constraints)
@@ -150,7 +150,34 @@ The blocks are Eigen matrices, read
 in place, in the format of the library: `fhhos4::SparseMatrix` (row-major, compressed), or an Eigen map of your own
 arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy).
 
-#### With MPI
+### Inputs
+
+- **The blocks** `A_TT` (cells x cells), `A_TF` (cells x faces), `A_FF` (faces x faces), and `A_FT` (faces x cells) for
+  a non-symmetric matrix. The DoFs of each cell (resp. face) are contiguous, cells and faces in any order. In a
+  symmetric system on one process, `A_TT` and `A_FF` are read from their lower triangular part (lower-only or full);
+  otherwise in full (`A_FF` on several processes, all the blocks of a non-symmetric system). A triangular block where
+  both lower and upper triangular parts are read (or an upper triangular one where the lower is) is refused.
+- **The format of the matrices**: Eigen sparse matrices, compressed, row-major, with the index type of the library
+  (`fhhos4::SparseIndex`: `int`, or 64 bits with `-DENABLE_64BIT_INDEX=ON`): `fhhos4::SparseMatrix`, or an Eigen map of your
+  own CSR arrays, `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)`, the columns
+  strictly increasing in each row (sorted, no duplicates; checked). **The matrices are read in place, never copied nor
+  converted**: assemble them in this format. Any other Eigen sparse matrix converts by Eigen, in one line, a copy that
+  stays visible in your code: `fhhos4::SparseMatrix B = A;` (see below). A wrong format does not compile, with a
+  message that says how to convert.
+- **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
+  the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
+  **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d whose degree is the
+  largest partial degree; except with `PCoarsening::ToZero`) **with a constant first function** `phi_0`:
+  `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
+  cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
+- **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set, and
+  `PolynomialSpace` for bases of Q^k. The setup checks the sizes and structure of the inputs against them (full
+  polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k; times `VectorComponents`).
+- **A vector-valued unknown** of `n` components: `VectorComponents = n`. Each cell and face block holds the scalar basis
+  times each unit vector, **interleaved by component** (array of structures): `phi_i e_c` is the DoF `n i + c` of the
+  block. The interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face.
+
+### With MPI
 
 If the library is compiled with MPI (`-DENABLE_MPI=ON`), `solver.Comm` sets the processes that solve the system:
 
@@ -164,10 +191,13 @@ If the library is compiled with MPI (`-DENABLE_MPI=ON`), `solver.Comm` sets the 
 its cells (a face has one or two cells), e.g. the one of smaller rank. A process may own no cell and no face: it then
 gives empty matrices and vectors, and still calls the setups and solves.
 
-**What each process gives** to `SetupSym()` (the `FHHOS4_MPI` branch of the example above):
+#### Expected format
+
+Each process gives `SetupSym()` the following (the `FHHOS4_MPI` branch of the example above):
 
 - `A_TT` and `A_TF`: the rows of its cells. `A_FF`: the rows of its faces, assembled (with the contributions of the
-  cells of other processes) and with both triangles (a triangular `A_FF` is accepted on one process only).
+  cells of other processes) and with both lower and upper triangular parts (on one process, the lower triangular part
+  alone is enough).
 - The columns of `A_TF` and `A_FF` follow a local numbering of the faces: first the faces of the process, in the order
   of the rows of `A_FF`, then its **ghost faces**, in any order. The ghost faces are the faces of other processes that
   appear in these rows: the faces of its cells that other processes own, and the faces coupled to its own faces in
@@ -193,11 +223,13 @@ fhhos4::DistributedBlocks blocks = fhhos4::ConvertGlobalToLocalSym(A_TF, A_FF, f
 solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne, blocks.FaceGhostGlobalNumbers);
 ```
 
-**What you get back.** `Solve()` writes `x_T` and `x_F` on the cells and faces of the process, and returns the `Result`
+#### What you get back
+
+`Solve()` writes `x_T` and `x_F` on the cells and faces of the process, and returns the `Result`
 of the whole system. An error in the inputs of one process is raised on all the processes, so that none is left
 waiting.
 
-**What changes in the solver.**
+#### What changes in the solver
 
 - Each process aggregates its own cells; the faces between processes are kept. The coarsest level is factorized and
   solved by MUMPS, distributed over all the processes. The number of iterations may change slightly with the number
@@ -277,10 +309,10 @@ V- and W-cycles work with any Krylov method (CG, GMRES), but are not recommended
 
 ### The Python interface
 
-The Python module `fhhos4` has the same interface, with the same names, on NumPy arrays read in place, as the library
-reads its inputs: never copied nor converted (with its own matrix types, Python having no Eigen: `fhhos4.CSRView`,
-`fhhos4.CSRMatrix`, below). It needs Python (>= 3.9), [nanobind](https://nanobind.readthedocs.io) and
-NumPy (SciPy is optional), and is built with the library (not installed yet: use it from the build tree):
+The Python module `fhhos4` has the classes, functions, parameters and enums of the C++ library, with the same names
+(`solver.Krylov = fhhos4.Krylov.GCR`), and also reads its inputs in place, as NumPy arrays. It needs Python (>= 3.9),
+[nanobind](https://nanobind.readthedocs.io) and NumPy (SciPy is optional), and is built with the library (not installed
+yet: use it from the build tree):
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PYTHON=ON
@@ -294,85 +326,39 @@ import numpy as np
 import fhhos4
 
 solver = fhhos4.Solver()
-solver.Dimension = 3   # space dimension
-solver.FaceDegree = k  # polynomial degree in the faces
-solver.CellDegree = k  # polynomial degree in the cells
-# solver.PolynomialSpace = fhhos4.PolynomialSpace.Q  # bases of Q^k instead of P^k
+solver.Dimension = 3
+solver.FaceDegree = k
+solver.CellDegree = k
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # e.g. scipy.sparse.csr_array, NumPy vectors
 x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
 result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 ```
 
-- The parameters are attributes, the enums of `fhhos4.h` classes of the module: `solver.Krylov = fhhos4.Krylov.GCR`.
-- The matrices: a `fhhos4.CSRView(rows, cols, rowPointers, columnIndices, values)` of NumPy arrays (or of any
-  contiguous array with the buffer protocol), a `fhhos4.CSRMatrix` (the result of the
-  helpers), or any object with the attributes `indptr`, `indices`, `data`, `shape` and `format` `"csr"` (SciPy's CSR
-  matrices). The indices: int32 or int64, uint64 read as int64; the values: float64. The setups take the index type
-  of the library (int32 by default) for both arrays; the other formats raise `TypeError`: convert them with the
-  helpers (copies), e.g. `fhhos4.ToCSR(M)` (SciPy CSC matrices included), or view a symmetric CSC matrix with
-  `fhhos4.TransposedView(A)`. The CSR format of the library requires sorted columns (SciPy: `sort_indices()`, or
-  `sum_duplicates()`, in place).
-- The vectors: NumPy vectors of `float64`, read (outputs: written) in place; another dtype raises `TypeError`.
-- The solver keeps the arrays that the solves read alive: those of `A_FT` (`SetupNonSym()`). `CondensedMatrix()`
-  returns a copy (`fhhos4.CSRMatrix`). The arrays of a `fhhos4.CSRMatrix`
-  (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.
-- The helpers have the same names: `ExtractBlocksSym(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
-  dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`,
-  `ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize)` and `ConvertGlobalToLocalNonSym()`
-  (their `FaceGhostGlobalNumbers` and `CellGhostGlobalNumbers`: read-only `int64` NumPy arrays, the
-  `faceGhostGlobalNumbers` and `cellGhostGlobalNumbers` of the setups).
-- The errors raise `fhhos4.Error`, a `RuntimeError`.
-- The setups, solves and helpers release the GIL.
-- Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), `solver.Comm` not set: one process, as
-  in C++ (see [Several processes](#with-mpi)). To set it, the module needs
-  [mpi4py](https://mpi4py.readthedocs.io), built with the same MPI as the library, and imported first (it initializes
-  MPI). `solver.Comm`: an mpi4py communicator (`MPI.COMM_SELF`, `MPI.COMM_WORLD`, or its Fortran handle
-  `comm.py2f()`). On several processes, `SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne,
-  faceGhostGlobalNumbers)`: `faceGhostGlobalNumbers`, the global numbers of the ghost faces, a NumPy array of `int64`
-  read in place (`None` by default: no ghosts); `SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne,
-  faceGhostGlobalNumbers, cellGhostGlobalNumbers)`, `cellGhostGlobalNumbers` likewise.
+What differs from C++:
 
-  ```python
-  from mpi4py import MPI  # first: initializes MPI
-  import fhhos4
-
-  solver = fhhos4.Solver()
-  solver.Comm = MPI.COMM_WORLD
-  ...
-  solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers)  # the rows of the process
-  result = solver.Solve(b_T, b_F, x_T, x_F)  # the vectors of the cells and faces of the process
-  ```
-
-### Inputs
-
-- **The blocks** `A_TT` (cells x cells), `A_TF` (cells x faces), `A_FF` (faces x faces), and `A_FT` (faces x cells) for
-  a non-symmetric matrix. The DoFs of each cell (resp. face) are contiguous, cells and faces in any order. In a
-  symmetric system on one process, `A_TT` and `A_FF` are read from their lower triangular part (lower-only or full);
-  otherwise in full (`A_FF` on several processes, all the blocks of a non-symmetric system). A triangular block where
-  both triangles are read (or an upper triangular one where the lower is) is refused.
-- **The format of the matrices**: Eigen sparse matrices, compressed, row-major, with the index type of the library
-  (`fhhos4::SparseIndex`: `int`, or 64 bits with `-DENABLE_64BIT_INDEX=ON`): `fhhos4::SparseMatrix`, or an Eigen map of your
-  own CSR arrays, `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)`, the columns
-  strictly increasing in each row (sorted, no duplicates; checked). **The matrices are read in place, never copied nor
-  converted**: assemble them in this format. Any other Eigen sparse matrix converts by Eigen, in one line, a copy that
-  stays visible in your code: `fhhos4::SparseMatrix B = A;` (see below). A wrong format does not compile, with a
-  message that says how to convert.
-- **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
-  the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
-  **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d whose degree is the
-  largest partial degree; except with `PCoarsening::ToZero`) **with a constant first function** `phi_0`:
-  `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
-  cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
-- **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set, and
-  `PolynomialSpace` for bases of Q^k. The setup checks the sizes and structure of the inputs against them (full
-  polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k; times `VectorComponents`).
-- **A vector-valued unknown** of `n` components: `VectorComponents = n`. Each cell and face block holds the scalar basis
-  times each unit vector, **interleaved by component** (array of structures): `phi_i e_c` is the DoF `n i + c` of the
-  block. The interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face.
+- **The matrices**: SciPy's CSR matrices (or any object with the attributes `indptr`, `indices`, `data`, `shape` and
+  `format` `"csr"`), a `fhhos4.CSRView(rows, cols, rowPointers, columnIndices, values)` of NumPy arrays (or of any
+  contiguous array with the buffer protocol), or a `fhhos4.CSRMatrix` (what the helpers return). The values: float64;
+  the columns sorted (SciPy: `sort_indices()`, in place). The setups take the index type of the library (int32 by
+  default) for both index arrays, the helpers int32 or int64 (uint64 read as int64). Other formats raise `TypeError`:
+  convert them with `fhhos4.ToCSR(M)` (a copy, SciPy's CSC matrices included), or view a symmetric CSC matrix with
+  `fhhos4.TransposedView(A)`.
+- **The vectors**: NumPy vectors of float64, read (outputs: written) in place; another dtype raises `TypeError`. The
+  lists of `fhhos4.DoFLists(count, offsets, dofs)`: NumPy arrays of the same integer dtype.
+- **Lifetimes**: the solver keeps alive the arrays that its solves read (those of `A_FT`, for `SetupNonSym()`).
+  `CondensedMatrix()` returns a copy. The arrays of a `fhhos4.CSRMatrix` (`RowPointers`, `ColumnIndices`, `Values`)
+  and the ghost numbers returned by `ConvertGlobalToLocalSym()`/`NonSym()` are read-only NumPy views of the library's
+  memory, which they keep alive.
+- **The errors** raise `fhhos4.Error`, a `RuntimeError`. The setups, solves and helpers release the GIL.
+- **With MPI** (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`): `solver.Comm` is an
+  [mpi4py](https://mpi4py.readthedocs.io) communicator (`MPI.COMM_WORLD`, or its Fortran handle `comm.py2f()`). Import
+  mpi4py, built with the same MPI as the library, before `fhhos4` (it initializes MPI). The ghost numbers are NumPy
+  arrays of int64, read in place (`None` by default: no ghosts). Without `Comm`, mpi4py is not needed.
 
 ### Other matrix formats
 
-`fhhos4` provides the following helper functions to convert your matrices to the format `fhhos4` expects.
+`fhhos4` provides the following helper functions to convert your matrices to the format `fhhos4` expects (see
+[Inputs](#inputs), and on several processes [Expected format](#expected-format)).
 
 | Your matrices | How to convert | Makes a copy? |
 |---|---|---|
@@ -380,7 +366,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 | Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No |
 | Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No |
 | The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Yes |
-| On several processes, the rows of a process with global columns (e.g. as given to PETSc or hypre) | `ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize)`, `ConvertGlobalToLocalNonSym()`: see [With MPI](#with-mpi) | Yes |
+| On several processes, the rows of a process with global columns (e.g. as given to PETSc or hypre) | `ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize)`, `ConvertGlobalToLocalNonSym()`: see [Expected format](#expected-format) | Yes |
 
 The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a global matrix (e.g. assembled by a framework
 in its own numbering):
@@ -397,8 +383,8 @@ solver.Solve(b_T, b_F, x_T, x_F);
 fhhos4::Scatter(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchanged (e.g. the Dirichlet values)
 ```
 
-- `M`: the whole matrix (both triangles), square, an Eigen row-major matrix (or a map of your arrays) with the index type
-  `std::int32_t` or `std::int64_t`.
+- `M`: the whole matrix (both lower and upper triangular parts), square, an Eigen row-major matrix (or a map of your
+  arrays) with the index type `std::int32_t` or `std::int64_t`.
 - The lists: `std::int32_t` or `std::int64_t`; each DoF in one list at most. The order of the lists gives the order of
   the blocks, and that of the DoFs of each cell or face the order of its basis (reorder them, e.g. by degree, here).
 - The Dirichlet DoFs, in no list: move their contribution to the right-hand side first (`b - M x_D`).

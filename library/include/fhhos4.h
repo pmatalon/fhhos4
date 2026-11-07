@@ -445,14 +445,14 @@ namespace fhhos4
 		// part (full or lower-only matrices; an upper triangular one is refused). The blocks of A_TT (one per cell) must be
 		// positive definite: they are factorized by Cholesky (fhhos4::Error otherwise).
 		// On several processes (Comm), each one gives the rows of its own cells and faces: A_TT and A_TF the rows of its
-		// cells, A_FF those of its faces, in full (both triangles: a triangular one is refused); the columns of A_TF and
-		// A_FF are numbered locally, in one numbering of the faces of the process: its own faces (those of the rows of A_FF,
-		// in their order), then its ghosts, the other faces of its rows (of its cells, and those coupled to its faces in A_FF
-		// through the cells of other processes), whose global numbers are faceGhostGlobalNumbers; the interpolations of
-		// 1 on its cells and faces. Each face belongs to a process that owns one of its cells (e.g. the one of the
-		// smaller rank); a process may own no cell nor face. Then Solve() with the vectors of the cells and faces of
-		// the process. On one process, faceGhostGlobalNumbers is empty. Blocks with global columns:
-		// ConvertGlobalToLocalSym() numbers them locally.
+		// cells, A_FF those of its faces, in full (both lower and upper triangular parts: a triangular one is refused);
+		// the columns of A_TF and A_FF are numbered locally, in one numbering of the faces of the process: its own
+		// faces (those of the rows of A_FF, in their order), then its ghosts, the other faces of its rows (of its
+		// cells, and those coupled to its faces in A_FF through the cells of other processes), whose global numbers are
+		// faceGhostGlobalNumbers; the interpolations of 1 on its cells and faces. Each face belongs to a process that
+		// owns one of its cells (e.g. the one of the smaller rank); a process may own no cell nor face. Then Solve()
+		// with the vectors of the cells and faces of the process. On one process, faceGhostGlobalNumbers is empty.
+		// Blocks with global columns: ConvertGlobalToLocalSym() numbers them locally.
 		template <typename TT, typename TF, typename FF>
 		void SetupSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
 		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
@@ -537,7 +537,8 @@ namespace fhhos4
 
 		//------------------------------------------------------------------//
 
-		// The condensed matrix A of the last setup, both triangles, computed by SetupSym() or SetupNonSym().
+		// The condensed matrix A of the last setup, both lower and upper triangular parts, computed by SetupSym() or
+		// SetupNonSym().
 		// Valid until the next setup or the destruction of the solver. On one process only (its products on any number:
 		// ApplyCondensedMatrix()).
 		SparseMatrixMap CondensedMatrix() const
