@@ -2,9 +2,8 @@
 # system of test_module.py distributed by rows, through mpi4py, against SciPy's direct solver on the whole system. The
 # cells of each process: horizontal strips; each face owned by the process of the smaller rank of its cells; the cells
 # and faces renumbered in rank order; the ghost faces (and cells of A_FT) of each process numbered in reverse order (any
-# order). Also with the process of rank 0 empty, non-symmetric, and the blocks numbered locally by
-# ConvertGlobalToLocalSym() and ConvertGlobalToLocalNonSym() (the ghosts in increasing order). The condensed system
-# (CondenseRHS(), Solve(b, x), SolveCellUnknowns(), ApplyCondensedMatrix()) too.
+# order). Also with the process of rank 0 empty, and non-symmetric. The condensed system (CondenseRHS(), Solve(b, x),
+# SolveCellUnknowns(), ApplyCondensedMatrix()) too.
 # Skipped (exit code 77) if the module is compiled without MPI, or without mpi4py.
 import os
 import sys
@@ -22,7 +21,7 @@ except ImportError:
     print("mpi4py is not installed: skipped")
     sys.exit(77)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from test_module import HybridSystem, RelativeError, ToSciPy
+from test_module import HybridSystem, RelativeError
 
 
 def Renumbering(ranks, nRanks):
@@ -33,7 +32,7 @@ def Renumbering(ranks, nRanks):
     return renumbering
 
 
-def DistributedSystem(emptyRank0, asymmetry=0.0, helpers=False):
+def DistributedSystem(emptyRank0, asymmetry=0.0):
     comm = MPI.COMM_WORLD
     rank, P = comm.Get_rank(), comm.Get_size()
     n = 48
@@ -75,22 +74,8 @@ def DistributedSystem(emptyRank0, asymmetry=0.0, helpers=False):
 
     ghosts = ghostsOf(np.concatenate([rowsTF.indices, rowsFF.indices]), faceBegin, nOwnFaces)
     cellGhostGlobalNumbers = ghostsOf(rowsFT.indices, cellBegin, nOwnCells)
-    if helpers:
-        ghosts, cellGhostGlobalNumbers = np.sort(ghosts), np.sort(cellGhostGlobalNumbers)
     faceColumns = lambda rows: localColumns(rows, ghosts, faceBegin, nOwnFaces)
     localA_TF, localA_FF, localA_FT = faceColumns(rowsTF), faceColumns(rowsFF), localColumns(rowsFT, cellGhostGlobalNumbers, cellBegin, nOwnCells)
-    if helpers:
-        tf, ft, ff = (M.sorted_indices() for M in (rowsTF, rowsFT, rowsFF))
-        if asymmetry == 0:
-            blocks = fhhos4.ConvertGlobalToLocalSym(tf, ff, faceBegin, 1)
-        else:
-            blocks = fhhos4.ConvertGlobalToLocalNonSym(tf, ft, ff, faceBegin, cellBegin, 1, 1)
-        assert np.array_equal(blocks.FaceGhostGlobalNumbers, ghosts) and np.array_equal(blocks.CellGhostGlobalNumbers, cellGhostGlobalNumbers if asymmetry != 0 else [])
-        assert (ToSciPy(blocks.A_TF) != localA_TF).nnz == 0 and (ToSciPy(blocks.A_FF) != localA_FF).nnz == 0
-        if asymmetry != 0:
-            assert (ToSciPy(blocks.A_FT) != localA_FT).nnz == 0
-            localA_FT, cellGhostGlobalNumbers = blocks.A_FT, blocks.CellGhostGlobalNumbers
-        localA_TF, localA_FF, ghosts = blocks.A_TF, blocks.A_FF, blocks.FaceGhostGlobalNumbers
 
     solver = fhhos4.Solver()
     solver.Comm = comm
@@ -156,13 +141,6 @@ def test_nonsymmetric_system():
     """SetupNonSym(): A_FT with the ghost cells of its rows (cellGhostGlobalNumbers)"""
     DistributedSystem(emptyRank0=False, asymmetry=0.3)
     DistributedSystem(emptyRank0=True, asymmetry=0.3)
-
-
-def test_convert_global_to_local_helpers():
-    """The blocks with global columns numbered locally by ConvertGlobalToLocalSym() and ConvertGlobalToLocalNonSym()"""
-    for asymmetry in (0.0, 0.3):
-        DistributedSystem(emptyRank0=False, asymmetry=asymmetry, helpers=True)
-        DistributedSystem(emptyRank0=True, asymmetry=asymmetry, helpers=True)
 
 
 if __name__ == "__main__":

@@ -66,11 +66,9 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 // asymmetry != 0. singular: the pure Neumann system (SingularMatrix; the right-hand side incompatible: projected),
 // the solutions compared up to the kernel (the constants, of each component). components: the system on each of them
 // (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision, blockCSR:
-// MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). localColumnsHelpers: the blocks with
-// local columns by ConvertGlobalToLocalSym() or ConvertGlobalToLocalNonSym() from their global columns (the ghosts by
-// increasing global numbers), checked against the test's. Returns the iterations on the processes; setupLog: the
-// printouts of their setup (Verbosity 2, on the root process) if not null.
-int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool localColumnsHelpers = false)
+// MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). Returns the iterations on the
+// processes; setupLog: the printouts of their setup (Verbosity 2, on the root process) if not null.
+int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, asymmetry, singular);
@@ -110,27 +108,6 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	fhhos4::SparseMatrix A_TT = OnEachComponent(system.A_TT, c), A_TF = OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c);
 	fhhos4::SparseMatrix A_FF = OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c), A_FT = OnEachComponent(LocalColumns(ownA_FT, cells, ghostCells), c);
 	vector<int64_t> faceGhostGlobalNumbers(ghostFaces.begin(), ghostFaces.end()), cellGhostGlobalNumbers(ghostCells.begin(), ghostCells.end());
-	if (localColumnsHelpers)
-	{
-		fhhos4::SparseMatrix rowsTF = OnEachComponent(ownA_TF, c), rowsFF = OnEachComponent(ownA_FF, c), rowsFT = OnEachComponent(ownA_FT, c);
-		fhhos4::DistributedBlocks blocks = asymmetry == 0 ? fhhos4::ConvertGlobalToLocalSym(rowsTF, rowsFF, faces.Begin, c)
-		                                                  : fhhos4::ConvertGlobalToLocalNonSym(rowsTF, rowsFT, rowsFF, faces.Begin, cells.Begin, c, c);
-		sort(ghostFaces.begin(), ghostFaces.end());
-		sort(ghostCells.begin(), ghostCells.end());
-		faceGhostGlobalNumbers.assign(ghostFaces.begin(), ghostFaces.end());
-		cellGhostGlobalNumbers = asymmetry == 0 ? vector<int64_t>() : vector<int64_t>(ghostCells.begin(), ghostCells.end());
-		EXPECT_EQ(blocks.FaceGhostGlobalNumbers, faceGhostGlobalNumbers);
-		EXPECT_EQ(blocks.CellGhostGlobalNumbers, cellGhostGlobalNumbers);
-		EXPECT_EQ(SparseMatrix(blocks.A_TF - OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c)).norm(), 0);
-		EXPECT_EQ(SparseMatrix(blocks.A_FF - OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c)).norm(), 0);
-		if (asymmetry == 0)
-			EXPECT_EQ(blocks.A_FT.rows(), 0);
-		else
-			EXPECT_EQ(SparseMatrix(blocks.A_FT - OnEachComponent(LocalColumns(ownA_FT, cells, ghostCells), c)).norm(), 0);
-		A_TF = blocks.A_TF;
-		A_FF = blocks.A_FF;
-		A_FT = blocks.A_FT;
-	}
 
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	solver.Prolongation = prolongation;
@@ -258,15 +235,6 @@ TEST(DistributedLibrary, BlockCSR)
 		if (World().IsRoot())
 			EXPECT_NE(setupLog.find("(and in block CSR (blocks of 2))"), string::npos) << setupLog;
 	}
-}
-
-// ConvertGlobalToLocalSym(), ConvertGlobalToLocalNonSym(): the blocks of each process with global columns, numbered
-// locally (and the ghosts), on 1 and 2 components
-TEST(DistributedLibrary, ConvertGlobalToLocalHelpers)
-{
-	for (double asymmetry : { 0.0, 0.3 })
-		for (int components : { 1, 2 })
-			ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, components, true, nullptr, false, true);
 }
 
 // MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxSize at MinRowsPerProcess * P rows (on

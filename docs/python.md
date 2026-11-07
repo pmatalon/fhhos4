@@ -26,9 +26,6 @@ NumPy arrays read in place (`nb::try_cast` without conversion; the vectors `noco
 - `PySolver` derives from `fhhos4::Solver` and keeps the views the solves read (`A`, `A_FT`), replaced only after a
   successful setup: the checks of a setup run before it resets the previous one, which still reads them;
 - `CondensedMatrix()`: a copy (`ToCSR()`); the setups, solves and helpers release the GIL.
-- `ConvertGlobalToLocalSym()`/`ConvertGlobalToLocalNonSym()` return the `detail::DistributedBlocks` (`CSRMatrix`
-  blocks; the ghosts as read-only int64 NumPy views of its `IndexArray`s, which keep it alive: the
-  `faceGhostGlobalNumbers`/`cellGhostGlobalNumbers` of the setups).
 
 Built with `-DENABLE_PYTHON=ON` (in the library section of `CMakeLists.txt`, also with `ENABLE_PROGRAM=OFF`) into
 `<build>/python`, not installed. Test: `ctest -R Python` (`PythonModule`: `library/python/tests/test_module.py`, the
@@ -41,8 +38,7 @@ returns the Python object), not set: one process, as in C++; `SetupSym(..., face
 `SetupNonSym(..., faceGhostGlobalNumbers=None, cellGhostGlobalNumbers=None)` (int64 arrays read in place,
 `ToGhostNumbers()`); `Solver.MinRowsPerProcess` (an MPI-only member, as in C++); `fhhos4.WithMPI`. Tests: `PythonModule` without `Comm` nor mpi4py (MPI not initialized:
 `CoarseSolver.MUMPS` refused); `PythonModuleMPI_np2`/`_np4` (`test_module_mpi.py`, under `mpiexec`: the toy system
-distributed by strips, also with an empty rank 0, symmetric or not, the blocks also by
-`ConvertGlobalToLocalSym()`/`NonSym()`, the condensed system's functions, against SciPy; an input error on one process
+distributed by strips, also with an empty rank 0, symmetric or not, the condensed system's functions, against SciPy; an input error on one process
 raised on all, a lower triangular `A_FF` refused). Not collective: the type errors of the arguments (nanobind's,
 `ToView()`), raised before the setup on their process only (the others then wait in the setup).
 

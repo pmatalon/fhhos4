@@ -812,25 +812,6 @@ namespace fhhos4
 			return CSRView(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr());
 		}
 
-		struct IndexArray::Impl
-		{
-			vector<std::int64_t> Numbers;
-		};
-
-		IndexArray::IndexArray() = default;
-		IndexArray::IndexArray(unique_ptr<Impl> impl)
-			: _impl(std::move(impl))
-		{}
-		IndexArray::~IndexArray() = default;
-		IndexArray::IndexArray(IndexArray&&) noexcept = default;
-		IndexArray& IndexArray::operator=(IndexArray&&) noexcept = default;
-
-		GhostNumbers IndexArray::View() const&
-		{
-			if (!_impl)
-				return GhostNumbers();
-			return GhostNumbers(_impl->Numbers.size(), _impl->Numbers.data());
-		}
 	}
 
 	namespace
@@ -945,38 +926,6 @@ namespace fhhos4
 			return blocks;
 		}
 
-		detail::IndexArray OwnNumbers(const vector<GlobalNumber>& numbers)
-		{
-			auto impl = make_unique<detail::IndexArray::Impl>();
-			impl->Numbers.assign(numbers.begin(), numbers.end());
-			return detail::IndexArray(std::move(impl));
-		}
-
-		// The matrices whose columns are global (the DoF k of the entity e: the column e * blockSize + k) with their columns
-		// numbered locally (local): the entities first, ..., first + nOwned - 1, then the others of their columns, the
-		// ghosts (returned), by increasing global number. The matrices: after CheckCSR().
-		vector<GlobalNumber> ToLocalColumns(const vector<const SparseMatrix*>& matrices, GlobalNumber first, BigNumber nOwned, int blockSize, vector<CSRMatrix>& local)
-		{
-			vector<GlobalNumber> ghosts;
-			for (const SparseMatrix* M : matrices)
-			{
-				vector<GlobalNumber> g = DistributedMatrix::ColumnGhosts(*M, first * blockSize, (first + nOwned) * blockSize, blockSize);
-				ghosts.insert(ghosts.end(), g.begin(), g.end());
-			}
-			sort(ghosts.begin(), ghosts.end());
-			ghosts.erase(unique(ghosts.begin(), ghosts.end()), ghosts.end());
-			auto localEntity = [&](GlobalNumber e) -> BigNumber
-			{
-				if (e >= first && e < first + nOwned)
-					return (BigNumber)(e - first);
-				return nOwned + (lower_bound(ghosts.begin(), ghosts.end(), e) - ghosts.begin());
-			};
-			BigNumber nCols = (nOwned + (BigNumber)ghosts.size()) * blockSize;
-			for (const SparseMatrix* M : matrices)
-				local.push_back(Own(DistributedMatrix::RenumberColumns(*M, localEntity, nCols, blockSize)));
-			return ghosts;
-		}
-
 		void CheckVectorSize(std::int64_t size, std::int64_t expected, const string& vector, const string& of)
 		{
 			if (size != expected)
@@ -996,39 +945,6 @@ namespace fhhos4
 		HybridBlocks ExtractBlocksNonSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 		{
 			return ExtractBlocks(M, cells, faces, false);
-		}
-
-		DistributedBlocks ConvertGlobalToLocal(const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF, std::int64_t firstFaceGlobalNumber, std::int64_t firstCellGlobalNumber, int faceBlockSize, int cellBlockSize)
-		{
-			CallScope scope(0, 0);
-			string function = string("fhhos4::") + (A_FT ? "ConvertGlobalToLocalNonSym()" : "ConvertGlobalToLocalSym()");
-			int fbs = faceBlockSize, cbs = cellBlockSize;
-			if (fbs < 1 || (A_FT && cbs < 1))
-				Utils::FatalError(function + ": the block sizes must be >= 1, got " + to_string(fbs) + (A_FT ? " and " + to_string(cbs) : "") + ".");
-			if (firstFaceGlobalNumber < 0 || (A_FT && firstCellGlobalNumber < 0))
-				Utils::FatalError(function + ": the global numbers of the first face and cell of the process must be >= 0, got " + to_string(firstFaceGlobalNumber) + (A_FT ? " and " + to_string(firstCellGlobalNumber) : "") + ".");
-			unique_ptr<BorrowedSparseMatrix> a_TF = Borrow(A_TF, "A_TF"), a_FF = Borrow(A_FF, "A_FF");
-			unique_ptr<BorrowedSparseMatrix> a_FT = A_FT ? Borrow(*A_FT, "A_FT") : nullptr;
-			auto size = [](const SparseMatrix& M) { return to_string(M.rows()) + " x " + to_string(M.cols()); };
-			BigNumber nFaces = a_FF->rows() / fbs;
-			if (a_FF->rows() % fbs != 0 || a_TF->cols() != a_FF->cols() || a_FF->cols() % fbs != 0 || (firstFaceGlobalNumber + nFaces) * fbs > a_FF->cols())
-				Utils::FatalError(function + ": A_FF (" + size(*a_FF) + ") has the rows of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_FF and A_TF (" + size(*a_TF) + ") the columns of the DoFs of all the faces, among which those of the faces of the process, from the face " + to_string(firstFaceGlobalNumber) + ".");
-			BigNumber nCells = A_FT ? a_TF->rows() / cbs : 0;
-			if (a_FT && (a_TF->rows() % cbs != 0 || a_FT->rows() != a_FF->rows() || a_FT->cols() % cbs != 0 || (firstCellGlobalNumber + nCells) * cbs > a_FT->cols()))
-				Utils::FatalError(function + ": A_FT (" + size(*a_FT) + ") has the rows of A_FF (" + size(*a_FF) + "), and the columns of the DoFs of all the cells (" + to_string(cbs) + " per cell), among which those of the cells of the process (the rows of A_TF, " + size(*a_TF) + "), from the cell " + to_string(firstCellGlobalNumber) + ".");
-
-			DistributedBlocks blocks;
-			vector<CSRMatrix> faceColumns;
-			blocks.FaceGhostGlobalNumbers = OwnNumbers(ToLocalColumns({ a_TF.get(), a_FF.get() }, firstFaceGlobalNumber, nFaces, fbs, faceColumns));
-			blocks.A_TF = std::move(faceColumns[0]);
-			blocks.A_FF = std::move(faceColumns[1]);
-			if (a_FT)
-			{
-				vector<CSRMatrix> cellColumns;
-				blocks.CellGhostGlobalNumbers = OwnNumbers(ToLocalColumns({ a_FT.get() }, firstCellGlobalNumber, nCells, cbs, cellColumns));
-				blocks.A_FT = std::move(cellColumns[0]);
-			}
-			return blocks;
 		}
 
 		template <typename RowPointer, typename Column>

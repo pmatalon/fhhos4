@@ -75,8 +75,7 @@ program too: `-DENABLE_PROGRAM=ON`).
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
   process may own nothing (NGSolve 6.2.2608's rank 0). `SingularMatrix`: the kernel on the own faces, the dot products
   global, the pinned DoF of the coarsest level (one per component) on one process (`docs/uamg.md`).
-  `ApplyCondensedMatrix()`: `DistributedA * x`. `ConvertGlobalToLocalSym()`/`NonSym()`: the blocks of a process from
-  their global columns, no communication (`docs/library.md`). Not yet: `CondensedMatrix()` (its columns may reach beyond
+  `ApplyCondensedMatrix()`: `DistributedA * x`. Not yet: `CondensedMatrix()` (its columns may reach beyond
   `faceGhostGlobalNumbers`: those of the received rows). Python: `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only. The mesh of each
   process is its part (`GMSHMesh`, built when `Communicator::Current()` is distributed). The partition (`OpenPart()`:

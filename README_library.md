@@ -211,18 +211,6 @@ For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the fac
 contain the faces 15 and 12 of rank 1, rank 0 numbers them locally 10 and 11 (or 11 and 10) and gives
 `faceGhostGlobalNumbers = {15, 12}` (or `{12, 15}`).
 
-If your `A_TF` and `A_FF` have global columns, as the entries you give to PETSc (`MatSetValues`) or hypre (IJ
-interface), `ConvertGlobalToLocalSym()` converts them: it finds the ghost faces among their columns, and returns copies
-of `A_TF` and `A_FF` with their columns numbered locally (the ghost faces by increasing global number), along with
-`FaceGhostGlobalNumbers`. It works on the process's data alone, without communication, hence the argument
-`firstFaceGlobalNumber`:
-
-```cpp
-// A_TF, A_FF: the rows of the process; the DoF k of the face of global number f is the column f * faceBlockSize + k.
-fhhos4::DistributedBlocks blocks = fhhos4::ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize);
-solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne, blocks.FaceGhostGlobalNumbers);
-```
-
 #### What you get back
 
 `Solve()` writes `x_T` and `x_F` on the cells and faces of the process, and returns the `Result`
@@ -269,9 +257,7 @@ What changes for a non-symmetric matrix (e.g. convection-diffusion):
   solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers,
                      cellGhostGlobalNumbers);
   ```
-  With global columns, `ConvertGlobalToLocalNonSym(A_TF, A_FT, A_FF, firstFaceGlobalNumber, firstCellGlobalNumber,
-  faceBlockSize, cellBlockSize)` also gives `blocks.CellGhostGlobalNumbers`. On each process, the Gauss-Seidel smoothers
-  follow the downwind order of its own faces.
+  On each process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
 
 ### Use as a preconditioner
 
@@ -347,8 +333,7 @@ What differs from C++:
   lists of `fhhos4.DoFLists(count, offsets, dofs)`: NumPy arrays of the same integer dtype.
 - **Lifetimes**: the solver keeps alive the arrays that its solves read (those of `A_FT`, for `SetupNonSym()`).
   `CondensedMatrix()` returns a copy. The arrays of a `fhhos4.CSRMatrix` (`RowPointers`, `ColumnIndices`, `Values`)
-  and the ghost numbers returned by `ConvertGlobalToLocalSym()`/`NonSym()` are read-only NumPy views of the library's
-  memory, which they keep alive.
+  are read-only NumPy views of the library's memory, which they keep alive.
 - **The errors** raise `fhhos4.Error`, a `RuntimeError`. The setups, solves and helpers release the GIL.
 - **With MPI** (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`): `solver.Comm` is an
   [mpi4py](https://mpi4py.readthedocs.io) communicator (`MPI.COMM_WORLD`, or its Fortran handle `comm.py2f()`). Import
@@ -358,7 +343,7 @@ What differs from C++:
 ### Other matrix formats
 
 `fhhos4` provides the following helper functions to convert your matrices to the format `fhhos4` expects (see
-[Inputs](#inputs), and on several processes [Expected format](#expected-format)).
+[Inputs](#inputs)).
 
 | Your matrices | How to convert | Makes a copy? |
 |---|---|---|
@@ -366,7 +351,6 @@ What differs from C++:
 | Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No |
 | Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No |
 | The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Yes |
-| On several processes, the rows of a process with global columns (e.g. as given to PETSc or hypre) | `ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize)`, `ConvertGlobalToLocalNonSym()`: see [Expected format](#expected-format) | Yes |
 
 The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a global matrix (e.g. assembled by a framework
 in its own numbering):

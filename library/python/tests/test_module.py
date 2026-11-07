@@ -271,32 +271,6 @@ def test_blocks_of_the_global_matrix():
         assert (values == system.A_TF.data).all()
 
 
-def test_convert_global_to_local():
-    # ConvertGlobalToLocalSym(), ConvertGlobalToLocalNonSym() on one process: all the faces and cells its own (from 0),
-    # no ghosts, the blocks unchanged; their result for the setups
-    for asymmetry in (0.0, 0.3):
-        system = HybridSystem(16, asymmetry)
-        if asymmetry == 0:
-            blocks = fhhos4.ConvertGlobalToLocalSym(system.A_TF, system.A_FF, 0, 1)
-        else:
-            blocks = fhhos4.ConvertGlobalToLocalNonSym(system.A_TF, system.A_FT, system.A_FF, 0, 0, 1, 1)
-        assert blocks.FaceGhostGlobalNumbers.dtype == np.int64 and blocks.FaceGhostGlobalNumbers.size == 0 and blocks.CellGhostGlobalNumbers.size == 0
-        assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0 and abs(ToSciPy(blocks.A_FF) - system.A_FF).max() == 0
-        if asymmetry != 0:
-            assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
-        solver = ToySolver()
-        if asymmetry == 0:
-            solver.SetupSym(system.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers)
-        else:
-            solver.SetupNonSym(system.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers, blocks.CellGhostGlobalNumbers)
-        assert solver.IsSetUp()
-    try:
-        fhhos4.ConvertGlobalToLocalSym(system.A_TF, system.A_FF, 1, 1)  # the faces of the process beyond the columns
-        assert False, "faces beyond the columns accepted"
-    except fhhos4.Error:
-        pass
-
-
 def test_parameters():
     solver = fhhos4.Solver()
     assert solver.Krylov == fhhos4.Krylov.Default and solver.Cycle == fhhos4.Cycle.K
