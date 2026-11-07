@@ -38,7 +38,7 @@ public:
 		_solver.PreSmoother = LibraryParameters::LibrarySmoother(mg.PreSmoother);
 		_solver.PostSmoother = LibraryParameters::LibrarySmoother(mg.PostSmoother);
 		_solver.CoarseningFactor = mg.CoarseningFactor;
-		_solver.CoarseMatrixMaxSize = mg.MatrixMaxSizeForCoarsestLevel;
+		_solver.CoarseMatrixMaxRows = mg.MatrixMaxSizeForCoarsestLevel;
 #if FHHOS4_MPI
 		_solver.MinRowsPerProcess = mg.MinRowsPerProcess;
 #endif

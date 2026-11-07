@@ -136,7 +136,7 @@ solver.CellDegree = k; // polynomial degree in the cells
 #if FHHOS4_MPI // 1 if the library is compiled with MPI (fhhos4_version.h)
 solver.Comm = MPI_COMM_WORLD;
 // The blocks: the rows of the cells and faces of this process, the columns of the faces numbered locally (see With MPI)
-std::vector<std::int64_t> faceGhostGlobalNumbers = ...; // or a std::span, an Eigen vector..., GhostNumbers(n, pointer)
+std::vector<std::int64_t> faceGhostGlobalNumbers = ...; // or a std::span, an Eigen vector, GhostGlobalNumbers(n, p)
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
 #else
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
@@ -350,10 +350,10 @@ What differs from C++:
 | Column-major (Eigen's default), or another index type | `fhhos4::SparseMatrix B = A;` (Eigen's conversion) | Yes |
 | Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No |
 | Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No |
-| The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Yes |
+| The monolithic matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `SplitVector()` and `JoinVector()` for the vectors | Yes |
 
-The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a global matrix (e.g. assembled by a framework
-in its own numbering):
+The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a monolithic matrix (e.g. assembled by a
+framework in its own numbering):
 
 ```cpp
 // The DoFs of each cell (resp. face) in the numbering of M: those of the i-th are DoFs[Offsets[i]], ...,
@@ -362,9 +362,9 @@ fhhos4::DoFLists<std::int64_t> cells{ nCells, cellOffsets, cellDoFs }, faces{ nF
 Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>> M(n, n, nnz, rowPointers, columns, values);
 fhhos4::HybridBlocks blocks = fhhos4::ExtractBlocksSym(M, cells, faces); // A_TT, A_TF, A_FF: one parallel pass
 solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne);
-fhhos4::Gather(b, cells, faces, b_T, b_F); // b: in the numbering of M
+fhhos4::SplitVector(b, cells, faces, b_T, b_F); // b: in the numbering of M
 solver.Solve(b_T, b_F, x_T, x_F);
-fhhos4::Scatter(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchanged (e.g. the Dirichlet values)
+fhhos4::JoinVector(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchanged (e.g. the Dirichlet values)
 ```
 
 - `M`: the whole matrix (both lower and upper triangular parts), square, an Eigen row-major matrix (or a map of your
@@ -397,8 +397,8 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `L1Theta` | `0.5` | `>= 0`: the factor of the l1 terms of the `L1Hybrid...` smoothers (the sum of the \|a_ij\| of the couplings to other threads or processes added to the diagonal). From `0.5`, convergent for a symmetric matrix whatever the partition; smaller values may save iterations where the hybrid sweeps converge (`0`: `HybridBlockGaussSeidel`) |
 | `Prolongation` | `Prolongation::HarmonicExtension` | Values of the faces interior to an aggregate: <ul><li>`HarmonicExtension`: solve their rows of the condensed matrix (shorter setup)</li><li>`Reconstruction`: the article's, from the coarse cell, then one damped Jacobi iteration</li></ul> |
 | `CoarseningFactor` | `3.8` | Ratio of the numbers of cells of two successive h-levels |
-| `CoarseMatrixMaxSize` | `1000` | Maximum number of rows of the coarsest matrix (on several processes: in total) |
-| `MinRowsPerProcess` | (MPI only) `50` | On several processes, the coarsening also stops at this many rows per process on average (`0`: only `CoarseMatrixMaxSize`). Each process aggregates its own cells: on many processes, the coarsest matrix cannot get down to `CoarseMatrixMaxSize` |
+| `CoarseMatrixMaxRows` | `1000` | Maximum number of rows of the coarsest matrix (on several processes: in total) |
+| `MinRowsPerProcess` | (MPI only) `50` | On several processes, the coarsening also stops at this many rows per process on average (`0`: only `CoarseMatrixMaxRows`). Each process aggregates its own cells: on many processes, the coarsest matrix cannot get down to `CoarseMatrixMaxRows` |
 | `CoarseSolver` | `Cholesky` if symmetric, `LU` if non-symmetric | <ul><li>`Cholesky`, `LU`: Eigen's on one process, MUMPS's on several</li><li>`MUMPS`: MUMPS's on one process too</li></ul> |
 | `MixedPrecision` | `true` | Levels stored and cycled in single precision (half the memory, faster); the Krylov method, residuals and solution stay in double. Chebyshev and Gauss-Seidel smoothers (all but `DampedBlockJacobi`); otherwise ignored |
 | `BlockCSRStorage` | `false` | Level operators stored by blocks of faces when `FaceDegree >= 1` (faster smoothing). Always so in mixed precision; in double, costs a copy of the condensed matrix. Chebyshev and Gauss-Seidel smoothers |

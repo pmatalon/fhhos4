@@ -90,7 +90,7 @@ n constants, a pinned DoF for each on the coarsest level (`SingularSolver`): the
 elasticity (its kernel has the rotations). `Prolongation::Reconstruction`: the n rows of the constants of the
 reconstruction of the coarse cell go to the n constants of each removed face (`CoarseningPass::ComputeProlongation()`;
 coupled components: coupled rows). Checked by `UAMGLibrary.VectorComponents` and `SingularVectorComponents`: the blocks
-⊗ I_n give the scalar iterations and solution on each component, with both prolongations (`CoarseMatrixMaxSize` times
+⊗ I_n give the scalar iterations and solution on each component, with both prolongations (`CoarseMatrixMaxRows` times
 n: it counts rows); `CoupledComponents`, the blocks ⊗ C: the direct solution; on several processes,
 `DistributedLibrary.VectorComponents` (the blocks of each process ⊗ I_n, the ghosts unchanged; singular too).
 

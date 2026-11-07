@@ -54,7 +54,7 @@ program too: `-DENABLE_PROGRAM=ON`).
   order of the faces of each process (`Diag`; Jacobi between the processes). Ghost faces may belong to no local cell
   (couplings of `A_FF`): `CoarseningPass::NOwnedFaces`. All global decisions (coarsening ratio, errors) reduced. The
   coarsening stops at `MatrixMaxSizeForCoarsestLevel` rows in total or `MinRowsPerProcess` per process on average
-  (`Multigrid::CoarseLevelNeeded()`; the library's `CoarseMatrixMaxSize`, `MinRowsPerProcess`): the aggregates stay
+  (`Multigrid::CoarseLevelNeeded()`; the library's `CoarseMatrixMaxRows`, `MinRowsPerProcess`): the aggregates stay
   within each process and the faces between processes are kept, so on many processes the total is out of reach.
   Mixed precision as on one process: `DistributedMatrixOf<float>` (`Cast<float>()`; the constructions in double
   but `AssembleFromLocalRows<T>()`, its sums in double), `Level::SingleDistributedOperator`/`SingleDistributedP`; the
@@ -67,7 +67,7 @@ program too: `-DENABLE_PROGRAM=ON`).
   `SweepRhs()` (`b - Offd x`, in the precision of the level); the float copies of the finest and p-levels'
   operators without `Diag` (`Cast<float>(false)`), the h-levels' keep theirs (assembled).
 - Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
-  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostNumbers faceGhostGlobalNumbers)` (local columns: own faces then
+  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostGlobalNumbers faceGhostGlobalNumbers)` (local columns: own faces then
   ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full: a triangular one refused, `CheckTriangles()`),
   `SetupNonSym(..., faceGhostGlobalNumbers, cellGhostGlobalNumbers)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all

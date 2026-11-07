@@ -237,7 +237,7 @@ TEST(DistributedLibrary, BlockCSR)
 	}
 }
 
-// MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxSize at MinRowsPerProcess * P rows (on
+// MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxRows at MinRowsPerProcess * P rows (on
 // 2 and 4 processes, a level earlier than at 1000); at the fine level with the number of faces
 TEST(DistributedLibrary, MinRowsPerProcess)
 {
@@ -250,10 +250,10 @@ TEST(DistributedLibrary, MinRowsPerProcess)
 	fhhos4::SparseMatrix A_FF = DistributedMatrix::RenumberColumns(SparseMatrix(system.Global.A_FF.middleRows(system.Faces->Begin, system.Faces->NOwned)), [&](BigNumber f) { return system.A_TF.ColMap->Local(f); }, system.A_TF.ColMap->NLocal(), 1);
 	vector<int64_t> ghosts(system.A_TF.ColMap->Ghosts.begin(), system.A_TF.ColMap->Ghosts.end());
 	Vector cellOnes = Vector::Ones(system.Cells->NOwned), faceOnes = Vector::Ones(system.Faces->NOwned);
-	auto levels = [&](int coarseMatrixMaxSize, int minRowsPerProcess)
+	auto levels = [&](int coarseMatrixMaxRows, int minRowsPerProcess)
 	{
 		fhhos4::Solver solver = CartesianSolver(World().Comm());
-		solver.CoarseMatrixMaxSize = coarseMatrixMaxSize;
+		solver.CoarseMatrixMaxRows = coarseMatrixMaxRows;
 		solver.MinRowsPerProcess = minRowsPerProcess;
 		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, ghosts);
 		return solver.NumberOfLevels();

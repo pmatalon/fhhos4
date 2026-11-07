@@ -40,7 +40,7 @@ For the library's users: `README_library.md`. This file is for changing the libr
 - Helpers, documented as copies but one: `TransposedView()` (no copy: a symmetric column-major matrix as its transpose,
   an Eigen map); `ExtractBlocksSym()`/`ExtractBlocksNonSym()` (a global Eigen row-major matrix + `DoFLists`
   of the cells and faces, index types int32/int64, one parallel pass: `SparseMatrixOps::BuildByRows`; Eigen blocks,
-  `HybridBlocks`, copied from the library's arrays); `Gather()`/`Scatter()`. `CondensedMatrix()`: an Eigen map. Other
+  `HybridBlocks`, copied from the library's arrays); `SplitVector()`/`JoinVector()`. `CondensedMatrix()`: an Eigen map. Other
   Eigen formats are converted by Eigen in the calling code.
 - `fhhos4::detail` holds the implementation types, never in a signature the user calls nor in the docs:
   `BasicCSRView`/`CSRView` (the arrays given to the compiled functions; `LibraryView()`, an Eigen matrix in the
@@ -72,7 +72,7 @@ on several processes too (see `docs/uamg.md`). `tests/UAMGLibraryTest.cpp` compa
 - Reuse what the client already computes and where it assembles: its local matrices, its assembly loops (the blocks
   assembled there, beside its own matrices), its Dirichlet treatment (where it moves the boundary values to the
   right-hand side).
-- Assemble into dedicated global matrices and vectors named as the blocks (`A_TT`, `A_TF`, `A_FT`, `A_FF`, `b_T`,
+- Assemble into dedicated matrices and vectors named as the blocks (`A_TT`, `A_TF`, `A_FT`, `A_FF`, `b_T`,
   `b_F`), never into the condensed system's variables: the assembly code must show that it assembles the blocks. Watch
   the memory: reserve, release, no restricted copies.
 - The data prepared as if fhhos4 were the only solver; the solver part minimal: `SetupSym(A_TT, A_TF, A_FF,

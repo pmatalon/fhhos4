@@ -206,7 +206,7 @@ namespace
 		// The setups of the library on the views of the arrays (fhhos4::Solver::Setup())
 		void SetupViews(bool symmetric, const fhhos4::detail::CSRView& A_TT, const fhhos4::detail::CSRView& A_TF, const fhhos4::detail::CSRView* A_FT,
 		                const fhhos4::detail::CSRView& A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne,
-		                const fhhos4::GhostNumbers& faceGhostGlobalNumbers = fhhos4::GhostNumbers(), const fhhos4::GhostNumbers& cellGhostGlobalNumbers = fhhos4::GhostNumbers())
+		                const fhhos4::GhostGlobalNumbers& faceGhostGlobalNumbers = fhhos4::GhostGlobalNumbers(), const fhhos4::GhostGlobalNumbers& cellGhostGlobalNumbers = fhhos4::GhostGlobalNumbers())
 		{
 			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 		}
@@ -230,16 +230,16 @@ namespace
 
 	// The global numbers of the ghost faces or cells (the setups on several processes): an int64 NumPy array, read in
 	// place (only by the setup), or None (no ghosts)
-	fhhos4::GhostNumbers ToGhostNumbers(nb::handle ghosts, const char* name)
+	fhhos4::GhostGlobalNumbers ToGhostGlobalNumbers(nb::handle ghosts, const char* name)
 	{
 		if (ghosts.is_none())
-			return fhhos4::GhostNumbers();
+			return fhhos4::GhostGlobalNumbers();
 		bool is64;
 		size_t size;
 		const void* data = IndexArray(ghosts, name, is64, size);
 		if (!is64)
 			throw nb::type_error((std::string("fhhos4: ") + name + " must be an array of int64 (global numbers), not converted").c_str());
-		return fhhos4::GhostNumbers(size, (const std::int64_t*)data);
+		return fhhos4::GhostGlobalNumbers(size, (const std::int64_t*)data);
 	}
 
 #if FHHOS4_MPI
@@ -339,7 +339,7 @@ NB_MODULE(fhhos4, m)
 		.def_prop_ro("ColumnIndices", [](const fhhos4::detail::CSRMatrix& M) { fhhos4::detail::CSRView v = M.View(); return ArrayOf(M, v.ColumnIndices, v.NonZeros()); })
 		.def_prop_ro("Values", [](const fhhos4::detail::CSRMatrix& M) { fhhos4::detail::CSRView v = M.View(); return ArrayOf(M, v.Values, v.NonZeros()); });
 
-	nb::class_<PyDoFLists>(m, "DoFLists", "The DoFs of each cell (or face) in the numbering of a global matrix: NumPy arrays read in place")
+	nb::class_<PyDoFLists>(m, "DoFLists", "The DoFs of each cell (or face) in the numbering of a monolithic matrix: NumPy arrays read in place")
 		.def(nb::init<std::int64_t, nb::handle, nb::handle>(), "count"_a, "offsets"_a, "dofs"_a)
 		.def_ro("Count", &PyDoFLists::Count);
 
@@ -356,23 +356,23 @@ NB_MODULE(fhhos4, m)
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
 			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractBlocksSym(v, c, f); }); });
-		}, "M"_a, "cells"_a, "faces"_a, "A copy: the blocks of the uncondensed system, from its global matrix, for SetupSym()");
+		}, "M"_a, "cells"_a, "faces"_a, "A copy: the blocks of the uncondensed system, from its monolithic matrix, for SetupSym()");
 
 	m.def("ExtractBlocksNonSym", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
 		{
 			PyCSRView view = ToView(M, "M");
 			nb::gil_scoped_release release;
 			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractBlocksNonSym(v, c, f); }); });
-		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its global matrix, for SetupNonSym()");
+		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its monolithic matrix, for SetupNonSym()");
 
-	m.def("Gather", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
+	m.def("SplitVector", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
 		{
-			VisitLists(cells, faces, [&](auto c, auto f) { fhhos4::Gather(x, c, f, x_T, x_F); });
+			VisitLists(cells, faces, [&](auto c, auto f) { fhhos4::SplitVector(x, c, f, x_T, x_F); });
 		}, "x"_a.noconvert(), "cells"_a, "faces"_a, "x_T"_a.noconvert(), "x_F"_a.noconvert(), "A copy: the cells and faces DoFs of x, into x_T and x_F");
 
-	m.def("Scatter", [](const ConstVector& x_T, const ConstVector& x_F, const PyDoFLists& cells, const PyDoFLists& faces, Vector x)
+	m.def("JoinVector", [](const ConstVector& x_T, const ConstVector& x_F, const PyDoFLists& cells, const PyDoFLists& faces, Vector x)
 		{
-			VisitLists(cells, faces, [&](auto c, auto f) { fhhos4::Scatter(x_T, x_F, c, f, x); });
+			VisitLists(cells, faces, [&](auto c, auto f) { fhhos4::JoinVector(x_T, x_F, c, f, x); });
 		}, "x_T"_a.noconvert(), "x_F"_a.noconvert(), "cells"_a, "faces"_a, "x"_a.noconvert(), "A copy: x_T and x_F into x (its other DoFs unchanged)");
 
 	m.def("ToCSR", [](nb::handle M)
@@ -428,7 +428,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("L1Theta", &fhhos4::Solver::L1Theta)
 		.def_rw("Prolongation", &fhhos4::Solver::Prolongation)
 		.def_rw("CoarseningFactor", &fhhos4::Solver::CoarseningFactor)
-		.def_rw("CoarseMatrixMaxSize", &fhhos4::Solver::CoarseMatrixMaxSize)
+		.def_rw("CoarseMatrixMaxRows", &fhhos4::Solver::CoarseMatrixMaxRows)
 #if FHHOS4_MPI
 		.def_rw("MinRowsPerProcess", &fhhos4::Solver::MinRowsPerProcess)
 #endif
@@ -450,7 +450,7 @@ NB_MODULE(fhhos4, m)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
-				fhhos4::GhostNumbers ghosts = ToGhostNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers");
+				fhhos4::GhostGlobalNumbers ghosts = ToGhostGlobalNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers");
 				s.Run([&] { s.SetupViews(true, tt, tf, nullptr, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
 			},
 			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none())
@@ -458,7 +458,7 @@ NB_MODULE(fhhos4, m)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
-				fhhos4::GhostNumbers fGhosts = ToGhostNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers"), cGhosts = ToGhostNumbers(cellGhostGlobalNumbers, "cellGhostGlobalNumbers");
+				fhhos4::GhostGlobalNumbers fGhosts = ToGhostGlobalNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers"), cGhosts = ToGhostGlobalNumbers(cellGhostGlobalNumbers, "cellGhostGlobalNumbers");
 				s.Run([&] { s.SetupViews(false, tt, tf, &ft, ff, cellInterpOfOne, faceInterpOfOne, fGhosts, cGhosts); }, { a_FT });
 			},
 			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none(), "cellGhostGlobalNumbers"_a = nb::none())

@@ -39,6 +39,11 @@ The four parts of the uncondensed system: `A_TT` (cell-cell, block-diagonal), `A
 The linear system on the cell and face unknowns, given by its blocks.
 _Avoid_: interface 1, full system
 
+**Monolithic matrix**:
+The uncondensed system as a single matrix of all its cell and face unknowns, in the client's numbering, instead of its
+four blocks.
+_Avoid_: global matrix (ambiguous: also said of a distributed matrix), whole matrix
+
 **Static condensation**:
 The elimination of the cell unknowns, cell by cell, which leaves a system on the face unknowns.
 
@@ -126,6 +131,11 @@ The number of a cell or face among those of all the processes: those of each pro
 
 **Local number**:
 The number of a cell or face on a process: its own ones first, then its ghosts.
+
+**Distributed matrix**:
+A matrix split by rows among the processes: each holds the rows of its own cells or faces, its columns in local
+numbers, with the global numbers of its ghosts. Its blocks or its monolithic matrix may each be distributed.
+_Avoid_: global matrix (ambiguous: also said of a monolithic matrix)
 
 ## Project
 

@@ -222,9 +222,9 @@ def test_other_formats():
 
 
 def test_blocks_of_the_global_matrix():
-    # The global matrix in its own numbering: the hybrid system with Dirichlet DoFs, scrambled, with NGSolve's index
+    # The monolithic matrix in its own numbering: the hybrid system with Dirichlet DoFs, scrambled, with NGSolve's index
     # types (uint64 row pointers, int32 columns). ExtractBlocksSym() and ExtractBlocksNonSym() give the
-    # blocks of the lists, Gather() and Scatter() the vectors.
+    # blocks of the lists, SplitVector() and JoinVector() the vectors.
     for asymmetry in [0.0, 0.3]:
         system = HybridSystem(32, asymmetry)
         nT, nF, nD = system.A_TT.shape[0], system.A_FF.shape[0], 40
@@ -253,14 +253,14 @@ def test_blocks_of_the_global_matrix():
         assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0
         # The global vectors: b (homogeneous Dirichlet conditions), and the solution x (the Dirichlet values unchanged)
         b = np.zeros(n)
-        fhhos4.Scatter(system.b_T, system.b_F, cells, faces, b)
+        fhhos4.JoinVector(system.b_T, system.b_F, cells, faces, b)
         b_T, b_F = np.zeros(nT), np.zeros(nF)
-        fhhos4.Gather(b, cells, faces, b_T, b_F)
+        fhhos4.SplitVector(b, cells, faces, b_T, b_F)
         assert (b_T == system.b_T).all() and (b_F == system.b_F).all()
         x_T, x_F = np.zeros(nT), np.zeros(nF)
         assert solver.Solve(b_T, b_F, x_T, x_F).Converged
         x = np.full(n, 2.0)
-        fhhos4.Scatter(x_T, x_F, cells, faces, x)
+        fhhos4.JoinVector(x_T, x_F, cells, faces, x)
         assert (x[perm[nT + nF:]] == 2.0).all()
         reference = spla.spsolve(system.Uncondensed(), np.concatenate([system.b_T, system.b_F]))
         assert RelativeError(x[perm[:nT + nF]], reference) < 1e-8

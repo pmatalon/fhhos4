@@ -408,7 +408,7 @@ namespace fhhos4
 			mg.PostSmoothingIterations = s.PostSmoothingIterations >= 0 ? s.PostSmoothingIterations : DefaultSmoothingIterations(mg.PostSmoother != SmootherType::Default ? mg.PostSmoother : mg.PreSmoother);
 			mg.L1Theta = s.L1Theta;
 			mg.CoarseningFactor = s.CoarseningFactor;
-			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxSize;
+			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxRows;
 #if FHHOS4_MPI
 			mg.MinRowsPerProcess = s.MinRowsPerProcess;
 #endif
@@ -568,8 +568,8 @@ namespace fhhos4
 	Solver& Solver::operator=(Solver&&) noexcept = default;
 
 	void Solver::Setup(bool symmetric, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF,
-	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhostGlobalNumbers,
-	                   const GhostNumbers& cellGhostGlobalNumbers)
+	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+	                   const GhostGlobalNumbers& cellGhostGlobalNumbers)
 	{
 		_impl->SetCommunicator(*this);
 		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
@@ -594,8 +594,8 @@ namespace fhhos4
 
 	// On several processes, the parameters are those of the process of rank 0 (the same on all of them)
 	void Solver::SetupDistributed(bool symmetric, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF,
-	                              detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhostGlobalNumbers,
-	                              const GhostNumbers& cellGhostGlobalNumbers)
+	                              detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+	                              const GhostGlobalNumbers& cellGhostGlobalNumbers)
 	{
 		const Communicator& comm = _impl->Comm;
 		unique_ptr<BorrowedSparseMatrix> a_TT, a_TF, a_FT, a_FF;
@@ -786,7 +786,7 @@ namespace fhhos4
 	}
 
 	//------------------------------------------------------------------------------------------------------------------//
-	//                       Helpers: the blocks from the global matrix of the system (copies)                        //
+	//                            Helpers: the blocks from the monolithic matrix (copies)                             //
 	//------------------------------------------------------------------------------------------------------------------//
 
 	namespace detail
@@ -859,10 +859,10 @@ namespace fhhos4
 			return nDoFs;
 		}
 
-		// The DoFs of the global numbering: of a cell, of a face, or of none
+		// The DoFs of the monolithic matrix: of a cell, of a face, or of none
 		enum class DoFKind : uint8_t { None, Cell, Face };
 
-		// The rows of M whose global indices are rows[0..nRows), in this order, restricted to the columns of the kind
+		// The rows of M whose numbers in M are rows[0..nRows), in this order, restricted to the columns of the kind
 		// columnKind, renumbered by their positions in their lists. lower: only the columns whose position is <= that of
 		// the row (the lower triangular part of a diagonal block). M: after CheckCSR().
 		template <typename RowPointer, typename Column, typename Index>
@@ -883,7 +883,7 @@ namespace fhhos4
 							row.push_back({ position[col], M.Values[p] });
 					}
 					auto byColumn = [](const pair<SparseMatrixIndex, double>& x, const pair<SparseMatrixIndex, double>& y) { return x.first < y.first; };
-					if (!is_sorted(row.begin(), row.end(), byColumn)) // the lists don't follow the global numbering
+					if (!is_sorted(row.begin(), row.end(), byColumn)) // the lists don't follow the numbering of M
 						sort(row.begin(), row.end(), byColumn);
 					for (const pair<SparseMatrixIndex, double>& coeff : row)
 						chunk.Add(coeff.first, coeff.second);
@@ -897,7 +897,7 @@ namespace fhhos4
 		{
 			CallScope scope(0, 0);
 			if (M.Rows != M.Cols)
-				Utils::FatalError("fhhos4: the global matrix M (" + to_string(M.Rows) + " x " + to_string(M.Cols) + ") must be square.");
+				Utils::FatalError("fhhos4: the monolithic matrix M (" + to_string(M.Rows) + " x " + to_string(M.Cols) + ") must be square.");
 			CheckCSR(M, "M");
 			BigNumber nT = CheckDoFLists(cells, M.Rows, "cells");
 			BigNumber nF = CheckDoFLists(faces, M.Rows, "faces");
@@ -911,7 +911,7 @@ namespace fhhos4
 				{
 					std::int64_t g = lists->DoFs[p];
 					if (kind[g] != DoFKind::None)
-						Utils::FatalError("fhhos4: the DoF " + to_string(g) + " of the global matrix is in two lists (of the cells or faces).");
+						Utils::FatalError("fhhos4: the DoF " + to_string(g) + " of the monolithic matrix is in two lists (of the cells or faces).");
 					kind[g] = k;
 					position[g] = p;
 				}
@@ -980,7 +980,7 @@ namespace fhhos4
 		}
 
 		template <typename Index>
-		void Gather(ConstVectorView x, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x_T, VectorView x_F)
+		void SplitVector(ConstVectorView x, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x_T, VectorView x_F)
 		{
 			CallScope scope(0, 0);
 			BigNumber nT = CheckDoFLists(cells, x.Size, "cells");
@@ -996,7 +996,7 @@ namespace fhhos4
 		}
 
 		template <typename Index>
-		void Scatter(ConstVectorView x_T, ConstVectorView x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x)
+		void JoinVector(ConstVectorView x_T, ConstVectorView x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x)
 		{
 			CallScope scope(0, 0);
 			BigNumber nT = CheckDoFLists(cells, x.Size, "cells");
@@ -1028,8 +1028,8 @@ namespace fhhos4
 
 	template CSRMatrix detail::Transpose<std::int32_t>(const BasicCSRView<std::int32_t, std::int32_t>&);
 	template CSRMatrix detail::Transpose<std::int64_t>(const BasicCSRView<std::int64_t, std::int64_t>&);
-	template void detail::Gather<std::int32_t>(detail::ConstVectorView, const DoFLists<std::int32_t>&, const DoFLists<std::int32_t>&, detail::VectorView, detail::VectorView);
-	template void detail::Gather<std::int64_t>(detail::ConstVectorView, const DoFLists<std::int64_t>&, const DoFLists<std::int64_t>&, detail::VectorView, detail::VectorView);
-	template void detail::Scatter<std::int32_t>(detail::ConstVectorView, detail::ConstVectorView, const DoFLists<std::int32_t>&, const DoFLists<std::int32_t>&, detail::VectorView);
-	template void detail::Scatter<std::int64_t>(detail::ConstVectorView, detail::ConstVectorView, const DoFLists<std::int64_t>&, const DoFLists<std::int64_t>&, detail::VectorView);
+	template void detail::SplitVector<std::int32_t>(detail::ConstVectorView, const DoFLists<std::int32_t>&, const DoFLists<std::int32_t>&, detail::VectorView, detail::VectorView);
+	template void detail::SplitVector<std::int64_t>(detail::ConstVectorView, const DoFLists<std::int64_t>&, const DoFLists<std::int64_t>&, detail::VectorView, detail::VectorView);
+	template void detail::JoinVector<std::int32_t>(detail::ConstVectorView, detail::ConstVectorView, const DoFLists<std::int32_t>&, const DoFLists<std::int32_t>&, detail::VectorView);
+	template void detail::JoinVector<std::int64_t>(detail::ConstVectorView, detail::ConstVectorView, const DoFLists<std::int64_t>&, const DoFLists<std::int64_t>&, detail::VectorView);
 }

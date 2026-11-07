@@ -1954,15 +1954,23 @@ sorted by degree, though with 40-45% fewer iterations; end to end 1.1-1.8x faste
   +19%; `CoarseningFactor` 8 (one level fewer): -3% to +1%. The defaults are at the optimum: closing the gap with BDDC
   (iterations 1.5-3.5x costlier at k >= 2: 5 passes of the fine matrix and 4 block sweeps per iteration, bound by the
   bandwidth on 8 threads, against one pass and cache-resident local solves for BDDC) takes fewer bytes per fine pass.
-- **The extraction of the blocks from a global matrix** (`ExtractBlocksSym()`, after the interface redesign:
+- **The extraction of the blocks from a monolithic matrix** (`ExtractBlocksSym()`, after the interface redesign:
   "The inputs of the library read in place" in Done): 0.17-0.32 s on 8 threads for 28-40M non-zeros, only 1.8-2.5x
   faster than on 1 thread. It reads the rows of the cells twice (`A_TT`, then `A_TF`: one `BuildByRows` per block), and
   `BuildByRows` writes each block twice (its chunks, then their concatenation); the map of the DoFs is filled
   sequentially. Expected: one pass on the rows of the cells for both blocks, written once (counts, then the
-  values), about 2x. Bit-identical. Worth it for the frameworks that assemble one matrix (NGSolve, PETSc's AIJ).
+  values), about 2x. Bit-identical. Worth it for the frameworks that assemble a monolithic matrix (NGSolve, PETSc's
+  AIJ).
 
 Other candidates:
 
+- **The halo exchange of the distributed products behind `Diag * x`** — not measured, small effort, bit-identical (the
+  same sums). `DistributedMatrix::Multiply()` exchanges the ghost values and waits (`UpdateGhosts()`, `MPI_Waitall`),
+  then computes `Diag * x`, then `Offd * ghosts`. Posting the receives and sends, computing `Diag * x`, then waiting and
+  adding `Offd * ghosts` hides the exchange behind the larger part of the product (PETSc's MPIAIJ product does so,
+  from memory); the Chebyshev smoothers (products) too. Expected: little on one node (MPI through shared memory, the
+  solve bound by the bandwidth: "Distributed memory (MPI)"), more across nodes; less than hoped if MPI makes no
+  progress outside its calls (MPICH by default) while the OpenMP threads compute.
 - **Coarsening prolongation without its block-Jacobi smoothing** (`-coarsening-prolong 5`, P_F^(0), instead of the
   default 6, P_F) — measured (2026-10-12), rejected (the user's decision: the anisotropic case worsens too much). It
   skips `BlockJacobi::IterationMatrix()` and the product `J * Y` in each pass, and P gets sparser; the operator

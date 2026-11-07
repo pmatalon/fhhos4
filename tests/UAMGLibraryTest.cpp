@@ -774,7 +774,7 @@ Blocks Kron(const Blocks& blocks, const Eigen::MatrixXd& C_TT, const Eigen::Matr
 
 // A vector-valued system of n identical components, the scalar blocks ⊗ I_n (VectorComponents = n), with the same
 // right-hand side on each: the iterations and the solution of the scalar system, on each component (the same levels,
-// given CoarseMatrixMaxSize times n, the same transfers and smoothers on each component). The bases scaled at random:
+// given CoarseMatrixMaxRows times n, the same transfers and smoothers on each component). The bases scaled at random:
 // the n constants of each block are rescaled. At degree 0 and with faces of degree 1 (a second face function, coupled
 // to no cell: a p-level), symmetric or not, with both prolongations (Reconstruction: the n constants of the coarse cell
 // on the removed faces).
@@ -803,7 +803,7 @@ TEST(UAMGLibrary, VectorComponents)
 				uamg.FaceDegree = faceDegree;
 				uamg.Prolongation = prolongation;
 				uamg.VectorComponents = components;
-				uamg.CoarseMatrixMaxSize *= components; // the coarsening stops on the rows: the same levels
+				uamg.CoarseMatrixMaxRows *= components; // the coarsening stops on the rows: the same levels
 				if (system.Symmetric)
 					uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 				else
@@ -854,7 +854,7 @@ TEST(UAMGLibrary, SingularVectorComponents)
 			uamg.SingularMatrix = true;
 			uamg.Prolongation = prolongation;
 			uamg.VectorComponents = components;
-			uamg.CoarseMatrixMaxSize *= components;
+			uamg.CoarseMatrixMaxRows *= components;
 			uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
 			x_T.resize(blocks.A_TT.rows());
 			x_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
@@ -959,10 +959,10 @@ TEST(UAMGLibrary, OtherFormats)
 	EXPECT_THROW(fhhos4::TransposedView(uncompressedColMajor), fhhos4::Error);
 }
 
-// The global matrix of the system, in its own numbering (here: the hybrid system with the DoFs of the boundary faces,
+// The monolithic matrix, in its own numbering (here: the hybrid system with the DoFs of the boundary faces,
 // scrambled), with 64-bit indices: ExtractBlocksSym() and ExtractBlocksNonSym() give the blocks of the lists
-// (also the compiled ones that the Python module calls, with 64-bit row pointers and 32-bit columns), Gather() and
-// Scatter() the vectors: the same solver and solution as from the blocks.
+// (also the compiled ones that the Python module calls, with 64-bit row pointers and 32-bit columns), SplitVector() and
+// JoinVector() the vectors: the same solver and solution as from the blocks.
 TEST(UAMGLibrary, BlocksOfTheGlobalMatrix)
 {
 	for (double asymmetry : { 0.0, 0.3 })
@@ -1033,10 +1033,10 @@ TEST(UAMGLibrary, BlocksOfTheGlobalMatrix)
 
 		// The vectors: b in the global numbering (zero on the Dirichlet DoFs: homogeneous conditions)
 		Eigen::VectorXd b_T = Eigen::VectorXd::Random(nT), b_F = Eigen::VectorXd::Random(nF), b = Eigen::VectorXd::Zero(n);
-		fhhos4::Scatter(b_T, b_F, cells, faces, b);
-		Eigen::VectorXd gathered_T(nT), gathered_F(nF);
-		fhhos4::Gather(b, cells, faces, gathered_T, gathered_F);
-		EXPECT_TRUE(gathered_T == b_T && gathered_F == b_F);
+		fhhos4::JoinVector(b_T, b_F, cells, faces, b);
+		Eigen::VectorXd split_T(nT), split_F(nF);
+		fhhos4::SplitVector(b, cells, faces, split_T, split_F);
+		EXPECT_TRUE(split_T == b_T && split_F == b_F);
 
 		fhhos4::Solver fromGlobal = ToySolver(), fromBlocks = ToySolver();
 		if (system.Symmetric)
@@ -1058,7 +1058,7 @@ TEST(UAMGLibrary, BlocksOfTheGlobalMatrix)
 
 		// The solution in the global numbering: the Dirichlet DoFs unchanged
 		Eigen::VectorXd x = Eigen::VectorXd::Constant(n, 2.0);
-		fhhos4::Scatter(y_T, y_F, cells, faces, x);
+		fhhos4::JoinVector(y_T, y_F, cells, faces, x);
 		for (std::int64_t d = nT + nF; d < n; d++)
 			EXPECT_EQ(x[global[d]], 2.0);
 		EXPECT_EQ(x[global[0]], y_T[0]);
@@ -1276,16 +1276,16 @@ TEST(UAMGLibrary, DefaultPostSmoother)
 	}
 }
 
-// GhostNumbers from a container, read in place; int32 numbers refused
-TEST(UAMGLibrary, GhostNumbers)
+// GhostGlobalNumbers from a container, read in place; int32 numbers refused
+TEST(UAMGLibrary, GhostGlobalNumbers)
 {
 	std::vector<std::int64_t> numbers = { 0, 5, 7 };
-	fhhos4::GhostNumbers fromVector = numbers;
+	fhhos4::GhostGlobalNumbers fromVector = numbers;
 	EXPECT_EQ(fromVector.Count, 3);
 	EXPECT_EQ(fromVector.Numbers, numbers.data());
 	Eigen::Matrix<std::int64_t, Eigen::Dynamic, 1> eigenNumbers(2);
-	EXPECT_EQ(fhhos4::GhostNumbers(eigenNumbers).Count, 2);
-	static_assert(!std::is_convertible_v<std::vector<int>, fhhos4::GhostNumbers>);
+	EXPECT_EQ(fhhos4::GhostGlobalNumbers(eigenNumbers).Count, 2);
+	static_assert(!std::is_convertible_v<std::vector<int>, fhhos4::GhostGlobalNumbers>);
 }
 
 // L1Theta: the theta of the l1 Gauss-Seidel smoothers, here on 4 threads (the rows coupled to other chunks have l1

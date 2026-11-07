@@ -41,7 +41,7 @@
 // Eigen vectors. Another Eigen sparse matrix (column-major, another index type) converts by Eigen, a copy in the
 // calling code: fhhos4::SparseMatrix B = A; (a symmetric column-major one: TransposedView(), no copy). Assembling the
 // matrices in the format of the library avoids the copies. The helpers at the end of this file extract the blocks
-// from the global matrix of the system (copies).
+// from the monolithic matrix of the system (copies).
 //
 // The functions compiled in the shared library fhhos4 take arrays only: the Eigen objects of this header are those of
 // the calling code, compiled with its own version of Eigen (the inline functions of this header give their arrays to
@@ -50,8 +50,8 @@
 // Compiled with MPI (FHHOS4_MPI, -DENABLE_MPI=ON), a Solver works on the processes of its communicator (Solver::Comm;
 // without it, on the calling process alone, as without MPI), on a system distributed by rows: each process gives the
 // rows of its own cells and faces, the columns of the faces numbered locally, its own faces first, then the other faces
-// of its cells (its ghosts), whose global numbers it gives too (GhostNumbers); the same for the columns of the cells of
-// A_FT (non-symmetric). See the setups below, and README_library.md.
+// of its cells (its ghosts), whose global numbers it gives too (GhostGlobalNumbers); the same for the columns of the
+// cells of A_FT (non-symmetric). See the setups below, and README_library.md.
 namespace fhhos4
 {
 	// The index type of the sparse matrices of the library: int (32 bits), or 64 bits if fhhos4 is compiled with
@@ -175,19 +175,19 @@ namespace fhhos4
 	// global numbers: the faces of the process of rank 0 first, then those of the process of rank 1, etc., each process's
 	// in the order of its local numbers (so that the faces of each process are numbered contiguously). Any order of the
 	// ghosts, no repetition.
-	struct GhostNumbers
+	struct GhostGlobalNumbers
 	{
 		std::int64_t Count = 0;
 		const std::int64_t* Numbers = nullptr; // Count
 
-		GhostNumbers() = default;
-		GhostNumbers(std::int64_t count, const std::int64_t* numbers)
+		GhostGlobalNumbers() = default;
+		GhostGlobalNumbers(std::int64_t count, const std::int64_t* numbers)
 			: Count(count), Numbers(numbers)
 		{}
 		// From a contiguous container of std::int64_t (std::vector, std::span, Eigen vector...), implicitly:
 		// SetupSym(..., faceGhostGlobalNumbers)
 		template <typename Container, typename = std::enable_if_t<std::is_convertible_v<decltype(std::declval<const Container&>().data()), const std::int64_t*>>>
-		GhostNumbers(const Container& numbers)
+		GhostGlobalNumbers(const Container& numbers)
 			: Count((std::int64_t)numbers.size()), Numbers(numbers.data())
 		{}
 	};
@@ -368,12 +368,12 @@ namespace fhhos4
 		// The prolongation of the h-coarsening: from the faces of the boundary of each aggregate to its interior faces
 		fhhos4::Prolongation Prolongation = fhhos4::Prolongation::HarmonicExtension;
 		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
-		int CoarseMatrixMaxSize = 1000;    // the coarsening stops when the matrix has at most this many rows (on several
+		int CoarseMatrixMaxRows = 1000;    // the coarsening stops when the matrix has at most this many rows (on several
 		                                   // processes, in total)
 #if FHHOS4_MPI
 		// On several processes (Comm), the coarsening also stops when the matrix has at most this many rows per process
-		// on average (0: only CoarseMatrixMaxSize): the aggregates stay within each process, so on many processes the
-		// coarsest matrix cannot reach CoarseMatrixMaxSize, and the last levels would have a few rows per process.
+		// on average (0: only CoarseMatrixMaxRows): the aggregates stay within each process, so on many processes the
+		// coarsest matrix cannot reach CoarseMatrixMaxRows, and the last levels would have a few rows per process.
 		int MinRowsPerProcess = 50;
 #endif
 		// Solver of the coarsest level. Default: Cholesky for a symmetric matrix, LU otherwise.
@@ -454,7 +454,7 @@ namespace fhhos4
 		template <typename TT, typename TF, typename FF>
 		void SetupSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
 		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
-		                    const GhostNumbers& faceGhostGlobalNumbers = GhostNumbers())
+		                    const GhostGlobalNumbers& faceGhostGlobalNumbers = GhostGlobalNumbers())
 		{
 			Setup(true, detail::LibraryView(A_TT), detail::LibraryView(A_TF), nullptr, detail::LibraryView(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhostGlobalNumbers);
 		}
@@ -479,7 +479,7 @@ namespace fhhos4
 		void SetupNonSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT,
 		                       const Eigen::SparseCompressedBase<FF>& A_FF,
 		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
-		                       const GhostNumbers& faceGhostGlobalNumbers = GhostNumbers(), const GhostNumbers& cellGhostGlobalNumbers = GhostNumbers())
+		                       const GhostGlobalNumbers& faceGhostGlobalNumbers = GhostGlobalNumbers(), const GhostGlobalNumbers& cellGhostGlobalNumbers = GhostGlobalNumbers())
 		{
 			detail::CSRView a_FT = detail::LibraryView(A_FT);
 			Setup(false, detail::LibraryView(A_TT), detail::LibraryView(A_TF), &a_FT, detail::LibraryView(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhostGlobalNumbers, cellGhostGlobalNumbers);
@@ -488,7 +488,7 @@ namespace fhhos4
 		template <typename TT, typename TF, typename FF, int Options, typename Index>
 		void SetupNonSym(const Eigen::SparseCompressedBase<TT>&, const Eigen::SparseCompressedBase<TF>&, Eigen::SparseMatrix<double, Options, Index>&& A_FT,
 		                       const Eigen::SparseCompressedBase<FF>&, const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&,
-		                       const GhostNumbers& = GhostNumbers(), const GhostNumbers& = GhostNumbers()) = delete;
+		                       const GhostGlobalNumbers& = GhostGlobalNumbers(), const GhostGlobalNumbers& = GhostGlobalNumbers()) = delete;
 
 		// Solves the system, after SetupSym() or SetupNonSym(): condenses the right-hand
 		// side, b = b_F - A_FT A_TT^{-1} b_T, solves A x_F = b, then computes x_T = A_TT^{-1} (b_T - A_TF x_F).
@@ -552,8 +552,8 @@ namespace fhhos4
 		// The implementation of the setups, on the arrays of the matrices (also for the Python module). A_FT: null for a
 		// symmetric matrix; faceGhostGlobalNumbers, cellGhostGlobalNumbers (A_FT): on several processes.
 		void Setup(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
-		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhostGlobalNumbers,
-		           const GhostNumbers& cellGhostGlobalNumbers = GhostNumbers());
+		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+		           const GhostGlobalNumbers& cellGhostGlobalNumbers = GhostGlobalNumbers());
 		detail::CSRView CondensedMatrixView() const;
 
 		static detail::ConstVectorView In(const Eigen::Ref<const Eigen::VectorXd>& v)
@@ -571,8 +571,8 @@ namespace fhhos4
 		std::unique_ptr<Impl> _impl;
 
 		void SetupDistributed(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
-		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostNumbers& faceGhostGlobalNumbers,
-		                      const GhostNumbers& cellGhostGlobalNumbers);
+		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+		                      const GhostGlobalNumbers& cellGhostGlobalNumbers);
 		Result SolveCondensed(detail::ConstVectorView b, detail::VectorView x);
 		Result SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F);
 		void CondenseRHSView(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView b);
@@ -584,7 +584,7 @@ namespace fhhos4
 	//                       Helpers: the inputs of the setups from other formats (copies)                            //
 	//------------------------------------------------------------------------------------------------------------------//
 
-	// The DoFs of each cell (or face) in the numbering of a global matrix, read in place: those of the i-th are
+	// The DoFs of each cell (or face) in the numbering of a monolithic matrix, read in place: those of the i-th are
 	// DoFs[Offsets[i]], ..., DoFs[Offsets[i + 1] - 1], in the order of its basis. Index: std::int32_t or std::int64_t.
 	template <typename Index>
 	struct DoFLists
@@ -615,9 +615,9 @@ namespace fhhos4
 		template <typename RowPointer, typename Column, typename Index>
 		FHHOS4_API HybridBlocks ExtractBlocksNonSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
 		template <typename Index>
-		FHHOS4_API void Gather(ConstVectorView x, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x_T, VectorView x_F);
+		FHHOS4_API void SplitVector(ConstVectorView x, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x_T, VectorView x_F);
 		template <typename Index>
-		FHHOS4_API void Scatter(ConstVectorView x_T, ConstVectorView x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x);
+		FHHOS4_API void JoinVector(ConstVectorView x_T, ConstVectorView x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces, VectorView x);
 		// A copy: M in the CSR format of the library, from other index types
 		template <typename RowPointer, typename Column>
 		FHHOS4_API CSRMatrix ToCSR(const BasicCSRView<RowPointer, Column>& M);
@@ -631,16 +631,16 @@ namespace fhhos4
 			return { ToEigen(blocks.A_TT), ToEigen(blocks.A_TF), ToEigen(blocks.A_FT), ToEigen(blocks.A_FF) };
 		}
 
-		// The arrays of the global matrix M of the helpers: compressed, row-major, of doubles, with the indices
+		// The arrays of the monolithic matrix M of the helpers: compressed, row-major, of doubles, with the indices
 		// std::int32_t or std::int64_t
 		template <typename Derived>
-		BasicCSRView<typename Derived::StorageIndex, typename Derived::StorageIndex> GlobalMatrixView(const Eigen::SparseCompressedBase<Derived>& M)
+		BasicCSRView<typename Derived::StorageIndex, typename Derived::StorageIndex> MonolithicMatrixView(const Eigen::SparseCompressedBase<Derived>& M)
 		{
 			return View<typename Derived::StorageIndex>(M);
 		}
 	}
 
-	// A copy: the blocks of the uncondensed system, extracted from its global matrix M (square), for SetupSym():
+	// A copy: the blocks of the uncondensed system, extracted from its monolithic matrix M (square), for SetupSym():
 	// A_TT, A_TF, A_FF, in one parallel pass (two on the rows of M). M: an Eigen sparse matrix, compressed, row-major, with
 	// the index type std::int32_t or std::int64_t (e.g. an Eigen::Map of the arrays of another code). The cells (resp.
 	// faces) in the order of their lists, the DoFs of each in the order of its list (e.g. reordered by degree); the DoFs
@@ -651,7 +651,7 @@ namespace fhhos4
 	{
 		static_assert(Derived::IsRowMajor, "fhhos4::ExtractBlocksSym(): a row-major matrix (convert a column-major one by Eigen, a copy)");
 		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
-		return detail::ToEigen(detail::ExtractBlocksSym(detail::GlobalMatrixView(M), cells, faces));
+		return detail::ToEigen(detail::ExtractBlocksSym(detail::MonolithicMatrixView(M), cells, faces));
 	}
 
 	// A copy: as ExtractBlocksSym(), the four blocks in full, for SetupNonSym()
@@ -660,25 +660,25 @@ namespace fhhos4
 	{
 		static_assert(Derived::IsRowMajor, "fhhos4::ExtractBlocksNonSym(): a row-major matrix (convert a column-major one by Eigen, a copy)");
 		static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
-		return detail::ToEigen(detail::ExtractBlocksNonSym(detail::GlobalMatrixView(M), cells, faces));
+		return detail::ToEigen(detail::ExtractBlocksNonSym(detail::MonolithicMatrixView(M), cells, faces));
 	}
 
-	// A copy: the vectors of the cells and faces DoFs (e.g. b_T and b_F) from a vector x in the numbering of the global
-	// matrix (b), with the lists of ExtractBlocksSym()
+	// A copy: the vectors of the cells and faces DoFs (e.g. b_T and b_F) from a vector x in the numbering of the
+	// monolithic matrix (b), with the lists of ExtractBlocksSym()
 	template <typename Index>
-	void Gather(const Eigen::Ref<const Eigen::VectorXd>& x, const DoFLists<Index>& cells, const DoFLists<Index>& faces,
+	void SplitVector(const Eigen::Ref<const Eigen::VectorXd>& x, const DoFLists<Index>& cells, const DoFLists<Index>& faces,
 	            Eigen::Ref<Eigen::VectorXd> x_T, Eigen::Ref<Eigen::VectorXd> x_F)
 	{
-		detail::Gather<Index>({ x.data(), (std::int64_t)x.size() }, cells, faces, { x_T.data(), (std::int64_t)x_T.size() }, { x_F.data(), (std::int64_t)x_F.size() });
+		detail::SplitVector<Index>({ x.data(), (std::int64_t)x.size() }, cells, faces, { x_T.data(), (std::int64_t)x_T.size() }, { x_F.data(), (std::int64_t)x_F.size() });
 	}
 
-	// A copy: the other way around, x_T and x_F into the vector x in the numbering of the global matrix (its DoFs in no
-	// list unchanged, e.g. those of the Dirichlet faces)
+	// A copy: the other way around, x_T and x_F into the vector x in the numbering of the monolithic matrix (its DoFs in
+	// no list unchanged, e.g. those of the Dirichlet faces)
 	template <typename Index>
-	void Scatter(const Eigen::Ref<const Eigen::VectorXd>& x_T, const Eigen::Ref<const Eigen::VectorXd>& x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces,
+	void JoinVector(const Eigen::Ref<const Eigen::VectorXd>& x_T, const Eigen::Ref<const Eigen::VectorXd>& x_F, const DoFLists<Index>& cells, const DoFLists<Index>& faces,
 	             Eigen::Ref<Eigen::VectorXd> x)
 	{
-		detail::Scatter<Index>({ x_T.data(), (std::int64_t)x_T.size() }, { x_F.data(), (std::int64_t)x_F.size() }, cells, faces, { x.data(), (std::int64_t)x.size() });
+		detail::JoinVector<Index>({ x_T.data(), (std::int64_t)x_T.size() }, { x_F.data(), (std::int64_t)x_F.size() }, cells, faces, { x.data(), (std::int64_t)x.size() });
 	}
 
 	// No copy: A^T in the format of the library, a map of the arrays of a column-major matrix A (compressed, with the

@@ -15,6 +15,7 @@ contradiction instead of overriding one). Open work: `.scratch/` (see "Agent ski
 - **MPI** (anything distributed): `docs/mpi.md`.
 - **The Python module**, and what client frameworks need from it: `docs/python.md`.
 - **Integrating the library into a client code**: `docs/library.md`.
+- **The library's clients and targets** (how each assembles, MPI or not, which helpers): `docs/clients.md`.
 - **A release**, the conda recipe, conda-forge, Spack: `docs/packaging.md`.
 - **Optimizing or measuring**: `PERFORMANCE.md` first.
 
@@ -178,6 +179,8 @@ Keep each document up to date in the same commit as the change it describes. Whe
     `README_library.md` and the comments of `fhhos4.h`, which document the same interface; a version change updates
     its Version section.
 - `docs/*.md`: how the code works today, for developers and agents; no history, no measurements.
+- `docs/clients.md`: updated when a client's integration changes or a target is studied; it drives the library's
+  interface and helpers.
 - `GLOSSARY.md`: terms only. `docs/adr/`: a decision that is hard to reverse, surprising, and a real trade-off.
 - `PERFORMANCE.md`: every measurement, with its date.
 - `.scratch/`: open work (local, gitignored), never in the documents above.
