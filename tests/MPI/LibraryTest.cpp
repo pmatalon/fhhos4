@@ -67,9 +67,9 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 // the solutions compared up to the kernel (the constants, of each component). components: the system on each of them
 // (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision, blockCSR:
 // MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). localColumnsHelpers: the blocks with
-// local columns by LocalColumnsSym() or LocalColumnsNonSym() from their global columns (the ghosts by increasing global
-// numbers), checked against the test's. Returns the iterations on the processes; setupLog: the printouts of their setup
-// (Verbosity 2, on the root process) if not null.
+// local columns by ConvertGlobalToLocalSym() or ConvertGlobalToLocalNonSym() from their global columns (the ghosts by
+// increasing global numbers), checked against the test's. Returns the iterations on the processes; setupLog: the
+// printouts of their setup (Verbosity 2, on the root process) if not null.
 int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool localColumnsHelpers = false)
 {
 	int n = 60;
@@ -113,8 +113,8 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	if (localColumnsHelpers)
 	{
 		fhhos4::SparseMatrix rowsTF = OnEachComponent(ownA_TF, c), rowsFF = OnEachComponent(ownA_FF, c), rowsFT = OnEachComponent(ownA_FT, c);
-		fhhos4::DistributedBlocks blocks = asymmetry == 0 ? fhhos4::LocalColumnsSym(rowsTF, rowsFF, faces.Begin, c)
-		                                                  : fhhos4::LocalColumnsNonSym(rowsTF, rowsFT, rowsFF, faces.Begin, cells.Begin, c, c);
+		fhhos4::DistributedBlocks blocks = asymmetry == 0 ? fhhos4::ConvertGlobalToLocalSym(rowsTF, rowsFF, faces.Begin, c)
+		                                                  : fhhos4::ConvertGlobalToLocalNonSym(rowsTF, rowsFT, rowsFF, faces.Begin, cells.Begin, c, c);
 		sort(ghostFaces.begin(), ghostFaces.end());
 		sort(ghostCells.begin(), ghostCells.end());
 		faceGhostGlobalNumbers.assign(ghostFaces.begin(), ghostFaces.end());
@@ -260,9 +260,9 @@ TEST(DistributedLibrary, BlockCSR)
 	}
 }
 
-// LocalColumnsSym(), LocalColumnsNonSym(): the blocks of each process with global columns, numbered locally (and the
-// ghosts), on 1 and 2 components
-TEST(DistributedLibrary, LocalColumnsHelpers)
+// ConvertGlobalToLocalSym(), ConvertGlobalToLocalNonSym(): the blocks of each process with global columns, numbered
+// locally (and the ghosts), on 1 and 2 components
+TEST(DistributedLibrary, ConvertGlobalToLocalHelpers)
 {
 	for (double asymmetry : { 0.0, 0.3 })
 		for (int components : { 1, 2 })

@@ -40,17 +40,17 @@ For the library's users: `README_library.md`. This file is for changing the libr
 - Helpers, documented as copies but one: `TransposedView()` (no copy: a symmetric column-major matrix as its transpose,
   an Eigen map); `ExtractBlocksSym()`/`ExtractBlocksNonSym()` (a global Eigen row-major matrix + `DoFLists`
   of the cells and faces, index types int32/int64, one parallel pass: `SparseMatrixOps::BuildByRows`; Eigen blocks,
-  `HybridBlocks`, copied from the library's arrays); `Gather()`/`Scatter()`; `LocalColumnsSym()`/`LocalColumnsNonSym()`
-  (the rows of a process with global columns, numbered locally, its ghosts by increasing global number:
-  `DistributedMatrix::ColumnGhosts()` and `RenumberColumns()`; no communication; `DistributedBlocks`, the ghosts copied
-  from a `detail::IndexArray`). `CondensedMatrix()`: an Eigen map. Other Eigen formats are converted by Eigen in the
-  calling code.
+  `HybridBlocks`, copied from the library's arrays); `Gather()`/`Scatter()`;
+  `ConvertGlobalToLocalSym()`/`ConvertGlobalToLocalNonSym()` (the rows of a process with global columns, numbered
+  locally, its ghosts by increasing global number: `DistributedMatrix::ColumnGhosts()` and `RenumberColumns()`; no
+  communication; `DistributedBlocks`, the ghosts copied from a `detail::IndexArray`). `CondensedMatrix()`: an Eigen map.
+  Other Eigen formats are converted by Eigen in the calling code.
 - `fhhos4::detail` holds the implementation types, never in a signature the user calls nor in the docs:
   `BasicCSRView`/`CSRView` (the arrays given to the compiled functions; `LibraryView()`, an Eigen matrix in the
   format of the setups), `CSRMatrix` and `IndexArray` (owned by the library), the compiled helpers
   (`detail::ExtractBlocksSym()` on any index types, also mixed, `detail::ToCSR()`, `detail::Transpose()`,
-  `detail::LocalColumns()`), used by the Python module. The raw-view `Solver::Setup()` and `CondensedMatrixView()` are
-  protected: the Python module's `PySolver` derives from `Solver`.
+  `detail::ConvertGlobalToLocal()`), used by the Python module. The raw-view `Solver::Setup()` and
+  `CondensedMatrixView()` are protected: the Python module's `PySolver` derives from `Solver`.
 - The compiled functions take plain types only (views, `detail::` vector views); the Eigen functions are inline in the
   header, compiled with the client's Eigen.
 - Parameters with a choice are enums (`fhhos4::Krylov`, `Cycle`, `PCoarsening`, `Smoother`, `Prolongation`,

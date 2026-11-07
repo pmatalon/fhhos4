@@ -166,13 +166,12 @@ gives empty matrices and vectors, and still calls the setups and solves.
 
 **What each process gives** to `SetupSym()` (the `FHHOS4_MPI` branch of the example above):
 
-- `A_TT` and `A_TF`: the rows of its cells. `A_FF`: the rows of its faces, with both triangles (a triangular `A_FF` is
-  accepted on one process only).
+- `A_TT` and `A_TF`: the rows of its cells. `A_FF`: the rows of its faces, assembled (with the contributions of the
+  cells of other processes) and with both triangles (a triangular `A_FF` is accepted on one process only).
 - The columns of `A_TF` and `A_FF` follow a local numbering of the faces: first the faces of the process, in the order
   of the rows of `A_FF`, then its **ghost faces**, in any order. The ghost faces are the faces of other processes that
   appear in these rows: the faces of its cells that other processes own, and the faces coupled to its own faces in
-  `A_FF` through the cells of other processes. This is the local numbering of DOLFINx's index maps, and of the columns
-  of PETSc's and hypre's distributed matrices.
+  `A_FF` through the cells of other processes. This is the local numbering of DOLFINx's index maps.
 - `faceGhostGlobalNumbers`: the global numbers of its ghost faces (faces, not DoFs), in the order of their local
   numbers. The faces are numbered as PETSc and hypre require for their distributed matrices: those of each process
   contiguously, in rank order.
@@ -182,13 +181,15 @@ For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the fac
 contain the faces 15 and 12 of rank 1, rank 0 numbers them locally 10 and 11 (or 11 and 10) and gives
 `faceGhostGlobalNumbers = {15, 12}` (or `{12, 15}`).
 
-If your blocks have the global numbers of the faces as columns, `LocalColumnsSym()` numbers them locally and finds the
-ghost faces (a copy, no communication; the ghosts by increasing global number):
+If your `A_TF` and `A_FF` have global columns, as the entries you give to PETSc (`MatSetValues`) or hypre (IJ
+interface), `ConvertGlobalToLocalSym()` converts them: it finds the ghost faces among their columns, and returns copies
+of `A_TF` and `A_FF` with their columns numbered locally (the ghost faces by increasing global number), along with
+`FaceGhostGlobalNumbers`. It works on the process's data alone, without communication, hence the argument
+`firstFaceGlobalNumber`:
 
 ```cpp
 // A_TF, A_FF: the rows of the process; the DoF k of the face of global number f is the column f * faceBlockSize + k.
-// firstFace: the global number of the first face of the process.
-fhhos4::DistributedBlocks blocks = fhhos4::LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize);
+fhhos4::DistributedBlocks blocks = fhhos4::ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize);
 solver.SetupSym(A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne, blocks.FaceGhostGlobalNumbers);
 ```
 
@@ -236,9 +237,9 @@ What changes for a non-symmetric matrix (e.g. convection-diffusion):
   solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers,
                      cellGhostGlobalNumbers);
   ```
-  With global columns, `LocalColumnsNonSym(A_TF, A_FT, A_FF, firstFace, firstCell, faceBlockSize, cellBlockSize)`
-  (`firstCell`: the global number of the first cell of the process) also gives `blocks.CellGhostGlobalNumbers`. On each
-  process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
+  With global columns, `ConvertGlobalToLocalNonSym(A_TF, A_FT, A_FF, firstFaceGlobalNumber, firstCellGlobalNumber,
+  faceBlockSize, cellBlockSize)` also gives `blocks.CellGhostGlobalNumbers`. On each process, the Gauss-Seidel smoothers
+  follow the downwind order of its own faces.
 
 ### Use as a preconditioner
 
@@ -317,9 +318,9 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
   (`RowPointers`, `ColumnIndices`, `Values`) are read-only NumPy views of the library's memory, which keep it alive.
 - The helpers have the same names: `ExtractBlocksSym(M, cells, faces)` with `fhhos4.DoFLists(count, offsets,
   dofs)` (NumPy arrays of the same integer dtype), `Gather()`, `Scatter()`, `ToCSR()`, `TransposedView()`,
-  `LocalColumnsSym(A_TF, A_FF, firstFace, faceBlockSize)` and `LocalColumnsNonSym()` (their `FaceGhostGlobalNumbers` and
-  `CellGhostGlobalNumbers`: read-only `int64` NumPy arrays, the `faceGhostGlobalNumbers` and `cellGhostGlobalNumbers` of
-  the setups).
+  `ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize)` and `ConvertGlobalToLocalNonSym()`
+  (their `FaceGhostGlobalNumbers` and `CellGhostGlobalNumbers`: read-only `int64` NumPy arrays, the
+  `faceGhostGlobalNumbers` and `cellGhostGlobalNumbers` of the setups).
 - The errors raise `fhhos4.Error`, a `RuntimeError`.
 - The setups, solves and helpers release the GIL.
 - Compiled with MPI (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`), `solver.Comm` not set: one process, as
@@ -379,6 +380,7 @@ result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 | Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No |
 | Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No |
 | The global matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `Gather()` and `Scatter()` for the vectors | Yes |
+| On several processes, the rows of a process with global columns (e.g. as given to PETSc or hypre) | `ConvertGlobalToLocalSym(A_TF, A_FF, firstFaceGlobalNumber, faceBlockSize)`, `ConvertGlobalToLocalNonSym()`: see [With MPI](#with-mpi) | Yes |
 
 The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a global matrix (e.g. assembled by a framework
 in its own numbering):

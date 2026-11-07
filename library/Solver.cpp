@@ -998,34 +998,34 @@ namespace fhhos4
 			return ExtractBlocks(M, cells, faces, false);
 		}
 
-		DistributedBlocks LocalColumns(const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF, std::int64_t firstFace, std::int64_t firstCell, int faceBlockSize, int cellBlockSize)
+		DistributedBlocks ConvertGlobalToLocal(const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF, std::int64_t firstFaceGlobalNumber, std::int64_t firstCellGlobalNumber, int faceBlockSize, int cellBlockSize)
 		{
 			CallScope scope(0, 0);
-			string function = string("fhhos4::") + (A_FT ? "LocalColumnsNonSym()" : "LocalColumnsSym()");
+			string function = string("fhhos4::") + (A_FT ? "ConvertGlobalToLocalNonSym()" : "ConvertGlobalToLocalSym()");
 			int fbs = faceBlockSize, cbs = cellBlockSize;
 			if (fbs < 1 || (A_FT && cbs < 1))
 				Utils::FatalError(function + ": the block sizes must be >= 1, got " + to_string(fbs) + (A_FT ? " and " + to_string(cbs) : "") + ".");
-			if (firstFace < 0 || (A_FT && firstCell < 0))
-				Utils::FatalError(function + ": the global numbers of the first face and cell of the process must be >= 0, got " + to_string(firstFace) + (A_FT ? " and " + to_string(firstCell) : "") + ".");
+			if (firstFaceGlobalNumber < 0 || (A_FT && firstCellGlobalNumber < 0))
+				Utils::FatalError(function + ": the global numbers of the first face and cell of the process must be >= 0, got " + to_string(firstFaceGlobalNumber) + (A_FT ? " and " + to_string(firstCellGlobalNumber) : "") + ".");
 			unique_ptr<BorrowedSparseMatrix> a_TF = Borrow(A_TF, "A_TF"), a_FF = Borrow(A_FF, "A_FF");
 			unique_ptr<BorrowedSparseMatrix> a_FT = A_FT ? Borrow(*A_FT, "A_FT") : nullptr;
 			auto size = [](const SparseMatrix& M) { return to_string(M.rows()) + " x " + to_string(M.cols()); };
 			BigNumber nFaces = a_FF->rows() / fbs;
-			if (a_FF->rows() % fbs != 0 || a_TF->cols() != a_FF->cols() || a_FF->cols() % fbs != 0 || (firstFace + nFaces) * fbs > a_FF->cols())
-				Utils::FatalError(function + ": A_FF (" + size(*a_FF) + ") has the rows of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_FF and A_TF (" + size(*a_TF) + ") the columns of the DoFs of all the faces, among which those of the faces of the process, from the face " + to_string(firstFace) + ".");
+			if (a_FF->rows() % fbs != 0 || a_TF->cols() != a_FF->cols() || a_FF->cols() % fbs != 0 || (firstFaceGlobalNumber + nFaces) * fbs > a_FF->cols())
+				Utils::FatalError(function + ": A_FF (" + size(*a_FF) + ") has the rows of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_FF and A_TF (" + size(*a_TF) + ") the columns of the DoFs of all the faces, among which those of the faces of the process, from the face " + to_string(firstFaceGlobalNumber) + ".");
 			BigNumber nCells = A_FT ? a_TF->rows() / cbs : 0;
-			if (a_FT && (a_TF->rows() % cbs != 0 || a_FT->rows() != a_FF->rows() || a_FT->cols() % cbs != 0 || (firstCell + nCells) * cbs > a_FT->cols()))
-				Utils::FatalError(function + ": A_FT (" + size(*a_FT) + ") has the rows of A_FF (" + size(*a_FF) + "), and the columns of the DoFs of all the cells (" + to_string(cbs) + " per cell), among which those of the cells of the process (the rows of A_TF, " + size(*a_TF) + "), from the cell " + to_string(firstCell) + ".");
+			if (a_FT && (a_TF->rows() % cbs != 0 || a_FT->rows() != a_FF->rows() || a_FT->cols() % cbs != 0 || (firstCellGlobalNumber + nCells) * cbs > a_FT->cols()))
+				Utils::FatalError(function + ": A_FT (" + size(*a_FT) + ") has the rows of A_FF (" + size(*a_FF) + "), and the columns of the DoFs of all the cells (" + to_string(cbs) + " per cell), among which those of the cells of the process (the rows of A_TF, " + size(*a_TF) + "), from the cell " + to_string(firstCellGlobalNumber) + ".");
 
 			DistributedBlocks blocks;
 			vector<CSRMatrix> faceColumns;
-			blocks.FaceGhostGlobalNumbers = OwnNumbers(ToLocalColumns({ a_TF.get(), a_FF.get() }, firstFace, nFaces, fbs, faceColumns));
+			blocks.FaceGhostGlobalNumbers = OwnNumbers(ToLocalColumns({ a_TF.get(), a_FF.get() }, firstFaceGlobalNumber, nFaces, fbs, faceColumns));
 			blocks.A_TF = std::move(faceColumns[0]);
 			blocks.A_FF = std::move(faceColumns[1]);
 			if (a_FT)
 			{
 				vector<CSRMatrix> cellColumns;
-				blocks.CellGhostGlobalNumbers = OwnNumbers(ToLocalColumns({ a_FT.get() }, firstCell, nCells, cbs, cellColumns));
+				blocks.CellGhostGlobalNumbers = OwnNumbers(ToLocalColumns({ a_FT.get() }, firstCellGlobalNumber, nCells, cbs, cellColumns));
 				blocks.A_FT = std::move(cellColumns[0]);
 			}
 			return blocks;

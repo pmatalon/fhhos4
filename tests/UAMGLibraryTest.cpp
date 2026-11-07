@@ -1276,10 +1276,10 @@ TEST(UAMGLibrary, DefaultPostSmoother)
 	}
 }
 
-// LocalColumnsSym(), LocalColumnsNonSym() on the rows of a process (no MPI needed): global columns, the faces of 2 DoFs
-// numbered 0-7 (the process owns 3 and 4), the cells of 1 DoF numbered 0-3 (it owns 1 and 2). The ghost faces 0, 5, 7,
-// the ghost cells 0, 3, numbered locally after the own ones by increasing global number.
-TEST(UAMGLibrary, LocalColumns)
+// ConvertGlobalToLocalSym(), ConvertGlobalToLocalNonSym() on the rows of a process (no MPI needed): global columns, the
+// faces of 2 DoFs numbered 0-7 (the process owns 3 and 4), the cells of 1 DoF numbered 0-3 (it owns 1 and 2). The ghost
+// faces 0, 5, 7, the ghost cells 0, 3, numbered locally after the own ones by increasing global number.
+TEST(UAMGLibrary, ConvertGlobalToLocal)
 {
 	auto matrix = [](int rows, int cols, std::vector<Eigen::Triplet<double>> entries)
 	{
@@ -1297,7 +1297,7 @@ TEST(UAMGLibrary, LocalColumns)
 	fhhos4::SparseMatrix localA_TF = matrix(2, 10, { { 0, 5, 9 }, { 0, 0, 10 }, { 0, 9, 11 }, { 1, 3, 12 }, { 1, 6, 13 } });
 	fhhos4::SparseMatrix localA_FT = matrix(4, 4, { { 0, 2, 14 }, { 0, 0, 15 }, { 2, 3, 16 } });
 
-	fhhos4::DistributedBlocks sym = fhhos4::LocalColumnsSym(A_TF, A_FF, 3, 2);
+	fhhos4::DistributedBlocks sym = fhhos4::ConvertGlobalToLocalSym(A_TF, A_FF, 3, 2);
 	EXPECT_EQ(sym.FaceGhostGlobalNumbers, (std::vector<std::int64_t>{ 0, 5, 7 }));
 	EXPECT_TRUE(sym.CellGhostGlobalNumbers.empty());
 	EXPECT_EQ(sym.A_FF.cols(), 10);
@@ -1305,7 +1305,7 @@ TEST(UAMGLibrary, LocalColumns)
 	EXPECT_EQ(fhhos4::SparseMatrix(sym.A_TF - localA_TF).norm(), 0);
 	EXPECT_EQ(sym.A_FT.rows(), 0);
 
-	fhhos4::DistributedBlocks nonsym = fhhos4::LocalColumnsNonSym(A_TF, A_FT, A_FF, 3, 1, 2, 1);
+	fhhos4::DistributedBlocks nonsym = fhhos4::ConvertGlobalToLocalNonSym(A_TF, A_FT, A_FF, 3, 1, 2, 1);
 	EXPECT_EQ(nonsym.FaceGhostGlobalNumbers, sym.FaceGhostGlobalNumbers);
 	EXPECT_EQ(nonsym.CellGhostGlobalNumbers, (std::vector<std::int64_t>{ 0, 3 }));
 	EXPECT_EQ(fhhos4::SparseMatrix(nonsym.A_FF - localA_FF).norm(), 0);
@@ -1321,11 +1321,11 @@ TEST(UAMGLibrary, LocalColumns)
 
 	// The faces of the process beyond the columns, rows not a multiple of the block size, A_TF and A_FF with different
 	// columns, a block size < 1
-	EXPECT_THROW(fhhos4::LocalColumnsSym(A_TF, A_FF, 7, 2), fhhos4::Error);
-	EXPECT_THROW(fhhos4::LocalColumnsSym(A_TF, A_FF, 3, 3), fhhos4::Error);
-	EXPECT_THROW(fhhos4::LocalColumnsSym(matrix(2, 18, {}), A_FF, 3, 2), fhhos4::Error);
-	EXPECT_THROW(fhhos4::LocalColumnsNonSym(A_TF, A_FT, A_FF, 3, 1, 2, 0), fhhos4::Error);
-	EXPECT_THROW(fhhos4::LocalColumnsNonSym(A_TF, A_FT, A_FF, 3, 3, 2, 1), fhhos4::Error); // cells 3, 4 of 4
+	EXPECT_THROW(fhhos4::ConvertGlobalToLocalSym(A_TF, A_FF, 7, 2), fhhos4::Error);
+	EXPECT_THROW(fhhos4::ConvertGlobalToLocalSym(A_TF, A_FF, 3, 3), fhhos4::Error);
+	EXPECT_THROW(fhhos4::ConvertGlobalToLocalSym(matrix(2, 18, {}), A_FF, 3, 2), fhhos4::Error);
+	EXPECT_THROW(fhhos4::ConvertGlobalToLocalNonSym(A_TF, A_FT, A_FF, 3, 1, 2, 0), fhhos4::Error);
+	EXPECT_THROW(fhhos4::ConvertGlobalToLocalNonSym(A_TF, A_FT, A_FF, 3, 3, 2, 1), fhhos4::Error); // cells 3, 4 of 4
 }
 
 // L1Theta: the theta of the l1 Gauss-Seidel smoothers, here on 4 threads (the rows coupled to other chunks have l1

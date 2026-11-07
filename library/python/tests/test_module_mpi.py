@@ -2,9 +2,9 @@
 # system of test_module.py distributed by rows, through mpi4py, against SciPy's direct solver on the whole system. The
 # cells of each process: horizontal strips; each face owned by the process of the smaller rank of its cells; the cells
 # and faces renumbered in rank order; the ghost faces (and cells of A_FT) of each process numbered in reverse order (any
-# order). Also with the process of rank 0 empty, non-symmetric, and the blocks numbered locally by LocalColumnsSym() and
-# LocalColumnsNonSym() (the ghosts in increasing order). The condensed system (CondenseRHS(), Solve(b, x),
-# SolveCellUnknowns(), ApplyCondensedMatrix()) too.
+# order). Also with the process of rank 0 empty, non-symmetric, and the blocks numbered locally by
+# ConvertGlobalToLocalSym() and ConvertGlobalToLocalNonSym() (the ghosts in increasing order). The condensed system
+# (CondenseRHS(), Solve(b, x), SolveCellUnknowns(), ApplyCondensedMatrix()) too.
 # Skipped (exit code 77) if the module is compiled without MPI, or without mpi4py.
 import os
 import sys
@@ -82,9 +82,9 @@ def DistributedSystem(emptyRank0, asymmetry=0.0, helpers=False):
     if helpers:
         tf, ft, ff = (M.sorted_indices() for M in (rowsTF, rowsFT, rowsFF))
         if asymmetry == 0:
-            blocks = fhhos4.LocalColumnsSym(tf, ff, faceBegin, 1)
+            blocks = fhhos4.ConvertGlobalToLocalSym(tf, ff, faceBegin, 1)
         else:
-            blocks = fhhos4.LocalColumnsNonSym(tf, ft, ff, faceBegin, cellBegin, 1, 1)
+            blocks = fhhos4.ConvertGlobalToLocalNonSym(tf, ft, ff, faceBegin, cellBegin, 1, 1)
         assert np.array_equal(blocks.FaceGhostGlobalNumbers, ghosts) and np.array_equal(blocks.CellGhostGlobalNumbers, cellGhostGlobalNumbers if asymmetry != 0 else [])
         assert (ToSciPy(blocks.A_TF) != localA_TF).nnz == 0 and (ToSciPy(blocks.A_FF) != localA_FF).nnz == 0
         if asymmetry != 0:
@@ -158,8 +158,8 @@ def test_nonsymmetric_system():
     DistributedSystem(emptyRank0=True, asymmetry=0.3)
 
 
-def test_local_columns_helpers():
-    """The blocks with global columns numbered locally by LocalColumnsSym() and LocalColumnsNonSym()"""
+def test_convert_global_to_local_helpers():
+    """The blocks with global columns numbered locally by ConvertGlobalToLocalSym() and ConvertGlobalToLocalNonSym()"""
     for asymmetry in (0.0, 0.3):
         DistributedSystem(emptyRank0=False, asymmetry=asymmetry, helpers=True)
         DistributedSystem(emptyRank0=True, asymmetry=asymmetry, helpers=True)

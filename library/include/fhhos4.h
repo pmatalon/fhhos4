@@ -127,8 +127,8 @@ namespace fhhos4
 			return BasicCSRView<Index, Index>(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr());
 		}
 
-		// The arrays of a matrix given to a setup (or to LocalColumnsSym()...): an Eigen sparse matrix in the format of the
-		// library, read in place
+		// The arrays of a matrix given to a setup (or to ConvertGlobalToLocalSym()...): an Eigen sparse matrix in the
+		// format of the library, read in place
 		template <typename Derived>
 		CSRView LibraryView(const Eigen::SparseCompressedBase<Derived>& M)
 		{
@@ -451,8 +451,8 @@ namespace fhhos4
 		// through the cells of other processes), whose global numbers are faceGhostGlobalNumbers; the interpolations of
 		// 1 on its cells and faces. Each face belongs to a process that owns one of its cells (e.g. the one of the
 		// smaller rank); a process may own no cell nor face. Then Solve() with the vectors of the cells and faces of
-		// the process. On one process, faceGhostGlobalNumbers is empty. Blocks with global columns: LocalColumnsSym()
-		// numbers them locally.
+		// the process. On one process, faceGhostGlobalNumbers is empty. Blocks with global columns:
+		// ConvertGlobalToLocalSym() numbers them locally.
 		template <typename TT, typename TF, typename FF>
 		void SetupSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
 		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
@@ -603,7 +603,8 @@ namespace fhhos4
 		SparseMatrix A_TT, A_TF, A_FT, A_FF; // A_FT: empty (0 x 0) for a symmetric system
 	};
 
-	// The blocks of the rows of a process with their columns numbered locally, and its ghosts: see LocalColumnsSym()
+	// The blocks of the rows of a process with their columns numbered locally, and its ghosts: see
+	// ConvertGlobalToLocalSym()
 	struct DistributedBlocks
 	{
 		SparseMatrix A_TF, A_FT, A_FF;                    // A_FT: empty (0 x 0) for a symmetric system
@@ -646,8 +647,8 @@ namespace fhhos4
 			IndexArray FaceGhostGlobalNumbers, CellGhostGlobalNumbers;
 		};
 
-		// A_FT: null for a symmetric system (firstCell and cellBlockSize then ignored)
-		FHHOS4_API DistributedBlocks LocalColumns(const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF, std::int64_t firstFace, std::int64_t firstCell,
+		// A_FT: null for a symmetric system (firstCellGlobalNumber and cellBlockSize then ignored)
+		FHHOS4_API DistributedBlocks ConvertGlobalToLocal(const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF, std::int64_t firstFaceGlobalNumber, std::int64_t firstCellGlobalNumber,
 		                                          int faceBlockSize, int cellBlockSize);
 
 		template <typename RowPointer, typename Column, typename Index>
@@ -736,29 +737,29 @@ namespace fhhos4
 	// their columns numbered locally as SetupSym() reads them, and its ghost faces (FaceGhostGlobalNumbers): for
 	// SetupSym(A_TT, b.A_TF, b.A_FF, cellInterpOfOne, faceInterpOfOne, b.FaceGhostGlobalNumbers). The global columns of
 	// A_TF and A_FF: the DoF k of the face of global number f is the column f * faceBlockSize + k, the faces numbered
-	// as the GhostNumbers (the faces of the process of rank 0 first, then those of rank 1...). firstFace: the global
-	// number of the first face of the process; its faces: firstFace, ..., firstFace + A_FF.rows() / faceBlockSize - 1,
-	// the rows of A_FF in this order. The local columns: the faces of the process, in this order, then its ghosts (all
-	// the other faces of the columns of A_TF and A_FF) by increasing global number. The matrices: in the format of the
-	// library (as the setups'), A_TF and A_FF with the same columns (the global face DoFs). One parallel pass on the
-	// non-zeros to find the ghosts, one to renumber. No communication.
+	// as the GhostNumbers (the faces of the process of rank 0 first, then those of rank 1...). firstFaceGlobalNumber:
+	// the global number of the first face of the process; its faces: firstFaceGlobalNumber, ..., firstFaceGlobalNumber
+	// + A_FF.rows() / faceBlockSize - 1, the rows of A_FF in this order. The local columns: the faces of the process,
+	// in this order, then its ghosts (all the other faces of the columns of A_TF and A_FF) by increasing global number.
+	// The matrices: in the format of the library (as the setups'), A_TF and A_FF with the same columns (the global face
+	// DoFs). One parallel pass on the non-zeros to find the ghosts, one to renumber. No communication.
 	template <typename TF, typename FF>
-	DistributedBlocks LocalColumnsSym(const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF, std::int64_t firstFace, int faceBlockSize)
+	DistributedBlocks ConvertGlobalToLocalSym(const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF, std::int64_t firstFaceGlobalNumber, int faceBlockSize)
 	{
-		return detail::ToEigen(detail::LocalColumns(detail::LibraryView(A_TF), nullptr, detail::LibraryView(A_FF), firstFace, 0, faceBlockSize, 1));
+		return detail::ToEigen(detail::ConvertGlobalToLocal(detail::LibraryView(A_TF), nullptr, detail::LibraryView(A_FF), firstFaceGlobalNumber, 0, faceBlockSize, 1));
 	}
 
-	// A copy: as LocalColumnsSym(), with A_FT (the rows of the faces of the process), for SetupNonSym(): its global
-	// columns, the DoF k of the cell of global number c is the column c * cellBlockSize + k, the cells numbered as the
-	// faces; the cells of the process: firstCell, ..., firstCell + A_TF.rows() / cellBlockSize - 1 (the rows of A_TF).
-	// Its local columns: the cells of the process, then its ghost cells (CellGhostGlobalNumbers) by increasing global
-	// number.
+	// A copy: as ConvertGlobalToLocalSym(), with A_FT (the rows of the faces of the process), for SetupNonSym(): its
+	// global columns, the DoF k of the cell of global number c is the column c * cellBlockSize + k, the cells numbered
+	// as the faces; the cells of the process: firstCellGlobalNumber, ..., firstCellGlobalNumber + A_TF.rows() /
+	// cellBlockSize - 1 (the rows of A_TF). Its local columns: the cells of the process, then its ghost cells
+	// (CellGhostGlobalNumbers) by increasing global number.
 	template <typename TF, typename FT, typename FF>
-	DistributedBlocks LocalColumnsNonSym(const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT, const Eigen::SparseCompressedBase<FF>& A_FF,
-	                                     std::int64_t firstFace, std::int64_t firstCell, int faceBlockSize, int cellBlockSize)
+	DistributedBlocks ConvertGlobalToLocalNonSym(const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT, const Eigen::SparseCompressedBase<FF>& A_FF,
+	                                             std::int64_t firstFaceGlobalNumber, std::int64_t firstCellGlobalNumber, int faceBlockSize, int cellBlockSize)
 	{
 		detail::CSRView a_FT = detail::LibraryView(A_FT);
-		return detail::ToEigen(detail::LocalColumns(detail::LibraryView(A_TF), &a_FT, detail::LibraryView(A_FF), firstFace, firstCell, faceBlockSize, cellBlockSize));
+		return detail::ToEigen(detail::ConvertGlobalToLocal(detail::LibraryView(A_TF), &a_FT, detail::LibraryView(A_FF), firstFaceGlobalNumber, firstCellGlobalNumber, faceBlockSize, cellBlockSize));
 	}
 
 	// No copy: A^T in the format of the library, a map of the arrays of a column-major matrix A (compressed, with the

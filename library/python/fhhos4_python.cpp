@@ -380,23 +380,23 @@ NB_MODULE(fhhos4, m)
 			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractBlocksNonSym(v, c, f); }); });
 		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its global matrix, for SetupNonSym()");
 
-	m.def("LocalColumnsSym", [](nb::handle A_TF, nb::handle A_FF, std::int64_t firstFace, int faceBlockSize)
+	m.def("ConvertGlobalToLocalSym", [](nb::handle A_TF, nb::handle A_FF, std::int64_t firstFaceGlobalNumber, int faceBlockSize)
 		{
 			PyCSRView a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
 			fhhos4::detail::CSRView tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
 			nb::gil_scoped_release release;
-			return fhhos4::detail::LocalColumns(tf, nullptr, ff, firstFace, 0, faceBlockSize, 1);
-		}, "A_TF"_a, "A_FF"_a, "firstFace"_a, "faceBlockSize"_a,
-		"A copy: the blocks of a process with global columns (the DoF k of the face f: f * faceBlockSize + k), their columns numbered locally (its faces from firstFace, then its ghosts FaceGhostGlobalNumbers), for SetupSym()");
+			return fhhos4::detail::ConvertGlobalToLocal(tf, nullptr, ff, firstFaceGlobalNumber, 0, faceBlockSize, 1);
+		}, "A_TF"_a, "A_FF"_a, "firstFaceGlobalNumber"_a, "faceBlockSize"_a,
+		"A copy: the blocks of a process with global columns (the DoF k of the face f: f * faceBlockSize + k), their columns numbered locally (its faces from firstFaceGlobalNumber, then its ghosts FaceGhostGlobalNumbers), for SetupSym()");
 
-	m.def("LocalColumnsNonSym", [](nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, std::int64_t firstFace, std::int64_t firstCell, int faceBlockSize, int cellBlockSize)
+	m.def("ConvertGlobalToLocalNonSym", [](nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, std::int64_t firstFaceGlobalNumber, std::int64_t firstCellGlobalNumber, int faceBlockSize, int cellBlockSize)
 		{
 			PyCSRView a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
 			fhhos4::detail::CSRView tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
 			nb::gil_scoped_release release;
-			return fhhos4::detail::LocalColumns(tf, &ft, ff, firstFace, firstCell, faceBlockSize, cellBlockSize);
-		}, "A_TF"_a, "A_FT"_a, "A_FF"_a, "firstFace"_a, "firstCell"_a, "faceBlockSize"_a, "cellBlockSize"_a,
-		"A copy: as LocalColumnsSym(), with A_FT (the DoF k of the cell c: the column c * cellBlockSize + k; its ghost cells CellGhostGlobalNumbers), for SetupNonSym()");
+			return fhhos4::detail::ConvertGlobalToLocal(tf, &ft, ff, firstFaceGlobalNumber, firstCellGlobalNumber, faceBlockSize, cellBlockSize);
+		}, "A_TF"_a, "A_FT"_a, "A_FF"_a, "firstFaceGlobalNumber"_a, "firstCellGlobalNumber"_a, "faceBlockSize"_a, "cellBlockSize"_a,
+		"A copy: as ConvertGlobalToLocalSym(), with A_FT (the DoF k of the cell c: the column c * cellBlockSize + k; its ghost cells CellGhostGlobalNumbers), for SetupNonSym()");
 
 	m.def("Gather", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
 		{
