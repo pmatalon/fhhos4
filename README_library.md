@@ -31,13 +31,13 @@ For distributed memory, you'll also need
 - [MUMPS](https://mumps-solver.org)  (e.g. conda-forge's `mumps-mpi`)
 
 ```bash
-git clone --branch v1.4.0 --depth 1 https://github.com/pmatalon/fhhos4.git && cd fhhos4
+git clone --branch v1.5.0 --depth 1 https://github.com/pmatalon/fhhos4.git && cd fhhos4
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF
 cmake --build build
 cmake --install build --prefix <prefix>    # lib/, include/ and the CMake package
 ```
 
-`v1.4.0` is the latest release. Between releases, this README file on `master` describes the development version; the release's is [README_library.md at v1.4.0](https://github.com/pmatalon/fhhos4/blob/v1.4.0/README_library.md).
+`v1.5.0` is the latest release. Between releases, this README file on `master` describes the development version; the release's is [README_library.md at v1.5.0](https://github.com/pmatalon/fhhos4/blob/v1.5.0/README_library.md).
 
 To update to a later release `vX.Y.Z`, run `git fetch --tags && git checkout vX.Y.Z` in the clone, then build and install again. `git pull` does nothing in this clone: it follows the tag only.
 
