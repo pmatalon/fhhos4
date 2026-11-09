@@ -45,8 +45,9 @@ feedstock too.
 ## Spack
 
 The library alone too, in Spack's builtin repository (`spack/spack-packages`,
-`repos/spack_repo/builtin/packages/fhhos4/package.py`; PR 7139), not in this repository. `CMakePackage`,
-`ENABLE_PROGRAM=OFF`, `ENABLE_NATIVE_ARCH=OFF` (Spack sets the target's flags), variant `openmp` (default on),
-`eigen@3.4:`. No variant for the index type: 64-bit indices (`SMALL_INDEX=OFF` then, `ENABLE_64BIT_INDEX=ON` from
-1.5.0) do not compile in 1.4.0. Its stand-alone test (`spack test run fhhos4`) builds and runs the conda test client
+`repos/spack_repo/builtin/packages/fhhos4/package.py`; PRs 7139, 7517), not in this repository. `CMakePackage`,
+`ENABLE_PROGRAM=OFF`, `ENABLE_NATIVE_ARCH=OFF` (Spack sets the target's flags), `ENABLE_TESTS=OFF` (with MPI they
+need GoogleTest), `eigen@3.4:`. Variants: `openmp` (default on); from 1.5.0 (64-bit indices do not compile in 1.4.0)
+`int64` (`ENABLE_64BIT_INDEX`), `mpi` (default on: `mpi`, `mumps+double+mpi`) and `mumps`, defined twice: always on
+with `+mpi` (`conflicts("~mumps", when="+mpi")`), default off with `~mpi` (`mumps+double~mpi`). Its stand-alone test (`spack test run fhhos4`) builds and runs the conda test client
 `conda/recipe/test`, cached from the sources: moving it changes the package too (per version).
