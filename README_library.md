@@ -149,6 +149,9 @@ Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size()); // wit
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
 
+A complete example, an HHO discretization assembled into the blocks, on one process or several with MPI:
+[`examples/fhhos4_solver.cpp`](examples/fhhos4_solver.cpp).
+
 The blocks are of type `fhhos4::SparseMatrix`, which is an Eigen sparse matrices (row-major, compressed).
 It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
 
@@ -211,6 +214,9 @@ Each process gives `SetupSym()` the following (the `FHHOS4_MPI` branch of the ex
 For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the faces 10 to 19. If the rows of rank 0
 contain the faces 15 and 12 of rank 1, rank 0 numbers them locally 10 and 11 (or 11 and 10) and gives
 `faceGhostGlobalNumbers = {15, 12}` (or `{12, 15}`).
+
+[`examples/fhhos4_solver.cpp`](examples/fhhos4_solver.cpp) assembles the rows of each process in this format, its
+ghost faces numbered in the order it meets them.
 
 PETSc's and hypre's distributed matrices store each block in two parts: `MergeOffDiag()` converts them (see
 [Other matrix formats](#other-matrix-formats)).

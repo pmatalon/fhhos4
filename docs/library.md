@@ -89,6 +89,15 @@ on several processes too (see `docs/uamg.md`). `tests/UAMGLibraryTest.cpp` compa
 - Check the client's bases: the interpolations of 1 (1/phi_0 for a hierarchical basis), and the order of the DoFs of
   each cell and face by degree (the p-levels extract the first ones).
 
+## The examples
+
+`examples/` (`README_library.md` refers to them; built with the tests, run by ctest): `fhhos4_solver.cpp`, the library
+alone (`ExampleSolver`: on 3 processes with MPI; its exit code: converged), and those of PETSc (below). The C++ ones
+share `HHO.h`: an HHO discretization on n x n squares (degrees k and l, Legendre bases), the mesh distributed by rows.
+`fhhos4_solver.cpp` assembles the distributed blocks itself (each process also computes the cells of the row above its
+own, for the rows of its faces): the library's own solve of `petsc_preconditioner.cpp` (`-ksp_type preonly
+-pc_fhhos4_krylov fcg`) gives its iterations and residuals exactly.
+
 ## The preconditioner for PETSc
 
 `library/petsc/fhhos4_petsc.cpp` (`ENABLE_PETSC_PC`, ADR-0012): `libfhhos4_petsc.so`, target `fhhos4_petsc` (exported
@@ -114,8 +123,8 @@ preconditioners (`petsc/private/pcimpl.h`) and `fhhos4.h` only, to move into PET
   processes, the library loaded by `-dll_append`, as by a user's program); the examples of `README_library.md`,
   `examples/petsc_preconditioner.cpp` and `.py` (`ctest -R ExamplePETScPreconditioner`: `Cpp`, linked to the library,
   built with the tests; `Python`, if petsc4py is installed). Their HHO, the local matrix of the reference square, was
-  checked by hand: symmetric, its kernel the interpolation of 1, exact on x^2; the C++ one equals the Python one to
-  rounding.
+  checked by hand: symmetric, its kernel the interpolation of 1, exact on x^2; the C++ one (`examples/HHO.h`, with the
+  mesh and its distribution, shared with `examples/fhhos4_solver.cpp`) equals the Python one to rounding.
 - Environment: conda env `fhhos4-petsc` (the stack of `fhhos4-python`, `docs/python.md`, with PETSc and petsc4py,
   pkg-config and GTest), build directory `build-python-petsc` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON -DENABLE_MPI=ON
   -DENABLE_PETSC_PC=ON`). On WSL, a Windows `pkg-config` on the PATH may be cached before the env's is installed:

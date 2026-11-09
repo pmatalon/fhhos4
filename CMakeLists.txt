@@ -292,6 +292,22 @@ if(ENABLE_MPI AND ENABLE_TESTS)
 	endforeach()
 endif()
 
+# The example of the library alone (examples/fhhos4_solver.cpp, README_library.md): built with the tests, run by ctest
+# (on 3 processes with MPI), which checks that it converges (its exit code)
+if(ENABLE_TESTS)
+	enable_testing()
+	add_executable(fhhos4_solver_example examples/fhhos4_solver.cpp)
+	set_target_properties(fhhos4_solver_example PROPERTIES OUTPUT_NAME fhhos4_solver)
+	target_link_libraries(fhhos4_solver_example PRIVATE fhhos4_lib)
+	if(ENABLE_MPI)
+		add_test(NAME ExampleSolver COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 3 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:fhhos4_solver_example> -n 32 -k 2 ${MPIEXEC_POSTFLAGS})
+		set_tests_properties(ExampleSolver PROPERTIES PROCESSORS 3)
+	else()
+		add_test(NAME ExampleSolver COMMAND $<TARGET_FILE:fhhos4_solver_example> -n 32 -k 2)
+	endif()
+	set_tests_properties(ExampleSolver PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600)
+endif()
+
 #----------------------------------------------------------------------------------------------------------------------
 # Program fhhos4 and its tests
 #----------------------------------------------------------------------------------------------------------------------
