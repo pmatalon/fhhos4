@@ -571,5 +571,7 @@ NB_MODULE(fhhos4, m)
 		// A copy of the condensed matrix (fhhos4.CSRMatrix)
 		.def("CondensedMatrix", [](const PySolver& s) { return fhhos4::detail::ToCSR(s.CondensedView()); })
 		.def("IsSetUp", &fhhos4::Solver::IsSetUp)
-		.def("NumberOfLevels", &fhhos4::Solver::NumberOfLevels);
+		.def("NumberOfLevels", &fhhos4::Solver::NumberOfLevels)
+		.def("CellBlockSize", &fhhos4::Solver::CellBlockSize)
+		.def("FaceBlockSize", &fhhos4::Solver::FaceBlockSize);
 }

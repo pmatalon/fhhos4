@@ -1353,6 +1353,24 @@ TEST(UAMGLibrary, MergeOffDiag)
 	EXPECT_THROW(fhhos4::MergeOffDiag(A_TF_diag, A_TF_offd, A_TF_offdColumns.data(), matrix(4, 3, {}), A_FT_offd, A_FT_offdColumns.data(), A_FF_diag, A_FF_offd, A_FF_offdColumns.data(), 2, 1), fhhos4::Error);
 }
 
+// CellBlockSize(), FaceBlockSize(): the DoFs of a cell and a face from the parameters; refused before they are set
+TEST(UAMGLibrary, BlockSizes)
+{
+	fhhos4::Solver solver;
+	EXPECT_THROW(solver.FaceBlockSize(), fhhos4::Error);
+	solver.Dimension = 3;
+	solver.FaceDegree = 2;
+	solver.CellDegree = 1;
+	EXPECT_EQ(solver.FaceBlockSize(), 6); // P^2 in 2D
+	EXPECT_EQ(solver.CellBlockSize(), 4); // P^1 in 3D
+	solver.PolynomialSpace = fhhos4::PolynomialSpace::Q;
+	EXPECT_EQ(solver.FaceBlockSize(), 9);
+	EXPECT_EQ(solver.CellBlockSize(), 8);
+	solver.VectorComponents = 2;
+	EXPECT_EQ(solver.FaceBlockSize(), 18);
+	EXPECT_EQ(solver.CellBlockSize(), 16);
+}
+
 // L1Theta: the theta of the l1 Gauss-Seidel smoothers, here on 4 threads (the rows coupled to other chunks have l1
 // terms): other values, other iterates; 0, the hybrid block Gauss-Seidel's
 TEST(UAMGLibrary, L1Theta)

@@ -120,6 +120,7 @@ def test_components():
     s = vector.Solve(np.repeat(system.b_T, 2), np.repeat(system.b_F, 2), y_T, y_F)
     assert r.Converged and s.Iterations == r.Iterations, (r, s)
     assert RelativeError(y_T, np.repeat(x_T, 2)) < 1e-9 and RelativeError(y_F, np.repeat(x_F, 2)) < 1e-9
+    assert (vector.CellBlockSize(), vector.FaceBlockSize()) == (2, 2)  # degree 0, 2 components
 
 
 def test_prolongations():

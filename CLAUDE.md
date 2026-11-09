@@ -11,7 +11,7 @@ other codes).
 Terms: `GLOSSARY.md` (use its words). Decisions: `docs/adr/` (read those of the area before designing a change; flag a
 contradiction instead of overriding one). Open work: `.scratch/` (see "Agent skills"). Then, by area:
 - **U-AMG**, the static condensation, the smoothers, Krylov methods: `docs/uamg.md`.
-- **The library's code** (public header, `library/Solver.cpp`, `-s libuamg`): `docs/library.md`.
+- **The library's code** (public header, `library/Solver.cpp`, `-s libuamg`, the PETSc preconditioner): `docs/library.md`.
 - **MPI** (anything distributed): `docs/mpi.md`.
 - **The Python module**, and what client frameworks need from it: `docs/python.md`.
 - **Integrating the library into a client code**: `docs/library.md`.
@@ -58,6 +58,7 @@ CMake options (`-D<OPTION>=ON/OFF`):
 - `ENABLE_PYTHON` (OFF): the Python module of the library (`library/python`).
 - `ENABLE_MPI` (OFF): the library and the program on several processes; needs MUMPS (the coarse solver, ADR-0021).
 - `ENABLE_MUMPS` (OFF; always with `ENABLE_MPI`): MUMPS on one process too (`CoarseSolver::MUMPS`, `mumpsch|mumpslu`).
+- `ENABLE_PETSC_PC` (OFF): the library's preconditioner for PETSc (`library/petsc`, `-pc_type fhhos4`): `docs/library.md`.
 
 `cmake --install . --prefix <prefix> [--component library|program]`: program, meshes (`share/fhhos4/meshes`), library,
 headers, CMake package. No path of the sources is compiled in (`Utils/FileSystem.h`): the program finds the meshes
@@ -74,7 +75,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-397 tests, ~9 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+398 tests, ~9 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, the full Neumann problem (`FullNeumann*`, 2D), and the library (`UAMGLibrary*`,

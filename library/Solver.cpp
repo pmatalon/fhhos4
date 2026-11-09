@@ -223,6 +223,22 @@ namespace fhhos4
 #endif
 			return "";
 		}
+
+		// The DoFs of a cell and of a face, from Dimension, the degrees, PolynomialSpace and VectorComponents (checked)
+		pair<int, int> BlockSizes(const Solver& s)
+		{
+			if (s.Dimension != 2 && s.Dimension != 3)
+				Utils::FatalError("fhhos4::Solver: set Dimension (2 or 3) before the setup, got " + to_string(s.Dimension) + ".");
+			if (s.FaceDegree < 0)
+				Utils::FatalError("fhhos4::Solver: set FaceDegree (>= 0) before the setup, got " + to_string(s.FaceDegree) + ".");
+			if (s.CellDegree < 0)
+				Utils::FatalError("fhhos4::Solver: set CellDegree (>= 0) before the setup, got " + to_string(s.CellDegree) + ".");
+			if (s.VectorComponents < 1)
+				Utils::FatalError("fhhos4::Solver: VectorComponents must be >= 1 (1 for a scalar problem), got " + to_string(s.VectorComponents) + ".");
+			bool q = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
+			return { s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension, s.CellDegree, q),
+			         s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, q) };
+		}
 	}
 
 	struct Solver::Impl
@@ -284,12 +300,8 @@ namespace fhhos4
 		// Checks the parameters, and computes the block sizes and the Krylov method for the symmetry of the matrix
 		void CheckParameters(const Solver& s, bool symmetric)
 		{
-			if (s.Dimension != 2 && s.Dimension != 3)
-				Utils::FatalError("fhhos4::Solver: set Dimension (2 or 3) before the setup, got " + to_string(s.Dimension) + ".");
-			if (s.FaceDegree < 0)
-				Utils::FatalError("fhhos4::Solver: set FaceDegree (>= 0) before the setup, got " + to_string(s.FaceDegree) + ".");
-			if (s.CellDegree < 0)
-				Utils::FatalError("fhhos4::Solver: set CellDegree (>= 0) before the setup, got " + to_string(s.CellDegree) + ".");
+			tie(CellBlockSize, FaceBlockSize) = BlockSizes(s);
+			PolynomialSpaceQ = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
 			switch (s.Krylov)
 			{
 				case fhhos4::Krylov::Default:
@@ -322,11 +334,6 @@ namespace fhhos4
 			}
 			if (!(s.L1Theta >= 0))
 				Utils::FatalError("fhhos4::Solver: L1Theta must be >= 0, got " + to_string(s.L1Theta) + ".");
-			if (s.VectorComponents < 1)
-				Utils::FatalError("fhhos4::Solver: VectorComponents must be >= 1 (1 for a scalar problem), got " + to_string(s.VectorComponents) + ".");
-			PolynomialSpaceQ = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
-			CellBlockSize = s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension, s.CellDegree, PolynomialSpaceQ);
-			FaceBlockSize = s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, PolynomialSpaceQ);
 		}
 
 		// The sizes and structure of the inputs, against the dimension and the degrees. A_FT: null if the matrix is
@@ -777,6 +784,18 @@ namespace fhhos4
 	bool Solver::IsSetUp() const
 	{
 		return _impl->IsSetUp;
+	}
+
+	int Solver::CellBlockSize() const
+	{
+		CallScope scope(0, 0);
+		return BlockSizes(*this).first;
+	}
+
+	int Solver::FaceBlockSize() const
+	{
+		CallScope scope(0, 0);
+		return BlockSizes(*this).second;
 	}
 
 	int Solver::NumberOfLevels() const

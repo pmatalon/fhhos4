@@ -11,7 +11,7 @@ from their sources or documentation unless marked "unchecked".
 | HArDCore3D | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()` (diffusion), `SetupNonSym()` (diffusion-advection-reaction) |
 | Disk++ | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()`, `VectorComponents` (vector Laplacian) |
 | NGSolve | client (the adapter, Python) | itself (`ngla`), CSR; partial rows on several processes | monolithic matrix (product space) | optional | `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; on several processes the adapter sums the shared rows itself |
-| PETSc users | target: the preconditioner (`mpi/12`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | `MergeOffDiag()` (from `MatMPIAIJGetSeqAIJ()`); `MatCreateSubMatrix()` then the merge for a monolithic matrix; `SplitVector()`/`JoinVector()` |
+| PETSc users | target: the preconditioner (`mpi/12`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | `-pc_type fhhos4` (`ENABLE_PETSC_PC`: `MergeOffDiag()` from `MatMPIAIJGetSeqAIJ()`); `MatCreateSubMatrix()` then the merge for a monolithic matrix; `SplitVector()`/`JoinVector()` |
 | DOLFINx | target (`mpi/04`) | itself (`MatrixCSR`) or PETSc (AIJ, MATNEST) | blocks or monolithic matrix | always | through PETSc: as PETSc users; native `MatrixCSR`: to study |
 | Code_Aster | target, studied only (no code yet) | itself (`MATR_ASSE`, MORSE storage); PETSc in its parallel versions | monolithic matrix, uncondensed | yes | one process: `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; several: through its PETSc conversion (to study) |
 | MFEM | possible | itself, then hypre (`ParallelAssemble()`: `HypreParMatrix`, ParCSR) | blocks (`BlockOperator`) or monolithic matrix | yes | `MergeOffDiag()` (ParCSR has PETSc's layout); unchecked |
@@ -40,7 +40,8 @@ Non-symmetric: one process only. Towards hypre and PETSc NGSolve sends its parti
 **PETSc users.** Each process assembles its own cells; PETSc sends the contributions to rows of other processes. A
 block on several processes is an MPIAIJ: two CSRs (the owned and the other columns) and `garray`, the global DoF
 numbers of the other columns. A copy before the library is accepted (as for hypre, AmgX, MUMPS). The interpolation of
-1 is the near-null space vector (`MatGetNearNullSpace`).
+1 is the near-null space vector (`MatGetNearNullSpace`). fhhos4's preconditioner, `-pc_type fhhos4` (`library/petsc`,
+loaded by `-dll_append`), takes a MATNEST of the four blocks; a monolithic AIJ matrix with index sets: not yet.
 
 **DOLFINx.** Each process assembles its own cells into owned and ghost rows (local columns: owned, then ghosts), then
 `scatter_rev()` adds the ghost rows to their owners; or PETSc matrices, including MATNEST (nest assembly). HDG: a cell

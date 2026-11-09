@@ -31,6 +31,7 @@ option(ENABLE_NATIVE_ARCH "Optimize for the CPU of the build machine (-march=nat
 option(ENABLE_PYTHON "Build the Python module of the library (fhhos4, with nanobind) and its tests" OFF)
 option(ENABLE_MPI "MPI parallelism (distributed memory) of the library and the program, on several processes (mpiexec). OFF: a single process" OFF)
 option(ENABLE_MUMPS "MUMPS's sparse factorizations (coarse solver CoarseSolver::MUMPS, -coarse-solver mumpsch|mumpslu). Always with ENABLE_MPI: the coarse solver on several processes" OFF)
+option(ENABLE_PETSC_PC "Build fhhos4's preconditioner for PETSc (libfhhos4_petsc: -pc_type fhhos4) and its tests: needs PETSc (pkg-config)" OFF)
 
 set(EXECUTABLE_OUTPUT_PATH bin/)
 include(GNUInstallDirs)
@@ -200,6 +201,61 @@ if(ENABLE_PYTHON)
 			set_tests_properties(PythonModuleMPI_np${np} PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/python;OMP_NUM_THREADS=2"
 				SKIP_RETURN_CODE 77 TIMEOUT 600 PROCESSORS ${np})
 		endforeach()
+	endif()
+endif()
+
+# fhhos4's preconditioner for PETSc (library/petsc): libfhhos4_petsc.so, -pc_type fhhos4. A PETSc program loads it with
+# -dll_append <dir>/libfhhos4_petsc.so (PETSc then calls its PetscDLLibraryRegister_fhhos4_petsc()), or links it
+# (fhhos4::petsc) and calls that function (fhhos4_petsc.h). PETSc found by pkg-config (PETSc.pc), linked privately: the
+# programs that load it have their own, the same. Its tests (tests/PETSc, their own main()) load it by -dll_append, on 1
+# to 4 processes.
+if(ENABLE_PETSC_PC)
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
+	add_library(fhhos4_petsc SHARED library/petsc/fhhos4_petsc.cpp)
+	add_library(fhhos4::petsc ALIAS fhhos4_petsc)
+	set_target_properties(fhhos4_petsc PROPERTIES
+		EXPORT_NAME petsc
+		CXX_VISIBILITY_PRESET hidden
+		VISIBILITY_INLINES_HIDDEN ON
+		LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+		VERSION ${PROJECT_VERSION}
+		SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+		# Loaded by programs that don't link libfhhos4: found next to it, PETSc where it was linked
+		INSTALL_RPATH "$ORIGIN"
+		INSTALL_RPATH_USE_LINK_PATH ON)
+	target_link_libraries(fhhos4_petsc PUBLIC fhhos4_lib PRIVATE PkgConfig::PETSC)
+	install(TARGETS fhhos4_petsc EXPORT fhhos4Targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT library)
+	install(FILES library/include/fhhos4_petsc.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT library)
+	message(STATUS "ENABLE_PETSC_PC: ON (PETSc ${PETSC_VERSION})")
+	if(ENABLE_MPI AND ENABLE_TESTS)
+		enable_testing()
+		find_package(GTest REQUIRED)
+		add_executable(fhhos4_petsc_tests tests/PETSc/PCTest.cpp)
+		add_dependencies(fhhos4_petsc_tests fhhos4_petsc) # loaded by -dll_append, not linked
+		target_include_directories(fhhos4_petsc_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
+		target_compile_definitions(fhhos4_petsc_tests PRIVATE MPI_ENABLED)
+		if(ENABLE_64BIT_INDEX)
+			target_compile_definitions(fhhos4_petsc_tests PRIVATE ENABLE_64BIT_INDEX)
+		endif()
+		target_link_libraries(fhhos4_petsc_tests PRIVATE fhhos4_lib PkgConfig::PETSC GTest::gtest Threads::Threads)
+		if(ENABLE_OPENMP)
+			target_link_libraries(fhhos4_petsc_tests PRIVATE OpenMP::OpenMP_CXX)
+		endif()
+		foreach(np 1 2 3 4)
+			add_test(NAME PETScPC_np${np} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} $<TARGET_FILE:fhhos4_petsc_tests>
+				-dll_append $<TARGET_FILE:fhhos4_petsc> ${MPIEXEC_POSTFLAGS})
+			set_tests_properties(PETScPC_np${np} PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS ${np})
+		endforeach()
+		# The example (examples/petsc_preconditioner.py), if petsc4py is installed: converged (a positive reason)
+		find_package(Python 3.9 COMPONENTS Interpreter)
+		execute_process(COMMAND ${Python_EXECUTABLE} -c "import petsc4py, numpy" RESULT_VARIABLE no_petsc4py OUTPUT_QUIET ERROR_QUIET)
+		if(Python_FOUND AND NOT no_petsc4py)
+			add_test(NAME ExamplePETScPreconditioner COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 3 ${MPIEXEC_PREFLAGS} ${Python_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/examples/petsc_preconditioner.py -dll_append $<TARGET_FILE:fhhos4_petsc> -n 32 -k 2 ${MPIEXEC_POSTFLAGS})
+			set_tests_properties(ExamplePETScPreconditioner PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS 3
+				PASS_REGULAR_EXPRESSION "converged reason [1-9]")
+		endif()
 	endif()
 endif()
 
@@ -429,7 +485,7 @@ if(ENABLE_TESTS)
 		CONFIGURE_DEPENDS
 		tests/*.cpp
 	)
-	list(FILTER test_source_files EXCLUDE REGEX "/tests/MPI/")
+	list(FILTER test_source_files EXCLUDE REGEX "/tests/(MPI|PETSc)/") # their own executables (fhhos4_mpi_tests, fhhos4_petsc_tests)
 	if(ENABLE_MPI)
 		# The main() of the MPI tests: MPI initialized (one process, without mpiexec)
 		list(APPEND test_source_files ${CMAKE_SOURCE_DIR}/tests/MPI/main.cpp)

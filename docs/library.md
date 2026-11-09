@@ -18,7 +18,8 @@ For the library's users: `README_library.md`. This file is for changing the libr
 
 - `Solver`: parameters as public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `PolynomialSpace`: P
   (default) or Q, which gives the block sizes of the cells, faces and p-levels; `VectorComponents` (default 1)
-  multiplies them (a vector-valued unknown, interleaved: see `docs/uamg.md`). `Result`, `Error`.
+  multiplies them (a vector-valued unknown, interleaved: see `docs/uamg.md`); `CellBlockSize()`/`FaceBlockSize()`
+  give these block sizes (`BlockSizes()`, the setup's computation). `Result`, `Error`.
 - `SetupSym()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonSym()` with `A_FT` too,
   then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells (`StaticCondensation.h`) and computes the
   cell unknowns. `CondensedMatrix()` (one process), and `Solve(b, x)` on it (right-hand sides condensed by the caller).
@@ -87,6 +88,36 @@ on several processes too (see `docs/uamg.md`). `tests/UAMGLibraryTest.cpp` compa
   `#else`: an error, exit). The solver option and the block assembly stay unguarded.
 - Check the client's bases: the interpolations of 1 (1/phi_0 for a hierarchical basis), and the order of the DoFs of
   each cell and face by degree (the p-levels extract the first ones).
+
+## The preconditioner for PETSc
+
+`library/petsc/fhhos4_petsc.cpp` (`ENABLE_PETSC_PC`, ADR-0012): `libfhhos4_petsc.so`, target `fhhos4_petsc` (exported
+`fhhos4::petsc`), linked to `libfhhos4` (public) and to PETSc (private; pkg-config's `PETSc.pc`), installed with the
+run path `$ORIGIN` (the programs that load it don't link `libfhhos4`: found next to it); its header
+`library/include/fhhos4_petsc.h` (`PCFHHOS4`, `PetscDLLibraryRegister_fhhos4_petsc()`: the function PETSc calls when
+`-dll_append` loads the library). One file in PETSc's style, on PETSc's interface for the implementations of
+preconditioners (`petsc/private/pcimpl.h`) and `fhhos4.h` only, to move into PETSc (`src/ksp/pc/impls`).
+- Setup (`PCSetUp_FHHOS4()`): the operator a 2 x 2 MATNEST of AIJ blocks, the cells first; the block sizes from
+  `Solver::CellBlockSize()`/`FaceBlockSize()`; the checks collective (`CheckOnAll()`: PETSc's errors are raised on the
+  process that detects them, the others would wait in the next collective call): the DoFs of whole cells and faces on
+  each process, the interpolations of 1 from the near null space (its first vector, or the constant one: the first DoF
+  of each block; the others 0, to 1e-10 relative). PETSc's arrays read in place (`MatGetRowIJ()`,
+  `MatSeqAIJGetArrayRead()`; `MatMPIAIJGetSeqAIJ()` on several processes), released after the setup. One process: the
+  blocks as Eigen maps of PETSc's arrays (copies by Eigen if `PetscInt` is not `SparseIndex`), `A_FT` copied (the solves
+  read it). Several: `A_TT`'s diagonal part, the others by `MergeOffDiag()` (its errors local: reduced before the
+  setup). The symmetric setup if `MatIsSymmetricKnown()` or `MatIsSPDKnown()`, or with `-pc_fhhos4_symmetric`.
+- Application (`PCApply_FHHOS4()`): `Solve(r_T, r_F, z_T, z_F)` on the parts of the vectors (`VecGetSubVector()` with
+  the nest's index sets: plain vectors, or VECNEST ones, whose `VecGetSubVector()` takes the MATNEST's index sets; also
+  for the near null space), `z_F` zero first; `Krylov::None`, `MaxIterations = 1` by default: one cycle.
+- Options `-pc_fhhos4_*` (`PCSetFromOptions_FHHOS4()`), `PCView_FHHOS4()` (`-ksp_view`).
+- Tests: `tests/PETSc/PCTest.cpp` (`fhhos4_petsc_tests`, its own `main()`: MPI, then PETSc; `ctest -R PETScPC`, 1-4
+  processes, the library loaded by `-dll_append`, as by a user's program); the example of `README_library.md`,
+  `examples/petsc_preconditioner.py` (`ctest -R ExamplePETScPreconditioner`, if petsc4py is installed: its HHO, local
+  matrix of the reference square, checked by hand: symmetric, its kernel the interpolation of 1, exact on x^2).
+- Environment: conda env `fhhos4-petsc` (the stack of `fhhos4-python`, `docs/python.md`, with PETSc and petsc4py,
+  pkg-config and GTest), build directory `build-python-petsc` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON -DENABLE_MPI=ON
+  -DENABLE_PETSC_PC=ON`). On WSL, a Windows `pkg-config` on the PATH may be cached before the env's is installed:
+  `cmake -UPKG_CONFIG_EXECUTABLE .`
 
 ## Threads, architecture, Eigen
 

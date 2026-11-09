@@ -9,6 +9,7 @@
    - [With MPI](#with-mpi)
    - [Non-symmetric systems](#non-symmetric-systems)
    - [Use as a preconditioner](#use-as-a-preconditioner)
+   - [With PETSc](#with-petsc)
    - [The Python interface](#the-python-interface)
    - [Other matrix formats](#other-matrix-formats)
    - [Parameters](#parameters)
@@ -50,6 +51,7 @@ Build options (`cmake -D<OPTION>=<value>`):
 | `ENABLE_OPENMP` | `ON` | Parallel (OpenMP) |
 | `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](#with-mpi). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
 | `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](#the-python-interface) |
+| `ENABLE_PETSC_PC` | `OFF` | The preconditioner for PETSc, `libfhhos4_petsc`, see [With PETSc](#with-petsc). Needs PETSc (found by `pkg-config`) |
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |
 | `MUMPS_INCLUDE_DIR`, `MUMPS_LIBRARY` | found | MUMPS is found from its header `dmumps_c.h` and its library `libdmumps`, or given by `-DMUMPS_INCLUDE_DIR=<dir> -DMUMPS_LIBRARY=<path>/libdmumps.so` |
 | `ENABLE_NATIVE_ARCH` | `OFF` | `-march=native`: optimized for the CPU of the build machine, may not run on others |
@@ -68,7 +70,7 @@ target_link_libraries(my_code PRIVATE fhhos4::fhhos4)
 
 and `-DCMAKE_PREFIX_PATH=<prefix>` (installation), or `-Dfhhos4_DIR=<fhhos4>/build` (build tree). CMake puts the
 directory of the library in the RPATH of the executable. A library compiled with MPI brings MPI along
-(`MPI::MPI_CXX`).
+(`MPI::MPI_CXX`). The preconditioner for PETSc, if built: `fhhos4::petsc`.
 
 # 2. Applicability
 
@@ -294,6 +296,50 @@ method summed over the processes). On one process, `CondensedMatrix()` gives the
 
 The default K-cycle is non-linear, which means that your Krylov method **must be flexible** (FCG, FGMRES, GCR).
 V- and W-cycles work with any Krylov method (CG, GMRES), but are not recommended for performance reasons.
+
+### With PETSc
+
+`fhhos4` is also a preconditioner of [PETSc](https://petsc.org), `-pc_type fhhos4`, for its Krylov methods on the
+uncondensed system. Build it with `-DENABLE_PETSC_PC=ON`, against the PETSc of your code (real scalars in double
+precision; with MPI, `-DENABLE_MPI=ON` and the same MPI).
+
+```bash
+mpiexec -n 4 ./my_code -dll_append <prefix>/lib/libfhhos4_petsc.so -ksp_type fcg -pc_type fhhos4 \
+    -pc_fhhos4_dimension 3 -pc_fhhos4_face_degree 1 -pc_fhhos4_cell_degree 1
+```
+
+A complete example in Python, [`examples/petsc_preconditioner.py`](examples/petsc_preconditioner.py): an HHO
+discretization of degree 1 or 2 assembled cell by cell with petsc4py, its interpolation of 1, and the solve.
+
+- **Loading it**: without recompiling, `-dll_append <prefix>/lib/libfhhos4_petsc.so` among PETSc's options (command
+  line, `PETSC_OPTIONS`, `petsc4py.init()`); or link `fhhos4::petsc` and call `PetscDLLibraryRegister_fhhos4_petsc()`
+  once after `PetscInitialize()` (`#include <fhhos4_petsc.h>`, which defines `PCFHHOS4`).
+- **The operator**: a `MATNEST` of 2 x 2 AIJ blocks `[[A_TT, A_TF], [A_FT, A_FF]]`, the cells first, assembled as usual
+  (`MatSetValues()` of the local matrices of each cell, `MatAssemblyEnd()`). On several processes, each process owns
+  the DoFs of whole cells and faces. The setup copies the blocks into the format of the library (`MergeOffDiag()`, see
+  [Other matrix formats](#other-matrix-formats)) but `A_TT`, read in place. The vectors: plain (`MatCreateVecs()` of
+  the MATNEST) or nested (`VECNEST`, the cells then the faces).
+- **The interpolation of 1** (no default): the near null space of the operator, `MatSetNearNullSpace()`, with the vector
+  of the coefficients of 1 on your bases (at any scale; a vector-valued unknown: that of the first component first).
+  At degree 0 on one component, it can be the constant vector (`MatNullSpaceCreate(comm, PETSC_TRUE, 0, NULL, ...)`).
+- **Symmetric or not**: the symmetric setup if the operator is known to be symmetric
+  (`MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE)`, or `MAT_SPD`) or with `-pc_fhhos4_symmetric`, the non-symmetric one
+  otherwise.
+- **The Krylov method**: each application is one K-cycle, a non-linear preconditioner: use a flexible method, `-ksp_type
+  fcg` (symmetric), `fgmres` or `gcr`, not PETSc's default GMRES. `-ksp_view` shows the setup.
+
+| Option | Default | Parameter |
+|---|---|---|
+| `-pc_fhhos4_dimension`, `-pc_fhhos4_face_degree`, `-pc_fhhos4_cell_degree` | none: required | `Dimension`, `FaceDegree`, `CellDegree` |
+| `-pc_fhhos4_polynomial_space p\|q` | `p` | `PolynomialSpace` |
+| `-pc_fhhos4_vector_components` | `1` | `VectorComponents` |
+| `-pc_fhhos4_symmetric` | from the operator | the symmetric setup |
+| `-pc_fhhos4_cycle k\|v\|w` | `k` | `Cycle` |
+| `-pc_fhhos4_krylov none\|fcg\|gcr` | `none`: one cycle | `Krylov` in each application: the whole solve of the library, with `-ksp_type preonly` |
+| `-pc_fhhos4_max_it`, `-pc_fhhos4_rtol` | `1`, `1e-8` | `MaxIterations` (cycles with `none`), `Tolerance` |
+| `-pc_fhhos4_verbosity` | `0` | `Verbosity` |
+
+The other parameters keep the library's defaults.
 
 ### The Python interface
 

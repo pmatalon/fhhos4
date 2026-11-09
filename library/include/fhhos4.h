@@ -548,6 +548,11 @@ namespace fhhos4
 		bool IsSetUp() const;
 		int NumberOfLevels() const;
 
+		// The DoFs of a cell (resp. face) that the setups expect, from Dimension, CellDegree (FaceDegree), PolynomialSpace
+		// and VectorComponents, set first (refused otherwise): e.g. the block sizes of MergeOffDiag()
+		int CellBlockSize() const;
+		int FaceBlockSize() const;
+
 	protected:
 		// The implementation of the setups, on the arrays of the matrices (also for the Python module). A_FT: null for a
 		// symmetric matrix; faceGhostGlobalNumbers, cellGhostGlobalNumbers (A_FT): on several processes.

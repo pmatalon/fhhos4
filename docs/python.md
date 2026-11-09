@@ -49,6 +49,8 @@ raised on all, a lower triangular `A_FF` refused). Not collective: the type erro
   env.
 - `build-python` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min); `build-python-mpi` (the same with
   `-DENABLE_MPI=ON -DENABLE_TESTS=OFF`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env `fhhos4`).
+- With PETSc and petsc4py: env `fhhos4-petsc`, build directory `build-python-petsc` (`docs/library.md`, the
+  preconditioner for PETSc).
 - For NGSolve on several processes: env `fhhos4-python-openmpi` (the same with openmpi 5.0.11 instead of mpich, and
   NGSolve 6.2.2608 from pip: NGSolve's runs on several processes use OpenMPI; MUMPS 5.7.3: `mumps-mpi=5.7.3
   openmpi=5.0.11 _openmp_mutex=*=*_gnu libblas=*=*blis liblapack=*=*netlib`, since its OpenMPI builds 5.8.x require
