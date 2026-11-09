@@ -61,14 +61,52 @@ SparseMatrix LocalColumns(const SparseMatrix& rows, const IndexMap& owners, cons
 	return DistributedMatrix::RenumberColumns(rows, local, owners.NOwned + ghosts.size(), 1);
 }
 
+// Rows with global columns in two parts, as PETSc and hypre store them: Diag, the columns [begin, end) numbered from 0,
+// and Offd, the others, compressed, whose global numbers are OffdColumns (increasing)
+struct TwoParts
+{
+	fhhos4::SparseMatrix Diag, Offd;
+	vector<int64_t> OffdColumns;
+};
+
+TwoParts Split(const fhhos4::SparseMatrix& rows, int64_t begin, int64_t end)
+{
+	TwoParts parts;
+	for (BigNumber p = 0; p < (BigNumber)rows.nonZeros(); p++)
+		if (rows.innerIndexPtr()[p] < begin || rows.innerIndexPtr()[p] >= end)
+			parts.OffdColumns.push_back(rows.innerIndexPtr()[p]);
+	sort(parts.OffdColumns.begin(), parts.OffdColumns.end());
+	parts.OffdColumns.erase(unique(parts.OffdColumns.begin(), parts.OffdColumns.end()), parts.OffdColumns.end());
+	vector<Eigen::Triplet<double>> diag, offd;
+	for (BigNumber i = 0; i < (BigNumber)rows.rows(); i++)
+	{
+		for (fhhos4::SparseMatrix::InnerIterator it(rows, i); it; ++it)
+		{
+			if (it.col() >= begin && it.col() < end)
+				diag.emplace_back(i, it.col() - begin, it.value());
+			else
+				offd.emplace_back(i, lower_bound(parts.OffdColumns.begin(), parts.OffdColumns.end(), it.col()) - parts.OffdColumns.begin(), it.value());
+		}
+	}
+	parts.Diag.resize(rows.rows(), end - begin);
+	parts.Diag.setFromTriplets(diag.begin(), diag.end());
+	parts.Offd.resize(rows.rows(), parts.OffdColumns.size());
+	parts.Offd.setFromTriplets(offd.begin(), offd.end());
+	parts.Diag.makeCompressed();
+	parts.Offd.makeCompressed();
+	return parts;
+}
+
 // The uncondensed system distributed by rows, through the interface of the library: the ghost faces and cells numbered
 // in reverse order of their global numbers (any order). The solution of the system on one process. Non-symmetric if
 // asymmetry != 0. singular: the pure Neumann system (SingularMatrix; the right-hand side incompatible: projected),
 // the solutions compared up to the kernel (the constants, of each component). components: the system on each of them
 // (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision, blockCSR:
-// MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). Returns the iterations on the
-// processes; setupLog: the printouts of their setup (Verbosity 2, on the root process) if not null.
-int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false)
+// MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). mergeOffDiag: the blocks of each
+// process in two parts (Split(), as PETSc stores them), merged by MergeOffDiag() (the ghosts
+// by increasing global number), checked against the test's. Returns the iterations on the processes; setupLog: the
+// printouts of their setup (Verbosity 2, on the root process) if not null.
+int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool mergeOffDiag = false)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, asymmetry, singular);
@@ -108,6 +146,31 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	fhhos4::SparseMatrix A_TT = OnEachComponent(system.A_TT, c), A_TF = OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c);
 	fhhos4::SparseMatrix A_FF = OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c), A_FT = OnEachComponent(LocalColumns(ownA_FT, cells, ghostCells), c);
 	vector<int64_t> faceGhostGlobalNumbers(ghostFaces.begin(), ghostFaces.end()), cellGhostGlobalNumbers(ghostCells.begin(), ghostCells.end());
+	if (mergeOffDiag)
+	{
+		// The rows with global DoF columns (the DoF k of the face f: c f + k)
+		int64_t faceBegin = c * faces.Begin, faceEnd = c * (faces.Begin + faces.NOwned), cellBegin = c * cells.Begin, cellEnd = c * (cells.Begin + cells.NOwned);
+		TwoParts tf = Split(OnEachComponent(ownA_TF, c), faceBegin, faceEnd), ff = Split(OnEachComponent(ownA_FF, c), faceBegin, faceEnd);
+		TwoParts ft = Split(OnEachComponent(ownA_FT, c), cellBegin, cellEnd);
+		fhhos4::DistributedBlocks blocks = asymmetry == 0
+			? fhhos4::MergeOffDiag(tf.Diag, tf.Offd, tf.OffdColumns.data(), ff.Diag, ff.Offd, ff.OffdColumns.data(), c)
+			: fhhos4::MergeOffDiag(tf.Diag, tf.Offd, tf.OffdColumns.data(), ft.Diag, ft.Offd, ft.OffdColumns.data(), ff.Diag, ff.Offd, ff.OffdColumns.data(), c, c);
+		sort(ghostFaces.begin(), ghostFaces.end());
+		sort(ghostCells.begin(), ghostCells.end());
+		faceGhostGlobalNumbers.assign(ghostFaces.begin(), ghostFaces.end());
+		cellGhostGlobalNumbers = asymmetry == 0 ? vector<int64_t>() : vector<int64_t>(ghostCells.begin(), ghostCells.end());
+		EXPECT_EQ(blocks.FaceGhostGlobalNumbers, faceGhostGlobalNumbers);
+		EXPECT_EQ(blocks.CellGhostGlobalNumbers, cellGhostGlobalNumbers);
+		EXPECT_EQ(SparseMatrix(blocks.A_TF - OnEachComponent(LocalColumns(ownA_TF, faces, ghostFaces), c)).norm(), 0);
+		EXPECT_EQ(SparseMatrix(blocks.A_FF - OnEachComponent(LocalColumns(ownA_FF, faces, ghostFaces), c)).norm(), 0);
+		if (asymmetry == 0)
+			EXPECT_EQ(blocks.A_FT.rows(), 0);
+		else
+			EXPECT_EQ(SparseMatrix(blocks.A_FT - OnEachComponent(LocalColumns(ownA_FT, cells, ghostCells), c)).norm(), 0);
+		A_TF = blocks.A_TF;
+		A_FF = blocks.A_FF;
+		A_FT = blocks.A_FT;
+	}
 
 	fhhos4::Solver solver = CartesianSolver(World().Comm());
 	solver.Prolongation = prolongation;
@@ -235,6 +298,15 @@ TEST(DistributedLibrary, BlockCSR)
 		if (World().IsRoot())
 			EXPECT_NE(setupLog.find("(and in block CSR (blocks of 2))"), string::npos) << setupLog;
 	}
+}
+
+// MergeOffDiag(): the blocks of each process in two parts, as PETSc and hypre store them (the
+// columns of its own faces or cells, and the others with their global numbers), merged; on 1 and 2 components
+TEST(DistributedLibrary, MergeOffDiag)
+{
+	for (double asymmetry : { 0.0, 0.3 })
+		for (int components : { 1, 2 })
+			ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, components, true, nullptr, false, true);
 }
 
 // MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxRows at MinRowsPerProcess * P rows (on

@@ -1288,6 +1288,71 @@ TEST(UAMGLibrary, GhostGlobalNumbers)
 	static_assert(!std::is_convertible_v<std::vector<int>, fhhos4::GhostGlobalNumbers>);
 }
 
+// MergeOffDiag() on the rows of a process in two parts, as PETSc and hypre store them (no MPI
+// needed): the faces of 2 DoFs numbered 0-7 (the process owns 3 and 4: the DoFs 6-9), the cells of 1 DoF numbered 0-3
+// (it owns 1 and 2). The ghost faces 0, 5, 7 (the face 0 through the DoF 1 in A_TF and the DoF 0 in A_FF), the ghost
+// cells 0, 3, numbered locally after the own ones by increasing global number.
+TEST(UAMGLibrary, MergeOffDiag)
+{
+	auto matrix = [](int rows, int cols, std::vector<Eigen::Triplet<double>> entries)
+	{
+		fhhos4::SparseMatrix M(rows, cols);
+		M.setFromTriplets(entries.begin(), entries.end());
+		M.makeCompressed();
+		return M;
+	};
+	// The diagonal parts (local columns), the off-diagonal ones (the global numbers of their columns: the DoF k of the
+	// face f is 2 f + k)
+	fhhos4::SparseMatrix A_FF_diag = matrix(4, 4, { { 0, 0, 1 }, { 0, 1, 2 }, { 1, 0, 4 }, { 1, 1, 5 }, { 2, 2, 7 }, { 3, 3, 8 } });
+	fhhos4::SparseMatrix A_FF_offd = matrix(4, 2, { { 0, 1, 3 }, { 2, 0, 6 } });
+	std::vector<std::int32_t> A_FF_offdColumns = { 0, 14 };
+	fhhos4::SparseMatrix A_TF_diag = matrix(2, 4, { { 0, 0, 10 }, { 1, 3, 12 } });
+	fhhos4::SparseMatrix A_TF_offd = matrix(2, 3, { { 0, 0, 9 }, { 0, 2, 11 }, { 1, 1, 13 } });
+	std::vector<std::int32_t> A_TF_offdColumns = { 1, 10, 15 };
+	fhhos4::SparseMatrix A_FT_diag = matrix(4, 2, { { 0, 0, 15 } });
+	fhhos4::SparseMatrix A_FT_offd = matrix(4, 2, { { 0, 0, 14 }, { 2, 1, 16 } });
+	std::vector<std::int32_t> A_FT_offdColumns = { 0, 3 };
+	// Local columns: the faces 3, 4, then 0, 5, 7; the cells 1, 2, then 0, 3
+	fhhos4::SparseMatrix localA_FF = matrix(4, 10, { { 0, 0, 1 }, { 0, 1, 2 }, { 0, 8, 3 }, { 1, 0, 4 }, { 1, 1, 5 }, { 2, 4, 6 }, { 2, 2, 7 }, { 3, 3, 8 } });
+	fhhos4::SparseMatrix localA_TF = matrix(2, 10, { { 0, 5, 9 }, { 0, 0, 10 }, { 0, 9, 11 }, { 1, 3, 12 }, { 1, 6, 13 } });
+	fhhos4::SparseMatrix localA_FT = matrix(4, 4, { { 0, 2, 14 }, { 0, 0, 15 }, { 2, 3, 16 } });
+
+	fhhos4::DistributedBlocks sym = fhhos4::MergeOffDiag(A_TF_diag, A_TF_offd, A_TF_offdColumns.data(), A_FF_diag, A_FF_offd, A_FF_offdColumns.data(), 2);
+	EXPECT_EQ(sym.FaceGhostGlobalNumbers, (std::vector<std::int64_t>{ 0, 5, 7 }));
+	EXPECT_TRUE(sym.CellGhostGlobalNumbers.empty());
+	EXPECT_EQ(sym.A_FF.cols(), 10);
+	EXPECT_EQ(sym.A_FF.nonZeros(), localA_FF.nonZeros());
+	EXPECT_EQ(fhhos4::SparseMatrix(sym.A_FF - localA_FF).norm(), 0);
+	EXPECT_EQ(sym.A_TF.nonZeros(), localA_TF.nonZeros());
+	EXPECT_EQ(fhhos4::SparseMatrix(sym.A_TF - localA_TF).norm(), 0);
+	EXPECT_EQ(sym.A_FT.rows(), 0);
+
+	// 64-bit indices and global numbers (e.g. PETSc compiled with them)
+	using Matrix64 = Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>;
+	Matrix64 tfDiag = A_TF_diag, tfOffd = A_TF_offd, ftDiag = A_FT_diag, ftOffd = A_FT_offd, ffDiag = A_FF_diag, ffOffd = A_FF_offd;
+	std::vector<std::int64_t> tfColumns(A_TF_offdColumns.begin(), A_TF_offdColumns.end()), ftColumns(A_FT_offdColumns.begin(), A_FT_offdColumns.end()),
+		ffColumns(A_FF_offdColumns.begin(), A_FF_offdColumns.end());
+	fhhos4::DistributedBlocks nonsym = fhhos4::MergeOffDiag(tfDiag, tfOffd, tfColumns.data(), ftDiag, ftOffd, ftColumns.data(), ffDiag, ffOffd, ffColumns.data(), 2, 1);
+	EXPECT_EQ(nonsym.FaceGhostGlobalNumbers, sym.FaceGhostGlobalNumbers);
+	EXPECT_EQ(nonsym.CellGhostGlobalNumbers, (std::vector<std::int64_t>{ 0, 3 }));
+	EXPECT_EQ(fhhos4::SparseMatrix(nonsym.A_FF - localA_FF).norm(), 0);
+	EXPECT_EQ(fhhos4::SparseMatrix(nonsym.A_FT - localA_FT).norm(), 0);
+
+	// Refused: a block size < 1, or not dividing the faces of the process; parts of different rows; A_TF_diag without
+	// the columns of A_FF_diag; off-diagonal columns not increasing; A_FT_diag without the columns of the cells of the
+	// process
+	auto mergeSym = [&](const fhhos4::SparseMatrix& tfDiag, const std::vector<std::int32_t>& ffColumns, int blockSize)
+	{
+		return fhhos4::MergeOffDiag(tfDiag, A_TF_offd, A_TF_offdColumns.data(), A_FF_diag, A_FF_offd, ffColumns.data(), blockSize);
+	};
+	EXPECT_THROW(mergeSym(A_TF_diag, A_FF_offdColumns, 0), fhhos4::Error);
+	EXPECT_THROW(mergeSym(A_TF_diag, A_FF_offdColumns, 3), fhhos4::Error);
+	EXPECT_THROW(mergeSym(matrix(3, 4, {}), A_FF_offdColumns, 2), fhhos4::Error);
+	EXPECT_THROW(mergeSym(matrix(2, 6, {}), A_FF_offdColumns, 2), fhhos4::Error);
+	EXPECT_THROW(mergeSym(A_TF_diag, { 14, 0 }, 2), fhhos4::Error);
+	EXPECT_THROW(fhhos4::MergeOffDiag(A_TF_diag, A_TF_offd, A_TF_offdColumns.data(), matrix(4, 3, {}), A_FT_offd, A_FT_offdColumns.data(), A_FF_diag, A_FF_offd, A_FF_offdColumns.data(), 2, 1), fhhos4::Error);
+}
+
 // L1Theta: the theta of the l1 Gauss-Seidel smoothers, here on 4 threads (the rows coupled to other chunks have l1
 // terms): other values, other iterates; 0, the hybrid block Gauss-Seidel's
 TEST(UAMGLibrary, L1Theta)

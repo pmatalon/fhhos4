@@ -195,6 +195,51 @@ namespace
 		return f(cells.Lists<std::int32_t>(), faces.Lists<std::int32_t>());
 	}
 
+	// A block in two parts (MergeOffDiag()): the arrays of its diagonal and off-diagonal parts (one index type for
+	// both), and the global numbers of the off-diagonal columns (int32 or int64), read in place
+	struct PyTwoParts
+	{
+		PyCSRView Diag, Offd;
+		const void* OffdColumns = nullptr;
+		bool OffdColumns64 = false;
+		nb::object Owner;
+
+		PyTwoParts(nb::handle diag, nb::handle offd, nb::handle offdColumns, const std::string& name)
+			: Diag(ToView(diag, (name + "_diag").c_str())), Offd(ToView(offd, (name + "_offd").c_str())), Owner(nb::borrow(offdColumns))
+		{
+			size_t size;
+			OffdColumns = IndexArray(offdColumns, (name + "_offdColumns").c_str(), OffdColumns64, size);
+			if ((std::int64_t)size != Offd.Cols)
+				throw nb::value_error(("fhhos4: " + name + "_offdColumns has " + std::to_string(size) + " numbers, but " + name + "_offd " + std::to_string(Offd.Cols) + " columns.").c_str());
+			if (Diag.RowPointers64 != Index64() || Offd.RowPointers64 != Index64() || Offd.Columns64 != Index64())
+				throw nb::type_error(("fhhos4: the arrays of " + name + "_diag and " + name + "_offd must have the same index type (int32 or int64)").c_str());
+		}
+
+		bool Index64() const
+		{
+			return Diag.Columns64;
+		}
+
+		template <typename Index, typename Global>
+		fhhos4::detail::TwoPartBlock<Index, Global> Block() const
+		{
+			return { Diag.View<Index, Index>(), Offd.View<Index, Index>(), (const Global*)OffdColumns };
+		}
+	};
+
+	// f(Index(), Global()), with the index type of the parts and that of their global numbers, the same in all the blocks
+	template <typename F>
+	auto VisitParts(std::initializer_list<const PyTwoParts*> blocks, F f)
+	{
+		const PyTwoParts& first = **blocks.begin();
+		for (const PyTwoParts* b : blocks)
+			if (b->Index64() != first.Index64() || b->OffdColumns64 != first.OffdColumns64)
+				throw nb::type_error("fhhos4: the parts of all the blocks must have the same index type, and their offdColumns too");
+		if (first.Index64())
+			return first.OffdColumns64 ? f(std::int64_t(), std::int64_t()) : f(std::int64_t(), std::int32_t());
+		return first.OffdColumns64 ? f(std::int32_t(), std::int64_t()) : f(std::int32_t(), std::int32_t());
+	}
+
 	// fhhos4::Solver, which also keeps the views of the matrices that the solves read (A_FT of SetupNonSym()): their
 	// arrays stay alive until the next setup. Replaced only after a successful
 	// setup: a setup that fails (on its checks) keeps the previous one, which still reads them.
@@ -349,6 +394,21 @@ NB_MODULE(fhhos4, m)
 		.def_prop_ro("A_FT", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FT; }, nb::rv_policy::reference_internal)
 		.def_prop_ro("A_FF", [](const fhhos4::detail::HybridBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FF; }, nb::rv_policy::reference_internal);
 
+	using DistributedBlocks = fhhos4::detail::DistributedBlocks;
+	// The ghosts: read-only int64 NumPy arrays of the library's memory, which keep the blocks alive
+	auto ghostsOf = [](nb::handle blocks, const fhhos4::detail::IndexArray& numbers)
+	{
+		fhhos4::GhostGlobalNumbers v = numbers.View();
+		size_t shape[1] = { (size_t)v.Count };
+		return nb::ndarray<nb::numpy, const std::int64_t, nb::ndim<1>>(v.Numbers, 1, shape, blocks);
+	};
+	nb::class_<DistributedBlocks>(m, "DistributedBlocks", "The blocks of the rows of a process with their columns numbered locally, and its ghosts, owned by the library")
+		.def_prop_ro("A_TF", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_TF; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("A_FT", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FT; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("A_FF", [](const DistributedBlocks& b) -> const fhhos4::detail::CSRMatrix& { return b.A_FF; }, nb::rv_policy::reference_internal)
+		.def_prop_ro("FaceGhostGlobalNumbers", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).FaceGhostGlobalNumbers); })
+		.def_prop_ro("CellGhostGlobalNumbers", [ghostsOf](nb::handle b) { return ghostsOf(b, nb::cast<const DistributedBlocks&>(b).CellGhostGlobalNumbers); });
+
 	//------------------------------------------------ Helpers -----------------------------------------------//
 
 	m.def("ExtractBlocksSym", [](nb::handle M, const PyDoFLists& cells, const PyDoFLists& faces)
@@ -364,6 +424,34 @@ NB_MODULE(fhhos4, m)
 			nb::gil_scoped_release release;
 			return view.Visit([&](auto v) { return VisitLists(cells, faces, [&](auto c, auto f) { return fhhos4::detail::ExtractBlocksNonSym(v, c, f); }); });
 		}, "M"_a, "cells"_a, "faces"_a, "A copy: the four blocks of the uncondensed system, from its monolithic matrix, for SetupNonSym()");
+
+	m.def("MergeOffDiag", [](nb::handle A_TF_diag, nb::handle A_TF_offd, nb::handle A_TF_offdColumns, nb::handle A_FF_diag, nb::handle A_FF_offd, nb::handle A_FF_offdColumns, int faceBlockSize)
+		{
+			PyTwoParts tf(A_TF_diag, A_TF_offd, A_TF_offdColumns, "A_TF"), ff(A_FF_diag, A_FF_offd, A_FF_offdColumns, "A_FF");
+			return VisitParts({ &tf, &ff }, [&](auto index, auto global)
+			{
+				using Index = decltype(index);
+				using Global = decltype(global);
+				nb::gil_scoped_release release;
+				return fhhos4::detail::MergeOffDiag<Index, Global>(tf.Block<Index, Global>(), nullptr, ff.Block<Index, Global>(), faceBlockSize, 1);
+			});
+		}, "A_TF_diag"_a, "A_TF_offd"_a, "A_TF_offdColumns"_a, "A_FF_diag"_a, "A_FF_offd"_a, "A_FF_offdColumns"_a, "faceBlockSize"_a,
+		"A copy: the blocks of a process in two parts (PETSc's MPIAIJ, hypre's ParCSR: the columns of its faces, and the others, whose global DoF numbers are _offdColumns), merged into the local columns of SetupSym(), with its ghosts FaceGhostGlobalNumbers");
+
+	m.def("MergeOffDiag", [](nb::handle A_TF_diag, nb::handle A_TF_offd, nb::handle A_TF_offdColumns, nb::handle A_FT_diag, nb::handle A_FT_offd, nb::handle A_FT_offdColumns,
+	                              nb::handle A_FF_diag, nb::handle A_FF_offd, nb::handle A_FF_offdColumns, int faceBlockSize, int cellBlockSize)
+		{
+			PyTwoParts tf(A_TF_diag, A_TF_offd, A_TF_offdColumns, "A_TF"), ft(A_FT_diag, A_FT_offd, A_FT_offdColumns, "A_FT"), ff(A_FF_diag, A_FF_offd, A_FF_offdColumns, "A_FF");
+			return VisitParts({ &tf, &ft, &ff }, [&](auto index, auto global)
+			{
+				using Index = decltype(index);
+				using Global = decltype(global);
+				fhhos4::detail::TwoPartBlock<Index, Global> a_FT = ft.Block<Index, Global>();
+				nb::gil_scoped_release release;
+				return fhhos4::detail::MergeOffDiag<Index, Global>(tf.Block<Index, Global>(), &a_FT, ff.Block<Index, Global>(), faceBlockSize, cellBlockSize);
+			});
+		}, "A_TF_diag"_a, "A_TF_offd"_a, "A_TF_offdColumns"_a, "A_FT_diag"_a, "A_FT_offd"_a, "A_FT_offdColumns"_a, "A_FF_diag"_a, "A_FF_offd"_a, "A_FF_offdColumns"_a,
+		"faceBlockSize"_a, "cellBlockSize"_a, "A copy: as MergeOffDiag() of A_TF and A_FF, with A_FT (its ghost cells CellGhostGlobalNumbers), for SetupNonSym()");
 
 	m.def("SplitVector", [](const ConstVector& x, const PyDoFLists& cells, const PyDoFLists& faces, Vector x_T, Vector x_F)
 		{

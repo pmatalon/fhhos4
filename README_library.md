@@ -210,6 +210,9 @@ For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the fac
 contain the faces 15 and 12 of rank 1, rank 0 numbers them locally 10 and 11 (or 11 and 10) and gives
 `faceGhostGlobalNumbers = {15, 12}` (or `{12, 15}`).
 
+PETSc's and hypre's distributed matrices store each block in two parts: `MergeOffDiag()` converts them (see
+[Other matrix formats](#other-matrix-formats)).
+
 #### What you get back
 
 `Solve()` writes `x_T` and `x_F` on the cells and faces of the process, and returns the `Result`
@@ -337,7 +340,8 @@ What differs from C++:
 - **With MPI** (`-DENABLE_MPI=ON` too; `fhhos4.WithMPI` is then `True`): `solver.Comm` is an
   [mpi4py](https://mpi4py.readthedocs.io) communicator (`MPI.COMM_WORLD`, or its Fortran handle `comm.py2f()`). Import
   mpi4py, built with the same MPI as the library, before `fhhos4` (it initializes MPI). The ghost numbers are NumPy
-  arrays of int64, read in place (`None` by default: no ghosts). Without `Comm`, mpi4py is not needed.
+  arrays of int64, read in place (`None` by default: no ghosts). Without `Comm`, mpi4py is not needed. The
+  `offdColumns` of `MergeOffDiag()`: NumPy arrays of int32 or int64; its ghosts: arrays of int64.
 
 ### Other matrix formats
 
@@ -350,6 +354,7 @@ What differs from C++:
 | Column-major and symmetric (`A_TT`, `A_FF`, or `A` of a symmetric system) | `TransposedView(A)`: `A^T` as an Eigen map of the arrays of `A`, which is `A`, up to the rounding errors of its assembly | No |
 | Your own CSR arrays, with the index type of the library | `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)` | No |
 | The monolithic matrix of the system (the cells and faces DoFs in your numbering, the Dirichlet DoFs included) | `ExtractBlocksSym(M, cells, faces)`, `ExtractBlocksNonSym(M, cells, faces)`; `SplitVector()` and `JoinVector()` for the vectors | Yes |
+| With MPI, blocks stored in two parts, as PETSc (MPIAIJ) and hypre (ParCSR) store them: the columns of the faces of the process, and the others with their global numbers | `MergeOffDiag(...)` (below) | Yes (not `A_TT`) |
 
 The copies are Eigen matrices of your code (`fhhos4::SparseMatrix`). From a monolithic matrix (e.g. assembled by a
 framework in its own numbering):
@@ -373,6 +378,30 @@ fhhos4::JoinVector(x_T, x_F, cells, faces, x); // the DoFs of x in no list uncha
 - The Dirichlet DoFs, in no list: move their contribution to the right-hand side first (`b - M x_D`).
 - `ExtractBlocksSym()` gives the lower triangular parts of `A_TT` and `A_FF` (what `SetupSym()` reads),
   `ExtractBlocksNonSym()` the four blocks in full.
+
+[With MPI](#with-mpi), from blocks stored in two parts (e.g. Eigen maps of the CSR arrays of PETSc's
+`MatMPIAIJGetSeqAIJ()`, or of hypre's `diag` and `offd`):
+
+```cpp
+// diag: the columns of the faces of the process; offd: the others, compressed, whose global DoF numbers are
+// offdColumns (PETSc's garray, hypre's col_map_offd)
+fhhos4::DistributedBlocks b = fhhos4::MergeOffDiag(A_TF_diag, A_TF_offd, A_TF_offdColumns, A_FF_diag, A_FF_offd, A_FF_offdColumns, faceBlockSize);
+solver.SetupSym(A_TT_diag, b.A_TF, b.A_FF, cellInterpOfOne, faceInterpOfOne, b.FaceGhostGlobalNumbers);
+```
+
+- The global DoF numbers: the DoF k of the face f is `f * faceBlockSize + k`, the faces numbered in rank order (as
+  `faceGhostGlobalNumbers`): those of PETSc's and hypre's matrices when each process owns the DoFs of whole faces.
+  `offdColumns`: strictly increasing.
+- The parts: Eigen sparse matrices, compressed, row-major, all with the same index type `std::int32_t` or
+  `std::int64_t`; `offdColumns`: pointers to `std::int32_t` or `std::int64_t`.
+- The local columns: the faces of the process, then its ghosts (those of the off-diagonal columns of `A_TF` and
+  `A_FF`) by increasing global number, in `b.FaceGhostGlobalNumbers`.
+- `A_TT` has no off-diagonal part (cells are not shared): give its diagonal part to the setup, read in place if its
+  index type is the library's.
+- For `SetupNonSym()`, the overload with `A_FT`: `MergeOffDiag(A_TF_diag, ..., A_FT_diag, A_FT_offd,
+  A_FT_offdColumns, A_FF_diag, ..., faceBlockSize, cellBlockSize)`. The off-diagonal columns of `A_FT` are the cells
+  of other processes (the DoF k of the cell c: `c * cellBlockSize + k`). It gives `b.A_FT` and
+  `b.CellGhostGlobalNumbers` too.
 
 ### Parameters
 

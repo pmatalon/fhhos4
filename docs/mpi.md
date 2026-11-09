@@ -76,7 +76,9 @@ program too: `-DENABLE_PROGRAM=ON`).
   process may own nothing (NGSolve 6.2.2608's rank 0). `SingularMatrix`: the kernel on the own faces, the dot products
   global, the pinned DoF of the coarsest level (one per component) on one process (`docs/uamg.md`).
   `ApplyCondensedMatrix()`: `DistributedA * x`. Not yet: `CondensedMatrix()` (its columns may reach beyond
-  `faceGhostGlobalNumbers`: those of the received rows). Python: `docs/python.md`.
+  `faceGhostGlobalNumbers`: those of the received rows). `MergeOffDiag()`: the blocks of a process in
+  two parts (PETSc's MPIAIJ, hypre's ParCSR) merged into the local columns of the setups, the ghosts by increasing
+  global number (`docs/library.md`). Python: `docs/python.md`.
 - Program (`Program_Diffusion_HHO_Impl.h`, `Program/DistributedHybridSystem.h`): GMSH meshes only. The mesh of each
   process is its part (`GMSHMesh`, built when `Communicator::Current()` is distributed). The partition (`OpenPart()`:
   METIS, `Mesh.PartitionCreateGhostCells`, GMSH's split files `part_<rank + 1>.msh`) is kept in the cache directory

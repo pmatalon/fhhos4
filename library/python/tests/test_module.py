@@ -271,6 +271,35 @@ def test_blocks_of_the_global_matrix():
         assert (values == system.A_TF.data).all()
 
 
+def test_merge_off_diag():
+    # MergeOffDiag() on one process: the blocks as their diagonal parts, no off-diagonal columns,
+    # no ghosts: the blocks unchanged; their result for the setups
+    offd, columns = lambda M: sp.csr_matrix((M.shape[0], 0)), np.zeros(0, dtype=np.int32)
+    for asymmetry in (0.0, 0.3):
+        system = HybridSystem(16, asymmetry)
+        if asymmetry == 0:
+            blocks = fhhos4.MergeOffDiag(system.A_TF, offd(system.A_TF), columns, system.A_FF, offd(system.A_FF), columns, 1)
+        else:
+            blocks = fhhos4.MergeOffDiag(system.A_TF, offd(system.A_TF), columns, system.A_FT, offd(system.A_FT), columns, system.A_FF, offd(system.A_FF), columns, 1, 1)
+        assert blocks.FaceGhostGlobalNumbers.dtype == np.int64 and blocks.FaceGhostGlobalNumbers.size == 0 and blocks.CellGhostGlobalNumbers.size == 0
+        assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0 and abs(ToSciPy(blocks.A_FF) - system.A_FF).max() == 0
+        if asymmetry != 0:
+            assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
+        solver = ToySolver()
+        if asymmetry == 0:
+            solver.SetupSym(system.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers)
+        else:
+            solver.SetupNonSym(system.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers, blocks.CellGhostGlobalNumbers)
+        assert solver.IsSetUp()
+    # 7 DoFs per face: not dividing the rows of A_FF (480); offdColumns of other index types in the blocks
+    for wrong, error in (((columns, 7), fhhos4.Error), ((columns.astype(np.int64), 1), TypeError)):
+        try:
+            fhhos4.MergeOffDiag(system.A_TF, offd(system.A_TF), columns, system.A_FF, offd(system.A_FF), *wrong)
+            assert False, "accepted"
+        except error:
+            pass
+
+
 def test_parameters():
     solver = fhhos4.Solver()
     assert solver.Krylov == fhhos4.Krylov.Default and solver.Cycle == fhhos4.Cycle.K

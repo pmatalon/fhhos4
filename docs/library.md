@@ -40,12 +40,17 @@ For the library's users: `README_library.md`. This file is for changing the libr
 - Helpers, documented as copies but one: `TransposedView()` (no copy: a symmetric column-major matrix as its transpose,
   an Eigen map); `ExtractBlocksSym()`/`ExtractBlocksNonSym()` (a global Eigen row-major matrix + `DoFLists`
   of the cells and faces, index types int32/int64, one parallel pass: `SparseMatrixOps::BuildByRows`; Eigen blocks,
-  `HybridBlocks`, copied from the library's arrays); `SplitVector()`/`JoinVector()`. `CondensedMatrix()`: an Eigen map. Other
-  Eigen formats are converted by Eigen in the calling code.
+  `HybridBlocks`, copied from the library's arrays); `SplitVector()`/`JoinVector()`; `MergeOffDiag()` (on
+  several processes, the blocks in two parts, diagonal and off-diagonal, as PETSc's MPIAIJ and hypre's ParCSR: one
+  parallel pass, no communication, no sort; the ghosts, the union of those of the blocks' off-diagonal columns;
+  `DistributedBlocks`, ghosts as `std::vector`; `A_TT` not merged, its diagonal part read in place). `CondensedMatrix()`:
+  an Eigen map. Other Eigen formats are converted by Eigen in the calling code.
 - `fhhos4::detail` holds the implementation types, never in a signature the user calls nor in the docs:
   `BasicCSRView`/`CSRView` (the arrays given to the compiled functions; `LibraryView()`, an Eigen matrix in the
-  format of the setups), `CSRMatrix` (owned by the library), the compiled helpers (`detail::ExtractBlocksSym()` on
-  any index types, also mixed, `detail::ToCSR()`, `detail::Transpose()`), used by the Python module. The raw-view `Solver::Setup()` and
+  format of the setups), `CSRMatrix` and `IndexArray` (owned by the library), `TwoPartBlock` (the parts of a block of
+  `MergeOffDiag()`, one index type for both, int32/int64, and the global numbers, int32/int64), the compiled helpers
+  (`detail::ExtractBlocksSym()` on any index types, also mixed, `detail::MergeOffDiag()`, `detail::ToCSR()`,
+  `detail::Transpose()`), used by the Python module. The raw-view `Solver::Setup()` and
   `CondensedMatrixView()` are protected: the Python module's `PySolver` derives from `Solver`.
 - The compiled functions take plain types only (views, `detail::` vector views); the Eigen functions are inline in the
   header, compiled with the client's Eigen.

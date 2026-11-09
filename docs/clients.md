@@ -11,10 +11,10 @@ from their sources or documentation unless marked "unchecked".
 | HArDCore3D | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()` (diffusion), `SetupNonSym()` (diffusion-advection-reaction) |
 | Disk++ | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()`, `VectorComponents` (vector Laplacian) |
 | NGSolve | client (the adapter, Python) | itself (`ngla`), CSR; partial rows on several processes | monolithic matrix (product space) | optional | `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; on several processes the adapter sums the shared rows itself |
-| PETSc users | target: the preconditioner (`mpi/12`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | merge helper (to write); `MatCreateSubMatrix()` then the merge helper for a monolithic matrix; `SplitVector()`/`JoinVector()` |
+| PETSc users | target: the preconditioner (`mpi/12`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | `MergeOffDiag()` (from `MatMPIAIJGetSeqAIJ()`); `MatCreateSubMatrix()` then the merge for a monolithic matrix; `SplitVector()`/`JoinVector()` |
 | DOLFINx | target (`mpi/04`) | itself (`MatrixCSR`) or PETSc (AIJ, MATNEST) | blocks or monolithic matrix | always | through PETSc: as PETSc users; native `MatrixCSR`: to study |
 | Code_Aster | target, studied only (no code yet) | itself (`MATR_ASSE`, MORSE storage); PETSc in its parallel versions | monolithic matrix, uncondensed | yes | one process: `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; several: through its PETSc conversion (to study) |
-| MFEM | possible | itself, then hypre (`ParallelAssemble()`: `HypreParMatrix`, ParCSR) | blocks (`BlockOperator`) or monolithic matrix | yes | merge helper (ParCSR has PETSc's layout); unchecked |
+| MFEM | possible | itself, then hypre (`ParallelAssemble()`: `HypreParMatrix`, ParCSR) | blocks (`BlockOperator`) or monolithic matrix | yes | `MergeOffDiag()` (ParCSR has PETSc's layout); unchecked |
 | deal.II | possible | itself, into PETSc or Trilinos (Tpetra) matrices | blocks (block matrices) or monolithic matrix | yes | through PETSc: as PETSc users; Tpetra (one CSR, local columns, any global numbers): no helper; unchecked |
 
 ## Notes by code
@@ -67,6 +67,6 @@ elimination (`AFFE_CHAR_CINE`) with HHO: the multigrid preconditioners require n
 - A monolithic matrix is common (NGSolve, Code_Aster, PETSc's AIJ, DOLFINx's monolithic assembly): `ExtractBlocks*()`
   on one process; on several processes, through PETSc (`MatCreateSubMatrix()`) or, for a client without PETSc, a
   distributed `ExtractBlocks*()` (not planned).
-- PETSc's and hypre's distributed matrices (two CSRs per block): the merge helper (`.scratch/mpi/issues/12-...`).
+- PETSc's and hypre's distributed matrices (two CSRs per block): `MergeOffDiag()`.
 - Partial rows (NGSolve, PETSc's MATIS): summed by the client today.
 - Repeated setups on the same pattern (Code_Aster's Newton iterations): the setup time matters.

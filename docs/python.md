@@ -36,9 +36,9 @@ toy system of `UAMGLibraryTest.cpp` against SciPy's direct solver).
 `Solver.Comm` from an mpi4py communicator (`py2f()`, `MPI_Comm_f2c`; refused if MPI is not initialized; the getter
 returns the Python object), not set: one process, as in C++; `SetupSym(..., faceGhostGlobalNumbers=None)`,
 `SetupNonSym(..., faceGhostGlobalNumbers=None, cellGhostGlobalNumbers=None)` (int64 arrays read in place,
-`ToGhostNumbers()`); `Solver.MinRowsPerProcess` (an MPI-only member, as in C++); `fhhos4.WithMPI`. Tests: `PythonModule` without `Comm` nor mpi4py (MPI not initialized:
+`ToGhostNumbers()`); `Solver.MinRowsPerProcess` (an MPI-only member, as in C++); `fhhos4.WithMPI`; `MergeOffDiag()` (`PyTwoParts`: each block's parts of one index type, all the blocks the same, their `offdColumns` int32 or int64; the ghosts of `DistributedBlocks`: int64 arrays of the library's memory, which keep it alive). Tests: `PythonModule` without `Comm` nor mpi4py (MPI not initialized:
 `CoarseSolver.MUMPS` refused); `PythonModuleMPI_np2`/`_np4` (`test_module_mpi.py`, under `mpiexec`: the toy system
-distributed by strips, also with an empty rank 0, symmetric or not, the condensed system's functions, against SciPy; an input error on one process
+distributed by strips, also with an empty rank 0, symmetric or not, the blocks in two parts merged by `MergeOffDiag()`, the condensed system's functions, against SciPy; an input error on one process
 raised on all, a lower triangular `A_FF` refused). Not collective: the type errors of the arguments (nanobind's,
 `ToView()`), raised before the setup on their process only (the others then wait in the setup).
 

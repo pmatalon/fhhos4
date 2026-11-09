@@ -812,6 +812,25 @@ namespace fhhos4
 			return CSRView(M.rows(), M.cols(), M.outerIndexPtr(), M.innerIndexPtr(), M.valuePtr());
 		}
 
+		struct IndexArray::Impl
+		{
+			vector<std::int64_t> Numbers;
+		};
+
+		IndexArray::IndexArray() = default;
+		IndexArray::IndexArray(unique_ptr<Impl> impl)
+			: _impl(std::move(impl))
+		{}
+		IndexArray::~IndexArray() = default;
+		IndexArray::IndexArray(IndexArray&&) noexcept = default;
+		IndexArray& IndexArray::operator=(IndexArray&&) noexcept = default;
+
+		GhostGlobalNumbers IndexArray::View() const&
+		{
+			if (!_impl)
+				return GhostGlobalNumbers();
+			return GhostGlobalNumbers(_impl->Numbers.size(), _impl->Numbers.data());
+		}
 	}
 
 	namespace
@@ -926,6 +945,93 @@ namespace fhhos4
 			return blocks;
 		}
 
+		detail::IndexArray OwnNumbers(vector<GlobalNumber>&& numbers)
+		{
+			auto impl = make_unique<detail::IndexArray::Impl>();
+			impl->Numbers = std::move(numbers);
+			return detail::IndexArray(std::move(impl));
+		}
+
+		// The parts of a block of MergeOffDiag() in the CSR format, with the same rows, and OffdColumns >= 0, strictly
+		// increasing
+		template <typename Index, typename Global>
+		void CheckTwoParts(const detail::TwoPartBlock<Index, Global>& A, const string& name, const string& function)
+		{
+			CheckCSR(A.Diag, name + "_diag");
+			CheckCSR(A.Offd, name + "_offd");
+			if (A.Diag.Rows != A.Offd.Rows)
+				Utils::FatalError(function + ": " + name + "_diag and " + name + "_offd have " + to_string(A.Diag.Rows) + " and " + to_string(A.Offd.Rows) + " rows: the parts of the same rows.");
+			if (A.Offd.Cols > 0 && !A.OffdColumns)
+				Utils::FatalError(function + ": " + name + "_offdColumns is null, but " + name + "_offd has " + to_string(A.Offd.Cols) + " columns.");
+			for (std::int64_t j = 0; j < A.Offd.Cols; ++j)
+			{
+				if (A.OffdColumns[j] < 0 || (j > 0 && A.OffdColumns[j] <= A.OffdColumns[j - 1]))
+					Utils::FatalError(function + ": " + name + "_offdColumns, the global numbers of the columns of " + name + "_offd, must be >= 0 and strictly increasing: " + name + "_offdColumns[" + to_string(j) + "] = " + to_string(A.OffdColumns[j]) + ".");
+			}
+		}
+
+		// The ghosts of the blocks (sorted, no repetition): the entities e of the global numbers g of their off-diagonal
+		// columns, g = e * blockSize + k. Their columns increasing: the entities are too.
+		template <typename Index, typename Global>
+		vector<GlobalNumber> GhostEntities(initializer_list<const detail::TwoPartBlock<Index, Global>*> blocks, int blockSize)
+		{
+			vector<GlobalNumber> ghosts;
+			for (const detail::TwoPartBlock<Index, Global>* A : blocks)
+			{
+				vector<GlobalNumber> entities, merged;
+				for (std::int64_t j = 0; j < A->Offd.Cols; ++j)
+				{
+					GlobalNumber e = A->OffdColumns[j] / blockSize;
+					if (entities.empty() || entities.back() != e)
+						entities.push_back(e);
+				}
+				set_union(ghosts.begin(), ghosts.end(), entities.begin(), entities.end(), back_inserter(merged));
+				ghosts = std::move(merged);
+			}
+			return ghosts;
+		}
+
+		// The block with its local columns: those of Diag, then the DoFs of the ghosts (sorted). The rows stay sorted:
+		// Diag's columns come first, and Offd's map to increasing local columns.
+		template <typename Index, typename Global>
+		SparseMatrix Merge(const detail::TwoPartBlock<Index, Global>& A, const vector<GlobalNumber>& ghosts, int blockSize, const string& name, const string& function)
+		{
+			std::int64_t nCols = A.Diag.Cols + (std::int64_t)ghosts.size() * blockSize, nnz = A.Diag.NonZeros() + A.Offd.NonZeros();
+			if (nCols > numeric_limits<SparseMatrixIndex>::max() || nnz > numeric_limits<SparseMatrixIndex>::max())
+				Utils::FatalError(function + ": " + name + " has too many columns or non-zeros (" + to_string(nnz) + ") for the index type of the library (compile fhhos4 with -DENABLE_64BIT_INDEX=ON).");
+			vector<SparseMatrixIndex> localColumn(A.Offd.Cols);
+			for (std::int64_t j = 0; j < A.Offd.Cols; ++j)
+			{
+				GlobalNumber g = A.OffdColumns[j];
+				BigNumber ghost = lower_bound(ghosts.begin(), ghosts.end(), g / blockSize) - ghosts.begin();
+				localColumn[j] = (SparseMatrixIndex)(A.Diag.Cols + ghost * blockSize + g % blockSize);
+			}
+			SparseMatrix M(A.Diag.Rows, nCols);
+			M.resizeNonZeros(nnz);
+			SparseMatrixIndex* rowPointers = M.outerIndexPtr();
+			SparseMatrixIndex* columns = M.innerIndexPtr();
+			double* values = M.valuePtr();
+			#pragma omp parallel for schedule(static)
+			for (BigNumber i = 0; i <= (BigNumber)A.Diag.Rows; ++i)
+				rowPointers[i] = (SparseMatrixIndex)(A.Diag.Rows > 0 ? A.Diag.RowPointers[i] + A.Offd.RowPointers[i] : 0); // no rows: the arrays may be null
+			#pragma omp parallel for schedule(static)
+			for (BigNumber i = 0; i < (BigNumber)A.Diag.Rows; ++i)
+			{
+				std::int64_t p = rowPointers[i];
+				for (std::int64_t q = A.Diag.RowPointers[i]; q < (std::int64_t)A.Diag.RowPointers[i + 1]; ++q, ++p)
+				{
+					columns[p] = (SparseMatrixIndex)A.Diag.ColumnIndices[q];
+					values[p] = A.Diag.Values[q];
+				}
+				for (std::int64_t q = A.Offd.RowPointers[i]; q < (std::int64_t)A.Offd.RowPointers[i + 1]; ++q, ++p)
+				{
+					columns[p] = localColumn[A.Offd.ColumnIndices[q]];
+					values[p] = A.Offd.Values[q];
+				}
+			}
+			return M;
+		}
+
 		void CheckVectorSize(std::int64_t size, std::int64_t expected, const string& vector, const string& of)
 		{
 			if (size != expected)
@@ -945,6 +1051,38 @@ namespace fhhos4
 		HybridBlocks ExtractBlocksNonSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces)
 		{
 			return ExtractBlocks(M, cells, faces, false);
+		}
+
+		template <typename Index, typename Global>
+		DistributedBlocks MergeOffDiag(const TwoPartBlock<Index, Global>& A_TF, const TwoPartBlock<Index, Global>* A_FT, const TwoPartBlock<Index, Global>& A_FF, int faceBlockSize, int cellBlockSize)
+		{
+			CallScope scope(0, 0);
+			string function = "fhhos4::MergeOffDiag()";
+			int fbs = faceBlockSize, cbs = cellBlockSize;
+			if (fbs < 1 || (A_FT && cbs < 1))
+				Utils::FatalError(function + ": the block sizes must be >= 1, got " + to_string(fbs) + (A_FT ? " and " + to_string(cbs) : "") + ".");
+			CheckTwoParts(A_TF, "A_TF", function);
+			CheckTwoParts(A_FF, "A_FF", function);
+			if (A_FT)
+				CheckTwoParts(*A_FT, "A_FT", function);
+			auto size = [](const BasicCSRView<Index, Index>& M) { return to_string(M.Rows) + " x " + to_string(M.Cols); };
+			if (A_FF.Diag.Rows != A_FF.Diag.Cols || A_FF.Diag.Rows % fbs != 0 || A_TF.Diag.Cols != A_FF.Diag.Cols)
+				Utils::FatalError(function + ": A_FF_diag (" + size(A_FF.Diag) + ") has the rows and columns of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_TF_diag (" + size(A_TF.Diag) + ") the same columns.");
+			if (A_FT && (A_FT->Diag.Rows != A_FF.Diag.Rows || A_FT->Diag.Cols != A_TF.Diag.Rows || A_TF.Diag.Rows % cbs != 0))
+				Utils::FatalError(function + ": A_FT_diag (" + size(A_FT->Diag) + ") has the rows of the faces of the process (those of A_FF_diag, " + size(A_FF.Diag) + "), and the columns of its cells (the rows of A_TF_diag, " + size(A_TF.Diag) + ", " + to_string(cbs) + " DoFs per cell).");
+
+			DistributedBlocks blocks;
+			vector<GlobalNumber> faceGhosts = GhostEntities({ &A_TF, &A_FF }, fbs);
+			blocks.A_TF = Own(Merge(A_TF, faceGhosts, fbs, "A_TF", function));
+			blocks.A_FF = Own(Merge(A_FF, faceGhosts, fbs, "A_FF", function));
+			blocks.FaceGhostGlobalNumbers = OwnNumbers(std::move(faceGhosts));
+			if (A_FT)
+			{
+				vector<GlobalNumber> cellGhosts = GhostEntities({ A_FT }, cbs);
+				blocks.A_FT = Own(Merge(*A_FT, cellGhosts, cbs, "A_FT", function));
+				blocks.CellGhostGlobalNumbers = OwnNumbers(std::move(cellGhosts));
+			}
+			return blocks;
 		}
 
 		template <typename RowPointer, typename Column>
@@ -1025,6 +1163,14 @@ namespace fhhos4
 	FHHOS4_INSTANTIATE_CSR(std::int32_t, std::int64_t)
 	FHHOS4_INSTANTIATE_CSR(std::int64_t, std::int32_t)
 	FHHOS4_INSTANTIATE_CSR(std::int64_t, std::int64_t)
+
+#define FHHOS4_INSTANTIATE_MERGE(Index, Global) \
+	template detail::DistributedBlocks detail::MergeOffDiag<Index, Global>(const detail::TwoPartBlock<Index, Global>&, const detail::TwoPartBlock<Index, Global>*, const detail::TwoPartBlock<Index, Global>&, int, int);
+
+	FHHOS4_INSTANTIATE_MERGE(std::int32_t, std::int32_t)
+	FHHOS4_INSTANTIATE_MERGE(std::int32_t, std::int64_t)
+	FHHOS4_INSTANTIATE_MERGE(std::int64_t, std::int32_t)
+	FHHOS4_INSTANTIATE_MERGE(std::int64_t, std::int64_t)
 
 	template CSRMatrix detail::Transpose<std::int32_t>(const BasicCSRView<std::int32_t, std::int32_t>&);
 	template CSRMatrix detail::Transpose<std::int64_t>(const BasicCSRView<std::int64_t, std::int64_t>&);

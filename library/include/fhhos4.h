@@ -602,6 +602,13 @@ namespace fhhos4
 		SparseMatrix A_TT, A_TF, A_FT, A_FF; // A_FT: empty (0 x 0) for a symmetric system
 	};
 
+	// The blocks of the rows of a process with their columns numbered locally, and its ghosts: see MergeOffDiag()
+	struct DistributedBlocks
+	{
+		SparseMatrix A_TF, A_FT, A_FF;                                            // A_FT: empty (0 x 0) for a symmetric system
+		std::vector<std::int64_t> FaceGhostGlobalNumbers, CellGhostGlobalNumbers; // CellGhostGlobalNumbers (of A_FT): empty for a symmetric system
+	};
+
 	namespace detail
 	{
 		// The blocks in the arrays of the library
@@ -609,6 +616,51 @@ namespace fhhos4
 		{
 			CSRMatrix A_TT, A_TF, A_FT, A_FF;
 		};
+
+		// An array of global numbers owned by the library (allocated and freed by it)
+		class FHHOS4_API IndexArray
+		{
+		public:
+			struct Impl; // defined in the library
+
+			IndexArray();
+			explicit IndexArray(std::unique_ptr<Impl> impl);
+			~IndexArray();
+			IndexArray(IndexArray&&) noexcept;
+			IndexArray& operator=(IndexArray&&) noexcept;
+			IndexArray(const IndexArray&) = delete;
+			IndexArray& operator=(const IndexArray&) = delete;
+
+			GhostGlobalNumbers View() const&; // empty if empty
+			GhostGlobalNumbers View() const&& = delete;
+
+		private:
+			std::unique_ptr<Impl> _impl;
+		};
+
+		// The distributed blocks in the arrays of the library
+		struct DistributedBlocks
+		{
+			CSRMatrix A_TF, A_FT, A_FF;
+			IndexArray FaceGhostGlobalNumbers, CellGhostGlobalNumbers;
+		};
+
+		// A block of the rows of a process in two parts (see MergeOffDiag()): Diag, the columns of its own entities,
+		// and Offd, the others, whose column j has the global number OffdColumns[j]. Index, Global: std::int32_t or
+		// std::int64_t.
+		template <typename Index, typename Global>
+		struct TwoPartBlock
+		{
+			static_assert(std::is_same<Global, std::int32_t>::value || std::is_same<Global, std::int64_t>::value,
+			              "fhhos4::MergeOffDiag(): the global numbers offdColumns are std::int32_t or std::int64_t");
+
+			BasicCSRView<Index, Index> Diag, Offd;
+			const Global* OffdColumns = nullptr; // Offd.Cols
+		};
+
+		// A_FT: null for a symmetric system (cellBlockSize then ignored)
+		template <typename Index, typename Global>
+		FHHOS4_API DistributedBlocks MergeOffDiag(const TwoPartBlock<Index, Global>& A_TF, const TwoPartBlock<Index, Global>* A_FT, const TwoPartBlock<Index, Global>& A_FF, int faceBlockSize, int cellBlockSize);
 
 		template <typename RowPointer, typename Column, typename Index>
 		FHHOS4_API HybridBlocks ExtractBlocksSym(const BasicCSRView<RowPointer, Column>& M, const DoFLists<Index>& cells, const DoFLists<Index>& faces);
@@ -629,6 +681,34 @@ namespace fhhos4
 		inline fhhos4::HybridBlocks ToEigen(const HybridBlocks& blocks)
 		{
 			return { ToEigen(blocks.A_TT), ToEigen(blocks.A_TF), ToEigen(blocks.A_FT), ToEigen(blocks.A_FF) };
+		}
+
+		inline std::vector<std::int64_t> ToVector(const IndexArray& numbers)
+		{
+			GhostGlobalNumbers v = numbers.View();
+			return std::vector<std::int64_t>(v.Numbers, v.Numbers + v.Count);
+		}
+
+		inline fhhos4::DistributedBlocks ToEigen(const DistributedBlocks& blocks)
+		{
+			return { ToEigen(blocks.A_TF), ToEigen(blocks.A_FT), ToEigen(blocks.A_FF), ToVector(blocks.FaceGhostGlobalNumbers), ToVector(blocks.CellGhostGlobalNumbers) };
+		}
+
+		// A part of a block of MergeOffDiag(): an Eigen sparse matrix, compressed, row-major, of doubles, with the
+		// index type Index (that of all the parts)
+		template <typename Index, typename Derived>
+		BasicCSRView<Index, Index> PartView(const Eigen::SparseCompressedBase<Derived>& M)
+		{
+			static_assert(Derived::IsRowMajor, "fhhos4::MergeOffDiag(): row-major matrices (e.g. an Eigen::Map of the CSR arrays of PETSc or hypre)");
+			static_assert(std::is_same<typename Derived::StorageIndex, Index>::value, "fhhos4::MergeOffDiag(): all the parts have the same index type");
+			static_assert(std::is_same<typename Derived::Scalar, double>::value, "fhhos4: matrices of doubles only");
+			return View<Index>(M);
+		}
+
+		template <typename Index, typename Global, typename Diag, typename Offd>
+		TwoPartBlock<Index, Global> TwoParts(const Eigen::SparseCompressedBase<Diag>& diag, const Eigen::SparseCompressedBase<Offd>& offd, const Global* offdColumns)
+		{
+			return { PartView<Index>(diag), PartView<Index>(offd), offdColumns };
 		}
 
 		// The arrays of the monolithic matrix M of the helpers: compressed, row-major, of doubles, with the indices
@@ -679,6 +759,44 @@ namespace fhhos4
 	             Eigen::Ref<Eigen::VectorXd> x)
 	{
 		detail::JoinVector<Index>({ x_T.data(), (std::int64_t)x_T.size() }, { x_F.data(), (std::int64_t)x_F.size() }, cells, faces, { x.data(), (std::int64_t)x.size() });
+	}
+
+	// A copy: on several processes, the blocks of the rows of a process (see SetupSym()) stored in two parts each, as
+	// PETSc (MPIAIJ: MatMPIAIJGetSeqAIJ()) and hypre (ParCSR: diag, offd, col_map_offd) store them, merged into the
+	// local columns that SetupSym() reads, with the ghost faces: for SetupSym(A_TT, b.A_TF, b.A_FF, cellInterpOfOne,
+	// faceInterpOfOne, b.FaceGhostGlobalNumbers). The two parts of each block: _diag, the columns of the faces of the
+	// process (its faces in the order of the rows of A_FF, faceBlockSize DoFs each), and _offd, the other columns,
+	// whose column j is the face DoF of global number _offdColumns[j], strictly increasing (PETSc's garray, hypre's
+	// col_map_offd); the DoF k of the face f has the global number f * faceBlockSize + k, the faces numbered as in
+	// GhostGlobalNumbers. The local columns: the faces of the process, then its ghosts (the faces of the off-diagonal
+	// columns of both blocks) by increasing global number. A_TT has no off-diagonal part: give its diagonal part to the
+	// setup (no copy if its index type is the library's). The parts: Eigen sparse matrices, compressed, row-major, of
+	// doubles, all with the same index type std::int32_t or std::int64_t (e.g. Eigen::Maps of the arrays of PETSc);
+	// the global numbers: std::int32_t or std::int64_t. One parallel pass on the non-zeros, no communication.
+	template <typename TFDiag, typename TFOffd, typename FFDiag, typename FFOffd, typename Global>
+	DistributedBlocks MergeOffDiag(const Eigen::SparseCompressedBase<TFDiag>& A_TF_diag, const Eigen::SparseCompressedBase<TFOffd>& A_TF_offd, const Global* A_TF_offdColumns,
+	                               const Eigen::SparseCompressedBase<FFDiag>& A_FF_diag, const Eigen::SparseCompressedBase<FFOffd>& A_FF_offd, const Global* A_FF_offdColumns, int faceBlockSize)
+	{
+		using Index = typename FFDiag::StorageIndex;
+		return detail::ToEigen(detail::MergeOffDiag<Index, Global>(detail::TwoParts<Index>(A_TF_diag, A_TF_offd, A_TF_offdColumns), nullptr,
+		                                                        detail::TwoParts<Index>(A_FF_diag, A_FF_offd, A_FF_offdColumns), faceBlockSize, 1));
+	}
+
+	// A copy: as the MergeOffDiag() above, with A_FT (the rows of the faces of the process), for SetupNonSym(A_TT, b.A_TF,
+	// b.A_FT, b.A_FF, cellInterpOfOne, faceInterpOfOne, b.FaceGhostGlobalNumbers, b.CellGhostGlobalNumbers): its
+	// diagonal part, the columns of the cells of the process (the rows of A_TF, cellBlockSize DoFs each); its
+	// off-diagonal columns, cell DoFs numbered as the face DoFs. Its local columns: the cells of the process, then its
+	// ghost cells (CellGhostGlobalNumbers) by increasing global number.
+	template <typename TFDiag, typename TFOffd, typename FTDiag, typename FTOffd, typename FFDiag, typename FFOffd, typename Global>
+	DistributedBlocks MergeOffDiag(const Eigen::SparseCompressedBase<TFDiag>& A_TF_diag, const Eigen::SparseCompressedBase<TFOffd>& A_TF_offd, const Global* A_TF_offdColumns,
+	                               const Eigen::SparseCompressedBase<FTDiag>& A_FT_diag, const Eigen::SparseCompressedBase<FTOffd>& A_FT_offd, const Global* A_FT_offdColumns,
+	                               const Eigen::SparseCompressedBase<FFDiag>& A_FF_diag, const Eigen::SparseCompressedBase<FFOffd>& A_FF_offd, const Global* A_FF_offdColumns,
+	                               int faceBlockSize, int cellBlockSize)
+	{
+		using Index = typename FFDiag::StorageIndex;
+		detail::TwoPartBlock<Index, Global> a_FT = detail::TwoParts<Index>(A_FT_diag, A_FT_offd, A_FT_offdColumns);
+		return detail::ToEigen(detail::MergeOffDiag<Index, Global>(detail::TwoParts<Index>(A_TF_diag, A_TF_offd, A_TF_offdColumns), &a_FT,
+		                                                        detail::TwoParts<Index>(A_FF_diag, A_FF_offd, A_FF_offdColumns), faceBlockSize, cellBlockSize));
 	}
 
 	// No copy: A^T in the format of the library, a map of the arrays of a column-major matrix A (compressed, with the

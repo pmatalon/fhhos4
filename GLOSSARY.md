@@ -137,6 +137,11 @@ A matrix split by rows among the processes: each holds the rows of its own cells
 numbers, with the global numbers of its ghosts. Its blocks or its monolithic matrix may each be distributed.
 _Avoid_: global matrix (ambiguous: also said of a monolithic matrix)
 
+**Diagonal part**, **off-diagonal part** (`Diag`, `Offd`):
+The two parts of the rows of a process in a distributed matrix, as PETSc (MPIAIJ) and hypre (ParCSR) store them: the
+columns of its own entities, and the others, compressed, with their global numbers. `MergeOffDiag()` merges them
+into the local numbers.
+
 ## Project
 
 **Program**:

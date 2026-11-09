@@ -2,8 +2,9 @@
 # system of test_module.py distributed by rows, through mpi4py, against SciPy's direct solver on the whole system. The
 # cells of each process: horizontal strips; each face owned by the process of the smaller rank of its cells; the cells
 # and faces renumbered in rank order; the ghost faces (and cells of A_FT) of each process numbered in reverse order (any
-# order). Also with the process of rank 0 empty, and non-symmetric. The condensed system (CondenseRHS(), Solve(b, x),
-# SolveCellUnknowns(), ApplyCondensedMatrix()) too.
+# order). Also with the process of rank 0 empty, non-symmetric, and the blocks of each process in two parts (as PETSc
+# stores them) merged by MergeOffDiag() (the ghosts in increasing order). The condensed system
+# (CondenseRHS(), Solve(b, x), SolveCellUnknowns(), ApplyCondensedMatrix()) too.
 # Skipped (exit code 77) if the module is compiled without MPI, or without mpi4py.
 import os
 import sys
@@ -21,7 +22,7 @@ except ImportError:
     print("mpi4py is not installed: skipped")
     sys.exit(77)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from test_module import HybridSystem, RelativeError
+from test_module import HybridSystem, RelativeError, ToSciPy
 
 
 def Renumbering(ranks, nRanks):
@@ -32,7 +33,7 @@ def Renumbering(ranks, nRanks):
     return renumbering
 
 
-def DistributedSystem(emptyRank0, asymmetry=0.0):
+def DistributedSystem(emptyRank0, asymmetry=0.0, merge=False):
     comm = MPI.COMM_WORLD
     rank, P = comm.Get_rank(), comm.Get_size()
     n = 48
@@ -75,7 +76,31 @@ def DistributedSystem(emptyRank0, asymmetry=0.0):
     ghosts = ghostsOf(np.concatenate([rowsTF.indices, rowsFF.indices]), faceBegin, nOwnFaces)
     cellGhostGlobalNumbers = ghostsOf(rowsFT.indices, cellBegin, nOwnCells)
     faceColumns = lambda rows: localColumns(rows, ghosts, faceBegin, nOwnFaces)
+    if merge:
+        ghosts, cellGhostGlobalNumbers = np.sort(ghosts), np.sort(cellGhostGlobalNumbers)
     localA_TF, localA_FF, localA_FT = faceColumns(rowsTF), faceColumns(rowsFF), localColumns(rowsFT, cellGhostGlobalNumbers, cellBegin, nOwnCells)
+    if merge:
+        def twoParts(rows, begin, nOwn):
+            """rows (global columns) in two parts, as PETSc stores them: the columns [begin, begin + nOwn) numbered from 0,
+            the others compressed, and their global numbers (increasing, int32 as PETSc's)"""
+            coo = rows.tocoo()
+            own = (begin <= coo.col) & (coo.col < begin + nOwn)
+            offdColumns = np.unique(coo.col[~own])
+            diag = sp.csr_matrix((coo.data[own], (coo.row[own], coo.col[own] - begin)), shape=(rows.shape[0], nOwn))
+            offd = sp.csr_matrix((coo.data[~own], (coo.row[~own], np.searchsorted(offdColumns, coo.col[~own]))), shape=(rows.shape[0], len(offdColumns)))
+            diag.sort_indices()
+            offd.sort_indices()
+            return diag, offd, offdColumns.astype(np.int32)
+        if asymmetry == 0:
+            blocks = fhhos4.MergeOffDiag(*twoParts(rowsTF, faceBegin, nOwnFaces), *twoParts(rowsFF, faceBegin, nOwnFaces), 1)
+        else:
+            blocks = fhhos4.MergeOffDiag(*twoParts(rowsTF, faceBegin, nOwnFaces), *twoParts(rowsFT, cellBegin, nOwnCells), *twoParts(rowsFF, faceBegin, nOwnFaces), 1, 1)
+        assert np.array_equal(blocks.FaceGhostGlobalNumbers, ghosts) and np.array_equal(blocks.CellGhostGlobalNumbers, cellGhostGlobalNumbers if asymmetry != 0 else [])
+        assert (ToSciPy(blocks.A_TF) != localA_TF).nnz == 0 and (ToSciPy(blocks.A_FF) != localA_FF).nnz == 0
+        if asymmetry != 0:
+            assert (ToSciPy(blocks.A_FT) != localA_FT).nnz == 0
+            localA_FT, cellGhostGlobalNumbers = blocks.A_FT, blocks.CellGhostGlobalNumbers
+        localA_TF, localA_FF, ghosts = blocks.A_TF, blocks.A_FF, blocks.FaceGhostGlobalNumbers
 
     solver = fhhos4.Solver()
     solver.Comm = comm
@@ -141,6 +166,13 @@ def test_nonsymmetric_system():
     """SetupNonSym(): A_FT with the ghost cells of its rows (cellGhostGlobalNumbers)"""
     DistributedSystem(emptyRank0=False, asymmetry=0.3)
     DistributedSystem(emptyRank0=True, asymmetry=0.3)
+
+
+def test_merge_off_diag_helpers():
+    """The blocks in two parts merged by MergeOffDiag()"""
+    for asymmetry in (0.0, 0.3):
+        DistributedSystem(emptyRank0=False, asymmetry=asymmetry, merge=True)
+        DistributedSystem(emptyRank0=True, asymmetry=asymmetry, merge=True)
 
 
 if __name__ == "__main__":
