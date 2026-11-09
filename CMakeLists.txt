@@ -247,13 +247,20 @@ if(ENABLE_PETSC_PC)
 				-dll_append $<TARGET_FILE:fhhos4_petsc> ${MPIEXEC_POSTFLAGS})
 			set_tests_properties(PETScPC_np${np} PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS ${np})
 		endforeach()
-		# The example (examples/petsc_preconditioner.py), if petsc4py is installed: converged (a positive reason)
+		# The examples (examples/petsc_preconditioner.cpp, linked to fhhos4::petsc; .py, if petsc4py is installed, loading it by
+		# -dll_append): converged (a positive reason)
+		add_executable(petsc_preconditioner examples/petsc_preconditioner.cpp)
+		target_link_libraries(petsc_preconditioner PRIVATE fhhos4_petsc PkgConfig::PETSC)
+		add_test(NAME ExamplePETScPreconditionerCpp COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 3 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:petsc_preconditioner>
+			-n 32 -k 2 ${MPIEXEC_POSTFLAGS})
+		set_tests_properties(ExamplePETScPreconditionerCpp PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS 3
+			PASS_REGULAR_EXPRESSION "converged reason [1-9]")
 		find_package(Python 3.9 COMPONENTS Interpreter)
 		execute_process(COMMAND ${Python_EXECUTABLE} -c "import petsc4py, numpy" RESULT_VARIABLE no_petsc4py OUTPUT_QUIET ERROR_QUIET)
 		if(Python_FOUND AND NOT no_petsc4py)
-			add_test(NAME ExamplePETScPreconditioner COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 3 ${MPIEXEC_PREFLAGS} ${Python_EXECUTABLE}
+			add_test(NAME ExamplePETScPreconditionerPython COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 3 ${MPIEXEC_PREFLAGS} ${Python_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/examples/petsc_preconditioner.py -dll_append $<TARGET_FILE:fhhos4_petsc> -n 32 -k 2 ${MPIEXEC_POSTFLAGS})
-			set_tests_properties(ExamplePETScPreconditioner PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS 3
+			set_tests_properties(ExamplePETScPreconditionerPython PROPERTIES ENVIRONMENT OMP_NUM_THREADS=2 TIMEOUT 600 PROCESSORS 3
 				PASS_REGULAR_EXPRESSION "converged reason [1-9]")
 		endif()
 	endif()

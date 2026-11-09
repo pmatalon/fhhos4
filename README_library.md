@@ -308,8 +308,9 @@ mpiexec -n 4 ./my_code -dll_append <prefix>/lib/libfhhos4_petsc.so -ksp_type fcg
     -pc_fhhos4_dimension 3 -pc_fhhos4_face_degree 1 -pc_fhhos4_cell_degree 1
 ```
 
-A complete example in Python, [`examples/petsc_preconditioner.py`](examples/petsc_preconditioner.py): an HHO
-discretization of degree 1 or 2 assembled cell by cell with petsc4py, its interpolation of 1, and the solve.
+Complete examples, an HHO discretization of degree 1 or 2 assembled cell by cell, its interpolation of 1, and the
+solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) (C++, linked to `fhhos4::petsc`), and
+[`examples/petsc_preconditioner.py`](examples/petsc_preconditioner.py) (petsc4py, loading the library by `-dll_append`).
 
 - **Loading it**: without recompiling, `-dll_append <prefix>/lib/libfhhos4_petsc.so` among PETSc's options (command
   line, `PETSC_OPTIONS`, `petsc4py.init()`); or link `fhhos4::petsc` and call `PetscDLLibraryRegister_fhhos4_petsc()`

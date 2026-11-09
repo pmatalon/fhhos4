@@ -1,8 +1,9 @@
 # fhhos4 as a preconditioner of PETSc (-pc_type fhhos4, README_library.md "With PETSc"), from Python: the HHO
-# discretization of -div(kappa grad u) = 1 on the unit square (n x n squares, a coefficient kappa per cell, homogeneous
-# Dirichlet conditions), with polynomials of degree k on the faces and l in the cells, assembled cell by cell into a
-# MATNEST with petsc4py, and solved by PETSc's FCG preconditioned by fhhos4. Needs petsc4py and NumPy, and fhhos4
-# built with -DENABLE_PETSC_PC=ON (and -DENABLE_MPI=ON on several processes) against the same PETSc.
+# discretization of -div(kappa grad u) = 1 on the unit square (n x n squares, kappa 1 or 10 on a checkerboard of 8 x 8
+# squares, homogeneous Dirichlet conditions), with polynomials of degree k on the faces and l in the cells, assembled
+# cell by cell into a MATNEST with petsc4py, and solved by PETSc's FCG preconditioned by fhhos4. Needs petsc4py and
+# NumPy, and fhhos4 built with -DENABLE_PETSC_PC=ON (and -DENABLE_MPI=ON on several processes) against the same PETSc.
+# The same as petsc_preconditioner.cpp.
 #
 #   mpiexec -n 4 python petsc_preconditioner.py -dll_append <prefix>/lib/libfhhos4_petsc.so [-n 64] [-k 1] [-l 1] [-ksp_view]
 import sys
@@ -101,7 +102,7 @@ for j in myRows:
         local = [nT + f * nF + m for f, F in enumerate(faces) if F is not None for m in range(nF)]
         cellDoFs = nT * T + np.arange(nT, dtype=PETSc.IntType)
         faceDoFs = [nF * F + m for F in faces if F is not None for m in range(nF)]
-        kappa = np.random.default_rng(T).uniform(1, 10)  # the diffusion coefficient of the cell
+        kappa = 10 if (8 * i // n + 8 * j // n) % 2 else 1  # the diffusion coefficient of the cell
         a = kappa * A_local
         A_TT.setValues(cellDoFs, cellDoFs, a[:nT, :nT], addv=True)
         A_TF.setValues(cellDoFs, faceDoFs, a[np.ix_(range(nT), local)], addv=True)

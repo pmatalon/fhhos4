@@ -111,9 +111,11 @@ preconditioners (`petsc/private/pcimpl.h`) and `fhhos4.h` only, to move into PET
   for the near null space), `z_F` zero first; `Krylov::None`, `MaxIterations = 1` by default: one cycle.
 - Options `-pc_fhhos4_*` (`PCSetFromOptions_FHHOS4()`), `PCView_FHHOS4()` (`-ksp_view`).
 - Tests: `tests/PETSc/PCTest.cpp` (`fhhos4_petsc_tests`, its own `main()`: MPI, then PETSc; `ctest -R PETScPC`, 1-4
-  processes, the library loaded by `-dll_append`, as by a user's program); the example of `README_library.md`,
-  `examples/petsc_preconditioner.py` (`ctest -R ExamplePETScPreconditioner`, if petsc4py is installed: its HHO, local
-  matrix of the reference square, checked by hand: symmetric, its kernel the interpolation of 1, exact on x^2).
+  processes, the library loaded by `-dll_append`, as by a user's program); the examples of `README_library.md`,
+  `examples/petsc_preconditioner.cpp` and `.py` (`ctest -R ExamplePETScPreconditioner`: `Cpp`, linked to the library,
+  built with the tests; `Python`, if petsc4py is installed). Their HHO, the local matrix of the reference square, was
+  checked by hand: symmetric, its kernel the interpolation of 1, exact on x^2; the C++ one equals the Python one to
+  rounding.
 - Environment: conda env `fhhos4-petsc` (the stack of `fhhos4-python`, `docs/python.md`, with PETSc and petsc4py,
   pkg-config and GTest), build directory `build-python-petsc` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON -DENABLE_MPI=ON
   -DENABLE_PETSC_PC=ON`). On WSL, a Windows `pkg-config` on the PATH may be cached before the env's is installed:
