@@ -85,6 +85,7 @@ directory of the library in the RPATH of the executable. A library compiled with
    - [x] If not ordered by degree: the degree 0 must at least be first. Then OK up to degree 2.
    - [x] Helper to reorder the bases
    - [ ] Non-hierarchical bases not managed
+   - [ ] p-adapdability not managed (fixed polynomial degrees across the mesh!)
 
 # 3. The algorithm in a nutshell
 
@@ -146,13 +147,12 @@ Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size()); // wit
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
 
-The blocks are Eigen matrices, read
-in place, in the format of the library: `fhhos4::SparseMatrix` (row-major, compressed), or an Eigen map of your own
-arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy).
+The blocks are of type `fhhos4::SparseMatrix`, which is an Eigen sparse matrices (row-major, compressed).
+It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
 
 ### Inputs
 
-- **The blocks** `A_TT` (cells x cells), `A_TF` (cells x faces), `A_FF` (faces x faces), and `A_FT` (faces x cells) for
+- **The blocks** `A_TT`, `A_TF`, `A_FF`, and `A_FT` for
   a non-symmetric matrix. The DoFs of each cell (resp. face) are contiguous, cells and faces in any order. In a
   symmetric system on one process, `A_TT` and `A_FF` are read from their lower triangular part (lower-only or full);
   otherwise in full (`A_FF` on several processes, all the blocks of a non-symmetric system). A triangular block where
@@ -162,8 +162,7 @@ arrays (see [Inputs](#inputs); the other Eigen matrices convert by Eigen, a copy
   own CSR arrays, `fhhos4::SparseMatrixMap(rows, cols, nonZeros, rowPointers, columnIndices, values)`, the columns
   strictly increasing in each row (sorted, no duplicates; checked). **The matrices are read in place, never copied nor
   converted**: assemble them in this format. Any other Eigen sparse matrix converts by Eigen, in one line, a copy that
-  stays visible in your code: `fhhos4::SparseMatrix B = A;` (see below). A wrong format does not compile, with a
-  message that says how to convert.
+  stays visible in your code: `fhhos4::SparseMatrix B = A;` (see below).
 - **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
   the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
   **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d whose degree is the
