@@ -35,7 +35,7 @@ def Basis(degree):
     return [(a, d - a) for d in range(degree + 1) for a in range(d, -1, -1)]
 
 
-def LocalMatrix():
+def LocalMatrixReferenceSquare():
     """The HHO matrix of the reference square [-1, 1]^2: the cell DoFs, then those of its faces, left, right, bottom,
     top (L_m(s), m <= k, s the coordinate along the face: the same functions from both cells of a face). The
     reconstruction R in P^{k+1}: (grad R, grad w) = (grad u_T, grad w) + sum_F (u_F - u_T, grad w.n)_F; the
@@ -75,18 +75,29 @@ def LocalMatrix():
     return A, nT, nF
 
 
-A_local, nT, nF = LocalMatrix()  # nT, nF: the DoFs of a cell, of a face
+A_local, nT, nF = LocalMatrixReferenceSquare()  # nT, nF: the DoFs of a cell, of a face
 
-# The partition: the cells of each process, rows of the mesh (a horizontal strip); each face owned by the process of its
-# lower or left cell. Numbered in rank order: row by row, the cells of a row, and its faces: the n - 1 vertical ones
-# between its cells, then the n horizontal ones above it (none above the last row).
-rowsOf = lambda r: [j for j in range(n) if j * size // n == r]
-facesBefore = lambda j: j * (2 * n - 1)  # the faces of the rows below j
-vertical = lambda i, j: facesBefore(j) + i            # between the cells (i, j) and (i + 1, j)
-horizontal = lambda i, j: facesBefore(j) + n - 1 + i  # between the cells (i, j) and (i, j + 1)
-myRows = rowsOf(rank)
-nCells = n * len(myRows)
-nFaces = sum(2 * n - 1 if j < n - 1 else n - 1 for j in myRows)
+# The mesh, seen by the assembly as an unstructured mesh: its cells and faces by their global numbers, in rank order
+# (those of the process of rank 0 first, etc.), each cell with its faces. Here, the cells of each process are rows of the
+# mesh (a horizontal strip), and each face is owned by the process of its lower or left cell; numbered row by row: the
+# cells of a row (the cell (i, j) is j n + i), and its faces: the n - 1 vertical ones between its cells, then the n
+# horizontal ones above it (none above the last row).
+facesBefore = lambda j: j * (2 * n - 1) - (n if j == n else 0)  # the faces of the rows below j
+firstRow, lastRow = (rank * n + size - 1) // size, ((rank + 1) * n + size - 1) // size  # its rows: j size // n == rank
+myCells = range(firstRow * n, lastRow * n)
+nCells, nFaces = len(myCells), facesBefore(lastRow) - facesBefore(firstRow)
+
+
+def Faces(T):
+    """The faces of the cell T, in the order of the local matrix: left, right, bottom, top; None on the boundary
+    (Dirichlet: no unknowns)"""
+    i, j = T % n, T // n
+    return [facesBefore(j) + i - 1 if i > 0 else None, facesBefore(j) + i if i < n - 1 else None,
+            facesBefore(j - 1) + n - 1 + i if j > 0 else None, facesBefore(j) + n - 1 + i if j < n - 1 else None]
+
+
+Kappa = lambda T: 10 if (8 * (T % n) // n + 8 * (T // n) // n) % 2 else 1  # the diffusion coefficient of the cell T
+Measure = lambda T: (1 / n) ** 2  # the measure of the cell T (its area)
 
 # The four blocks, preallocated (non-zeros per row in the columns of the process, and in the others)
 AIJ = lambda rows, cols, nnz: PETSc.Mat().createAIJ(((rows, None), (cols, None)), nnz=nnz, comm=comm)
@@ -94,20 +105,16 @@ A_TT, A_TF = AIJ(nT * nCells, nT * nCells, (nT, 0)), AIJ(nT * nCells, nF * nFace
 A_FT, A_FF = AIJ(nF * nFaces, nT * nCells, (2 * nT, 2 * nT)), AIJ(nF * nFaces, nF * nFaces, (7 * nF, 7 * nF))
 
 # The local matrices of the cells of the process, added; the DoFs of the boundary faces (Dirichlet, homogeneous) dropped
-for j in myRows:
-    for i in range(n):
-        T = j * n + i
-        faces = [vertical(i - 1, j) if i > 0 else None, vertical(i, j) if i < n - 1 else None,
-                 horizontal(i, j - 1) if j > 0 else None, horizontal(i, j) if j < n - 1 else None]
-        local = [nT + f * nF + m for f, F in enumerate(faces) if F is not None for m in range(nF)]
-        cellDoFs = nT * T + np.arange(nT, dtype=PETSc.IntType)
-        faceDoFs = [nF * F + m for F in faces if F is not None for m in range(nF)]
-        kappa = 10 if (8 * i // n + 8 * j // n) % 2 else 1  # the diffusion coefficient of the cell
-        a = kappa * A_local
-        A_TT.setValues(cellDoFs, cellDoFs, a[:nT, :nT], addv=True)
-        A_TF.setValues(cellDoFs, faceDoFs, a[np.ix_(range(nT), local)], addv=True)
-        A_FT.setValues(faceDoFs, cellDoFs, a[np.ix_(local, range(nT))], addv=True)
-        A_FF.setValues(faceDoFs, faceDoFs, a[np.ix_(local, local)], addv=True)
+for T in myCells:
+    faces = Faces(T)
+    local = [nT + f * nF + m for f, F in enumerate(faces) if F is not None for m in range(nF)]
+    cellDoFs = nT * T + np.arange(nT, dtype=PETSc.IntType)
+    faceDoFs = [nF * F + m for F in faces if F is not None for m in range(nF)]
+    a = Kappa(T) * A_local
+    A_TT.setValues(cellDoFs, cellDoFs, a[:nT, :nT], addv=True)
+    A_TF.setValues(cellDoFs, faceDoFs, a[np.ix_(range(nT), local)], addv=True)
+    A_FT.setValues(faceDoFs, cellDoFs, a[np.ix_(local, range(nT))], addv=True)
+    A_FF.setValues(faceDoFs, faceDoFs, a[np.ix_(local, local)], addv=True)
 for M in (A_TT, A_TF, A_FT, A_FF):
     M.assemble()
 A = PETSc.Mat().createNest([[A_TT, A_TF], [A_FT, A_FF]], comm=comm)
@@ -117,7 +124,7 @@ x, b = A.createVecs()
 cellsIS, facesIS = A.getNestISs()[0]  # the cell and face DoFs in the vectors of the operator
 cells, faces = cellsIS.getIndices(), facesIS.getIndices()
 b.zeroEntries()
-b.setValues(cells[::nT], np.full(nCells, (1 / n) ** 2))  # the source 1: its integral on the first function of each cell
+b.setValues(cells[::nT], [Measure(T) for T in myCells])  # the source 1: its integral on the first function of each cell
 b.assemble()
 
 # The interpolation of 1 on the DoFs, for fhhos4: 1 on the first function of each cell and face, 0 on the others

@@ -2,22 +2,25 @@
 // discretization of -div(kappa grad u) = 1 on the unit square (n x n squares, kappa 1 or 10 on a checkerboard of 8 x 8
 // squares, homogeneous Dirichlet conditions), with polynomials of degree k on the faces and l in the cells, assembled
 // cell by cell into a MATNEST, and solved by PETSc's FCG preconditioned by fhhos4. The program links fhhos4::petsc and
-// registers the preconditioner itself (PetscDLLibraryRegister_fhhos4_petsc()); the discretization and the mesh: HHO.h.
-// The same as petsc_preconditioner.py, its local matrix up to rounding: the same iterations, though not the same residuals
-// (on this regular mesh, many couplings are equal, and the aggregation breaks their ties by the rounding errors).
+// registers the preconditioner itself (PetscDLLibraryRegister_fhhos4_petsc()); the discretization and the mesh:
+// HHO_diffusion.h. The same as petsc_preconditioner.py, its local matrix up to rounding: the same iterations, though
+// not the same residuals (on this regular mesh, many couplings are equal, and the aggregation breaks their ties by the
+// rounding errors).
 //
 //   mpiexec -n 4 ./petsc_preconditioner [-n 64] [-k 1] [-l 1] [-ksp_view]
 #include <string>
 #include <vector>
 #include <petscksp.h>
 #include <fhhos4_petsc.h>
-#include "HHO.h"
+#include "HHO_diffusion.h"
 
 using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
 int main(int argc, char** argv)
 {
-	PetscInt n = 64, k = 1, l, iterations;
+	PetscInt n = 64;
+	PetscInt k = 1;
+	PetscInt l, iterations;
 	PetscMPIInt rank, size;
 	int nT, nF;
 	Mat A_TT, A_TF, A_FT, A_FF, A;
@@ -37,11 +40,12 @@ int main(int argc, char** argv)
 	PetscCall(PetscOptionsGetInt(nullptr, nullptr, "-k", &k, nullptr)); // the degree on the faces
 	l = k;
 	PetscCall(PetscOptionsGetInt(nullptr, nullptr, "-l", &l, nullptr)); // the degree in the cells
-	HHO::Matrix A_local = HHO::LocalMatrix((int)k, (int)l, nT, nF);
+	HHO::Matrix A_local = HHO::LocalMatrixReferenceSquare((int)k, (int)l, nT, nF);
 	HHO::Mesh mesh{ n, size };
-	auto [firstRow, lastRow] = mesh.Rows(rank);
-	auto [firstFace, lastFace] = mesh.FaceRange(rank);
-	PetscInt nCells = n * (lastRow - firstRow), nFaces = lastFace - firstFace;
+	auto [firstCell, lastCell] = mesh.CellOwnershipRange(rank);
+	auto [firstFace, lastFace] = mesh.FaceOwnershipRange(rank);
+	PetscInt nCells = lastCell - firstCell;
+	PetscInt nFaces = lastFace - firstFace;
 
 	// The four blocks, preallocated (non-zeros per row in the columns of the process, and in the others)
 	PetscCall(MatCreateAIJ(PETSC_COMM_WORLD, nT * nCells, nT * nCells, PETSC_DETERMINE, PETSC_DETERMINE, nT, nullptr, 0, nullptr, &A_TT));
@@ -51,35 +55,35 @@ int main(int argc, char** argv)
 
 	// The local matrices of the cells of the process, added; the DoFs of the boundary faces (Dirichlet, homogeneous)
 	// dropped
-	for (PetscInt j = firstRow; j < lastRow; j++)
+	for (PetscInt T = firstCell; T < lastCell; T++)
 	{
-		for (PetscInt i = 0; i < n; i++)
+		std::array<std::int64_t, 4> faces = mesh.Faces(T);
+		std::vector<int> cellLocal, faceLocal;
+		std::vector<PetscInt> cellDoFs, faceDoFs;
+		for (int t = 0; t < nT; t++)
 		{
-			PetscInt T = j * n + i;
-			std::array<std::int64_t, 4> faces = mesh.Faces(i, j);
-			std::vector<int> cellLocal, faceLocal;
-			std::vector<PetscInt> cellDoFs, faceDoFs;
-			for (int t = 0; t < nT; t++)
-			{
-				cellLocal.push_back(t);
-				cellDoFs.push_back(nT * T + t);
-			}
-			for (int f = 0; f < 4; f++)
-			{
-				for (int m = 0; faces[f] >= 0 && m < nF; m++)
-				{
-					faceLocal.push_back(nT + f * nF + m);
-					faceDoFs.push_back(nF * faces[f] + m);
-				}
-			}
-			HHO::Matrix a = mesh.Kappa(i, j) * A_local;
-			RowMajorMatrix TT = a(cellLocal, cellLocal), TF = a(cellLocal, faceLocal), FT = a(faceLocal, cellLocal), FF = a(faceLocal, faceLocal);
-			PetscInt cT = (PetscInt)cellDoFs.size(), cF = (PetscInt)faceDoFs.size();
-			PetscCall(MatSetValues(A_TT, cT, cellDoFs.data(), cT, cellDoFs.data(), TT.data(), ADD_VALUES));
-			PetscCall(MatSetValues(A_TF, cT, cellDoFs.data(), cF, faceDoFs.data(), TF.data(), ADD_VALUES));
-			PetscCall(MatSetValues(A_FT, cF, faceDoFs.data(), cT, cellDoFs.data(), FT.data(), ADD_VALUES));
-			PetscCall(MatSetValues(A_FF, cF, faceDoFs.data(), cF, faceDoFs.data(), FF.data(), ADD_VALUES));
+			cellLocal.push_back(t);
+			cellDoFs.push_back(nT * T + t);
 		}
+		for (int f = 0; f < 4; f++)
+		{
+			for (int m = 0; faces[f] >= 0 && m < nF; m++)
+			{
+				faceLocal.push_back(nT + f * nF + m);
+				faceDoFs.push_back(nF * faces[f] + m);
+			}
+		}
+		HHO::Matrix a = mesh.Kappa(T) * A_local;
+		RowMajorMatrix TT = a(cellLocal, cellLocal);
+		RowMajorMatrix TF = a(cellLocal, faceLocal);
+		RowMajorMatrix FT = a(faceLocal, cellLocal);
+		RowMajorMatrix FF = a(faceLocal, faceLocal);
+		PetscInt cT = (PetscInt)cellDoFs.size();
+		PetscInt cF = (PetscInt)faceDoFs.size();
+		PetscCall(MatSetValues(A_TT, cT, cellDoFs.data(), cT, cellDoFs.data(), TT.data(), ADD_VALUES));
+		PetscCall(MatSetValues(A_TF, cT, cellDoFs.data(), cF, faceDoFs.data(), TF.data(), ADD_VALUES));
+		PetscCall(MatSetValues(A_FT, cF, faceDoFs.data(), cT, cellDoFs.data(), FT.data(), ADD_VALUES));
+		PetscCall(MatSetValues(A_FF, cF, faceDoFs.data(), cF, faceDoFs.data(), FF.data(), ADD_VALUES));
 	}
 	for (Mat M : { A_TT, A_TF, A_FT, A_FF })
 	{
@@ -100,13 +104,14 @@ int main(int argc, char** argv)
 	for (int part = 0; part < 2; part++)
 	{
 		const PetscInt* indices;
-		PetscInt nDoFs, blockSize = part == 0 ? nT : nF;
+		PetscInt nDoFs;
+		PetscInt blockSize = part == 0 ? nT : nF;
 		PetscCall(ISGetLocalSize(rows[part], &nDoFs));
 		PetscCall(ISGetIndices(rows[part], &indices));
 		for (PetscInt p = 0; p < nDoFs; p += blockSize)
 		{
 			if (part == 0)
-				PetscCall(VecSetValue(b, indices[p], 1.0 / (n * n), INSERT_VALUES));
+				PetscCall(VecSetValue(b, indices[p], mesh.Measure(firstCell + p / nT), INSERT_VALUES));
 			PetscCall(VecSetValue(one, indices[p], 1, INSERT_VALUES));
 		}
 		PetscCall(ISRestoreIndices(rows[part], &indices));

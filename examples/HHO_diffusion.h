@@ -19,10 +19,14 @@ namespace HHO
 	// The Legendre polynomial of degree m at x, and its derivative
 	inline std::pair<double, double> Legendre(int m, double x)
 	{
-		double L = 1, previous = 0, dL = 0, dPrevious = 0;
+		double L = 1;
+		double previous = 0;
+		double dL = 0;
+		double dPrevious = 0;
 		for (int i = 0; i < m; i++)
 		{
-			double next = ((2 * i + 1) * x * L - i * previous) / (i + 1), dNext = dPrevious + (2 * i + 1) * L;
+			double next = ((2 * i + 1) * x * L - i * previous) / (i + 1);
+			double dNext = dPrevious + (2 * i + 1) * L;
 			previous = L;
 			L = next;
 			dPrevious = dL;
@@ -57,13 +61,15 @@ namespace HHO
 	// R in P^{k+1}: (grad R, grad w) = (grad u_T, grad w) + sum_F (u_F - u_T, grad w.n)_F; the stabilization:
 	// sum_F h_F^-1 |pi_F(u_F - u_T - (R - pi_T R))|_F^2, h_F = 2. In 2D, the matrix of every square. nT, nF: the DoFs of a
 	// cell, of a face. The interpolation of 1: 1 on the first function of each cell and face, 0 on the others.
-	inline Matrix LocalMatrix(int k, int l, int& nT, int& nF)
+	inline Matrix LocalMatrixReferenceSquare(int k, int l, int& nT, int& nF)
 	{
-		std::vector<Function> cell = Basis(l), reconstruction = Basis(k + 1);
+		std::vector<Function> cell = Basis(l);
+		std::vector<Function> reconstruction = Basis(k + 1);
 		reconstruction.erase(reconstruction.begin()); // R without its constant: its gradient
 		nT = (int)cell.size();
 		nF = k + 1;
-		int nR = (int)reconstruction.size(), n = nT + 4 * nF;
+		int nR = (int)reconstruction.size();
+		int n = nT + 4 * nF;
 		Vector x, w;
 		GaussLegendre(k + l + 3, x, w);
 		auto value = [](Function f, double X, double Y) { return Legendre(f.first, X).first * Legendre(f.second, Y).first; };
@@ -76,7 +82,8 @@ namespace HHO
 		const int faces[4][2] = { { 0, -1 }, { 0, 1 }, { 1, -1 }, { 1, 1 } }; // (the axis of the normal, its sign)
 		auto onFace = [&](int f, int p) { return faces[f][0] == 0 ? Eigen::Vector2d(faces[f][1], x[p]) : Eigen::Vector2d(x[p], faces[f][1]); };
 
-		Matrix K = Matrix::Zero(nR, nR), B = Matrix::Zero(nR, n);
+		Matrix K = Matrix::Zero(nR, nR);
+		Matrix B = Matrix::Zero(nR, n);
 		for (int p = 0; p < x.size(); p++)
 			for (int q = 0; q < x.size(); q++)
 				for (int i = 0; i < nR; i++)
@@ -121,7 +128,8 @@ namespace HHO
 							P(m, j) += w[p] * Legendre(m, x[p]).first * value(functions[j], onFace(f, p)[0], onFace(f, p)[1]) / mass[m];
 				return P;
 			};
-			Matrix projectedR = project(reconstruction), D = Matrix::Zero(nF, n);
+			Matrix projectedR = project(reconstruction);
+			Matrix D = Matrix::Zero(nF, n);
 			for (int i : high)
 				D -= projectedR.col(i) * R.row(i);
 			D.leftCols(nT) -= project(cell);
@@ -131,32 +139,60 @@ namespace HHO
 		return A;
 	}
 
-	// The mesh, n x n squares, distributed among the processes: the cells of each one, rows of the mesh (a horizontal
-	// strip); each face owned by the process of its lower or left cell. Numbered in rank order: row by row, the cells of a
-	// row (the cell (i, j) is j n + i), and its faces: the n - 1 vertical ones between its cells, then the n horizontal
-	// ones above it (none above the last row).
+	// The mesh, n x n squares, distributed among the processes, seen by the assemblies as an unstructured mesh: its cells
+	// and faces by their global numbers, in rank order (those of the process of rank 0 first, etc.), each cell with its
+	// faces, each face with its cells. Here, the cells of each process are rows of the mesh (a horizontal strip), and each
+	// face is owned by the process of its lower or left cell; numbered row by row: the cells of a row (the cell (i, j) is
+	// j n + i), and its faces: the n - 1 vertical ones between its cells, then the n horizontal ones above it (none above
+	// the last row).
 	struct Mesh
 	{
 		std::int64_t n;
 		int Processes;
 
-		// The faces of the rows below j (2 n - 1 each, n - 1 for the last row)
-		std::int64_t FacesBefore(std::int64_t j) const
+		// The faces of the cell T, in the order of the local matrix: left, right, bottom, top; -1 on the boundary
+		// (Dirichlet: no unknowns)
+		std::array<std::int64_t, 4> Faces(std::int64_t T) const
 		{
-			return j * (2 * n - 1) - (j == n ? n : 0);
-		}
-
-		// The faces of the cell (i, j): left, right, bottom, top; -1 on the boundary (Dirichlet: no unknowns)
-		std::array<std::int64_t, 4> Faces(std::int64_t i, std::int64_t j) const
-		{
+			std::int64_t i = T % n;
+			std::int64_t j = T / n;
 			return { i > 0 ? FacesBefore(j) + i - 1 : -1, i < n - 1 ? FacesBefore(j) + i : -1,
 			         j > 0 ? FacesBefore(j - 1) + n - 1 + i : -1, j < n - 1 ? FacesBefore(j) + n - 1 + i : -1 };
 		}
 
-		// The diffusion coefficient of the cell (i, j)
-		double Kappa(std::int64_t i, std::int64_t j) const
+		// The two cells of the face F (not on the boundary)
+		std::array<std::int64_t, 2> Cells(std::int64_t F) const
 		{
-			return (8 * i / n + 8 * j / n) % 2 ? 10 : 1;
+			std::int64_t j = F / (2 * n - 1);
+			std::int64_t i = F % (2 * n - 1);
+			return i < n - 1 ? std::array<std::int64_t, 2>{ j * n + i, j * n + i + 1 }      // vertical
+			                 : std::array<std::int64_t, 2>{ j * n + i - (n - 1), (j + 1) * n + i - (n - 1) }; // horizontal
+		}
+
+		// The diffusion coefficient of the cell T
+		double Kappa(std::int64_t T) const
+		{
+			return (8 * (T % n) / n + 8 * (T / n) / n) % 2 ? 10 : 1;
+		}
+
+		// The measure of the cell T (its area)
+		double Measure(std::int64_t) const
+		{
+			return 1.0 / ((double)n * n);
+		}
+
+		// The cells of the process of rank r, [first, last)
+		std::pair<std::int64_t, std::int64_t> CellOwnershipRange(int r) const
+		{
+			auto [first, last] = Rows(r);
+			return { first * n, last * n };
+		}
+
+		// The faces of the process of rank r, [first, last)
+		std::pair<std::int64_t, std::int64_t> FaceOwnershipRange(int r) const
+		{
+			auto [first, last] = Rows(r);
+			return { FacesBefore(first), FacesBefore(last) };
 		}
 
 		// The rows of the process of rank r, [first, last): those j with j Processes / n = r
@@ -165,11 +201,10 @@ namespace HHO
 			return { (r * n + Processes - 1) / Processes, ((r + 1) * n + Processes - 1) / Processes };
 		}
 
-		// The faces of the process of rank r, [first, last)
-		std::pair<std::int64_t, std::int64_t> FaceRange(int r) const
+		// The faces of the rows below j (2 n - 1 each, n - 1 for the last row)
+		std::int64_t FacesBefore(std::int64_t j) const
 		{
-			auto [first, last] = Rows(r);
-			return { FacesBefore(first), FacesBefore(last) };
+			return j * (2 * n - 1) - (j == n ? n : 0);
 		}
 	};
 }
