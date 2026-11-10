@@ -35,12 +35,10 @@ MPI `docs/mpi.md`; Python, its env and build directories: `docs/python.md`.
 
 ```bash
 conda activate fhhos4
-cd build          # or: mkdir build && cd build
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON ..
-ninja
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON
 ```
 
-Produces `build/bin/fhhos4` (main solver), `build/bin/fhhos4_tests` (GTest suite) and `build/lib/libfhhos4.so`
+Then build (and test) with the `build` skill: one heavy job at a time, under a memory watchdog. Produces `build/bin/fhhos4` (main solver), `build/bin/fhhos4_tests` (GTest suite) and `build/lib/libfhhos4.so`
 (U-AMG for other codes, see `library/`).
 Clean build ~2.5 min. Ninja runs at most `MAX_COMPILE_JOBS` (default 2) compilations in
 parallel: `Program.cpp` alone takes ~4 GB of RAM and ~2.5 min, and sets the build time (ADR-0015).
