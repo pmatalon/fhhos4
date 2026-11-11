@@ -73,8 +73,9 @@ program too: `-DENABLE_PROGRAM=ON`).
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
-  process may own nothing (NGSolve 6.2.2608's rank 0). `SingularMatrix`: the kernel on the own faces, the dot products
-  global, the pinned DoF of the coarsest level (one per component) on one process (`docs/uamg.md`).
+  process may own nothing (NGSolve 6.2.2608's rank 0; its block CSR matrices empty, of the block size of the faces).
+  `SingularMatrix`: the kernel on the own faces, the dot products global, the pinned DoF of the coarsest level (one
+  per component) on one process (`docs/uamg.md`).
   `ApplyCondensedMatrix()`: `DistributedA * x`. Not yet: `CondensedMatrix()` (its columns may reach beyond
   `faceGhostGlobalNumbers`: those of the received rows). `MergeOffDiag()`: the blocks of a process in
   two parts (PETSc's MPIAIJ, hypre's ParCSR) merged into the local columns of the setups, the ghosts by increasing
@@ -113,7 +114,8 @@ program too: `-DENABLE_PROGRAM=ON`).
 
 `fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes, also in the release workflow;
 `tests/support/PartitionedSystem.h`;
-`MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host);
+`MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host; `LibraryTest.cpp`'s
+`EmptyProcess`: the library with an empty first process, NGSolve's, in block CSR);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; 3D k=0
 `-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses

@@ -72,7 +72,9 @@ public:
 		vector<SparseMatrixIndex> blockStart(A.rows() / blockSize + 1);
 		for (size_t I = 0; I < blockStart.size(); I++)
 			blockStart[I] = I * blockSize;
-		return FromCSR(A, std::move(blockStart));
+		BlockSparseMatrix M = FromCSR(A, std::move(blockStart));
+		M.BlockSize = blockSize; // also without blocks (on several processes, a process that owns no rows)
+		return M;
 	}
 
 	// From the CSR matrix A (of any precision) whose rows and columns are grouped in the blocks starting at blockStart.

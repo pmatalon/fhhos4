@@ -7,8 +7,9 @@
 namespace fhhos4_tests
 {
 	// The cells of each process: horizontal strips, or blocks (px x py processes, px the largest divisor of the number
-	// of processes not greater than its square root)
-	enum class PartitionShape { Strips, Blocks };
+	// of processes not greater than its square root), or strips on the processes but the first, which owns nothing (as
+	// NGSolve's rank 0; several processes)
+	enum class PartitionShape { Strips, Blocks, StripsWithFirstProcessEmpty };
 
 	// The Cartesian system of n x n cells (CartesianHybridSystem) partitioned among the processes of comm,
 	// renumbered so that each process owns contiguous cells and faces: the cells of the processes in rank order (in the
@@ -37,7 +38,9 @@ namespace fhhos4_tests
 			std::vector<int> cellRank(nCells);
 			for (int j = 0; j < n; j++)
 				for (int i = 0; i < n; i++)
-					cellRank[j * n + i] = shape == PartitionShape::Strips ? j * P / n : (j * py / n) * px + i * px / n;
+					cellRank[j * n + i] = shape == PartitionShape::Strips ? j * P / n
+						: shape == PartitionShape::StripsWithFirstProcessEmpty ? 1 + j * (P - 1) / n
+						: (j * py / n) * px + i * px / n;
 			// The faces: their smaller rank among their cells (the columns of A_TF)
 			std::vector<int> faceRank(nFaces, P);
 			for (BigNumber T = 0; T < nCells; T++)

@@ -104,13 +104,13 @@ TwoParts Split(const fhhos4::SparseMatrix& rows, int64_t begin, int64_t end)
 // (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision, blockCSR:
 // MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). mergeOffDiag: the blocks of each
 // process in two parts (Split(), as PETSc stores them), merged by MergeOffDiag() (the ghosts
-// by increasing global number), checked against the test's. Returns the iterations on the processes; setupLog: the
-// printouts of their setup (Verbosity 2, on the root process) if not null.
-int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool mergeOffDiag = false)
+// by increasing global number), checked against the test's. shape: the partition. Returns the iterations on the
+// processes; setupLog: the printouts of their setup (Verbosity 2, on the root process) if not null.
+int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool mergeOffDiag = false, PartitionShape shape = PartitionShape::Blocks)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, asymmetry, singular);
-	PartitionedSystem system(global, n, PartitionShape::Blocks, World());
+	PartitionedSystem system(global, n, shape, World());
 	const IndexMap& faces = *system.Faces;
 	const IndexMap& cells = *system.Cells;
 	int c = components;
@@ -307,6 +307,16 @@ TEST(DistributedLibrary, MergeOffDiag)
 	for (double asymmetry : { 0.0, 0.3 })
 		for (int components : { 1, 2 })
 			ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, components, true, nullptr, false, true);
+}
+
+// A process that owns no cell and no face (NGSolve's rank 0): its levels empty, in block CSR (2 components, mixed
+// precision) too; symmetric (the Chebyshev smoothers) and not (the l1 hybrid block Gauss-Seidel)
+TEST(DistributedLibrary, EmptyProcess)
+{
+	if (World().Size() == 1)
+		GTEST_SKIP() << "several processes";
+	for (double asymmetry : { 0.0, 0.3 })
+		ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, 2, true, nullptr, false, false, PartitionShape::StripsWithFirstProcessEmpty);
 }
 
 // MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxRows at MinRowsPerProcess * P rows (on
