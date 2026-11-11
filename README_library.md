@@ -32,8 +32,9 @@ For distributed memory, you'll also need
 - [MUMPS](https://mumps-solver.org)  (e.g. conda-forge's `mumps-mpi`)
 
 ```bash
-git clone --branch v1.5.0 --depth 1 https://github.com/pmatalon/fhhos4.git && cd fhhos4
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=OFF
+git clone --branch v1.5.0 --depth 1 https://github.com/pmatalon/fhhos4.git
+cd fhhos4
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 cmake --install build --prefix <prefix>    # lib/, include/ and the CMake package
 ```
@@ -489,22 +490,11 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 ## Constraints
 
-- **Symmetric positive definite** condensed system (`SetupSym()`), or semi-definite with the interpolation of 1
-  (of each component) as kernel (`SingularMatrix`: the pure Neumann problem), or non-symmetric with a positive definite symmetric part
-  (`SetupNonSym()`). With `SetupSym()`, the blocks
-  of `A_TT` (one per cell) must be positive definite: the library factorizes them by Cholesky (LU with
-  `SetupNonSym()`).
 - **Eigen 3.4 or 5.x** in your code, for the header `<fhhos4>`. No Eigen object crosses the boundary of the library:
   its compiled functions take arrays (views), which the header builds from your Eigen matrices and vectors, with your
   version of Eigen and your flags (any version, any alignment settings).
-- **The matrix read in place by the solves**: `A_FT` of `SetupNonSym()`. Keep it alive and unchanged until the
-  next setup or the destruction of the solver. The others are only read by the setup.
-- **Errors**: `fhhos4::Error` (a `std::runtime_error`). `Solve()` does not throw if the tolerance is not reached: see
-  `Result::Converged`.
 - **Not thread-safe**: one `fhhos4::Solver` object must not be used by several threads at the same time. The library
   parallelizes its own work with OpenMP.
-- **MPI**: the calling code initializes MPI (the library calls MPI from the main thread only: `MPI_THREAD_FUNNELED`),
-  and `Comm` stays valid while the solver is used.
 
 # License
 
