@@ -98,4 +98,9 @@ TEST(DistributedChebyshev, BlockCSR)
 	reusing.SolveInSinglePrecision(singleB, y[1], false, &residual[1], nullptr);
 	EXPECT_LE(Parallel::Norm(Vector((y[1] - y[0]).cast<double>())), 1e-5 * Parallel::Norm(Vector(y[0].cast<double>())));
 	EXPECT_LE(Parallel::Norm(Vector((residual[1] - residual[0]).cast<double>())), 1e-5 * Parallel::Norm(Vector(residual[0].cast<double>())));
+
+	// Blocks of another size on the last process only: the error raised on all the processes
+	const Communicator& comm = Communicator::Current();
+	BlockSparseMatrix<double> wrongBlocks = comm.Rank() == comm.Size() - 1 ? BlockSparseMatrix<double>::FromCSR(S.Diag, 1) : blocks;
+	EXPECT_THROW(bcsr.SetupBlockCSR(wrongBlocks, &S), fhhos4::Error);
 }

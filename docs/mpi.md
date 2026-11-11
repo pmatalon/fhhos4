@@ -72,10 +72,12 @@ program too: `-DENABLE_PROGRAM=ON`).
   `SetupNonSym(..., faceGhostGlobalNumbers, cellGhostGlobalNumbers)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
-  symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes). A
-  process may own nothing (NGSolve 6.2.2608's rank 0; its block CSR matrices empty, of the block size of the faces).
-  `SingularMatrix`: the kernel on the own faces, the dot products global, the pinned DoF of the coarsest level (one
-  per component) on one process (`docs/uamg.md`).
+  symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes;
+  not around the setup, whose collective calls a process that throws would leave the others waiting in: its own checks
+  reduce their condition before raising, e.g. `BlockChebyshev::SetupBlocks()`). A process may own nothing (NGSolve
+  6.2.2608's rank 0; its block CSR matrices empty, of the block size of the faces). `SingularMatrix`: the kernel on
+  the own faces, the dot products global, the pinned DoF of the coarsest level (one per component) on one process
+  (`docs/uamg.md`).
   `ApplyCondensedMatrix()`: `DistributedA * x`. Not yet: `CondensedMatrix()` (its columns may reach beyond
   `faceGhostGlobalNumbers`: those of the received rows). `MergeOffDiag()`: the blocks of a process in
   two parts (PETSc's MPIAIJ, hypre's ParCSR) merged into the local columns of the setups, the ghosts by increasing

@@ -211,8 +211,11 @@ private:
 	template <typename T>
 	void SetupBlocks(const BlockSparseMatrix<T>& A)
 	{
-		if (_blockSize == 1 || A.BlockSize != _blockSize)
-			Utils::FatalError("The block CSR storage of a Chebyshev smoother requires blocks of its block size (" + to_string(_blockSize) + ", > 1), got " + to_string(A.BlockSize) + ".");
+		// The smallest wrong block size of the processes: the error on all of them (the others would wait in the
+		// estimation of lambdaMax)
+		int wrongBlockSize = Communicator::Current().Min(_blockSize > 1 && A.BlockSize == _blockSize ? numeric_limits<int>::max() : A.BlockSize);
+		if (wrongBlockSize != numeric_limits<int>::max())
+			Utils::FatalError("The block CSR storage of a Chebyshev smoother requires blocks of its block size (" + to_string(_blockSize) + ", > 1), got " + to_string(wrongBlockSize) + ".");
 		_diagBlockSolver.Setup(A, _blockSize, DiagBlockSolveMethod::Inverse);
 		EstimateLambdaMaxAndCost<T>();
 	}
