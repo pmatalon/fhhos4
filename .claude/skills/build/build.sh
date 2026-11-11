@@ -45,7 +45,7 @@ build=$!
 fired=
 while kill -0 "$build" 2>/dev/null; do
     available=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
-    if [ "$available" -lt 1500000 ]; then
+    if [ "$available" -lt 1000000 ]; then
         pkill -u "$user" -x cc1plus  # -x: the process name; -f would also match the Bash tool's shell running this script
         fired=$available
     fi

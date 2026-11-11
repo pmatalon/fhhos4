@@ -9,7 +9,7 @@ description: Builds fhhos4 in a build directory (an existing one or a new one) o
 machine that runs out of memory may crash (WSL does). Every build therefore goes through `build.sh`: it refuses to
 start beside another of your compilations or fhhos4 runs, activates the directory's conda env (a compiler outside
 conda builds in the current environment: load the modules or the Spack env first), compiles with `-j1` under 8 GB
-available, and kills the compilation below 1.5 GB.
+available, and kills the compilation below 1 GB.
 
 ## Steps
 
