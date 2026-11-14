@@ -131,11 +131,12 @@ cell and face unknowns `(x_T, x_F)`.
 #include <fhhos4>
 
 fhhos4::Solver solver;
+solver.VectorComponents = 1; // components of the unknown: 1 if scalar, e.g. 3 for a vector in 3D (see Inputs)
+// Optional, inferred from the blocks if not set (see Inputs):
 solver.Dimension = 3;  // space dimension
 solver.FaceDegree = k; // polynomial degree in the faces
 solver.CellDegree = k; // polynomial degree in the cells
 solver.PolynomialSpace = fhhos4::PolynomialSpace::P; // or Q: bases of Q^k instead of P^k
-// solver.VectorComponents = 3; // a vector-valued unknown of 3 components (see Inputs)
 
 #if FHHOS4_MPI // 1 if the library is compiled with MPI (fhhos4_version.h)
 solver.Comm = MPI_COMM_WORLD;
@@ -149,6 +150,11 @@ solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
 Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size()); // with MPI: of the process
 fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F); // flexible conjugate gradient preconditioned by the AMG
 ```
+
+> [!TIP]
+> `VectorComponents` is the one parameter to set: in the vast majority of common cases, the setup infers the
+> dimension, the degrees and the polynomial space from the blocks (see [Inputs](#inputs) for its assumptions, and the
+> rare ambiguities, where an error names the parameter to set).
 
 A complete example, an HHO discretization assembled into the blocks, on one process or several with MPI:
 [`examples/fhhos4_solver.cpp`](examples/fhhos4_solver.cpp).
@@ -325,7 +331,7 @@ precision; with MPI, `-DENABLE_MPI=ON` and the same MPI).
 
 ```bash
 mpiexec -n 4 ./my_code -dll_append <prefix>/lib/libfhhos4_petsc.so -ksp_type fcg -pc_type fhhos4 \
-    -pc_fhhos4_dimension 3 -pc_fhhos4_face_degree 1 -pc_fhhos4_cell_degree 1
+    -pc_fhhos4_vector_components 1 -pc_fhhos4_dimension 3 -pc_fhhos4_face_degree 1 -pc_fhhos4_cell_degree 1
 ```
 
 Complete examples, an HHO discretization of degree 1 or 2 assembled cell by cell, its interpolation of 1, and the
@@ -356,9 +362,9 @@ solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) 
 
 | Option | Default | Parameter |
 |---|---|---|
+| `-pc_fhhos4_vector_components` | none: required if the dimension or a degree is not given; `1` otherwise | `VectorComponents` |
 | `-pc_fhhos4_dimension`, `-pc_fhhos4_face_degree`, `-pc_fhhos4_cell_degree` | inferred from the blocks (see [Inputs](#inputs)) | `Dimension`, `FaceDegree`, `CellDegree` |
 | `-pc_fhhos4_polynomial_space p\|q` | inferred from the blocks | `PolynomialSpace` |
-| `-pc_fhhos4_vector_components` | none: required if one of the three above is not given; `1` otherwise | `VectorComponents` |
 | `-pc_fhhos4_symmetric` | from the operator | the symmetric setup |
 | `-pc_fhhos4_cycle k\|v\|w` | `k` | `Cycle` |
 | `-pc_fhhos4_krylov none\|fcg\|gcr` | `none`: one cycle | `Krylov` in each application: the whole solve of the library, with `-ksp_type preonly` |
@@ -386,6 +392,7 @@ import numpy as np
 import fhhos4
 
 solver = fhhos4.Solver()
+solver.VectorComponents = 1  # 1 if scalar; the next four optional: inferred from the blocks if not set
 solver.Dimension = 3
 solver.FaceDegree = k
 solver.CellDegree = k
@@ -483,9 +490,9 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 | Parameter | Default | Values |
 |---|---|---|
+| `VectorComponents` | `-1`: required if `Dimension` or a degree is inferred, `1` otherwise | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `Dimension`, `FaceDegree`, `CellDegree` | `-1`: inferred from the blocks (see [Inputs](#inputs)) | `2` or `3`; k `>= 0`; l = k - 1, k or k + 1 |
 | `PolynomialSpace` | `PolynomialSpace::Inferred`: from the blocks | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
-| `VectorComponents` | `-1`: required if `Dimension` or a degree is inferred, `1` otherwise | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `SingularMatrix` | `false` | `true`: the kernel is the interpolation of 1 of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
 | `Krylov` | `FCG` if symmetric, `GCR` if non-symmetric | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#use-as-a-preconditioner))</li></ul> |
 | `Restart` | `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
