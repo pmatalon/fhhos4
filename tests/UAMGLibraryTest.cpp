@@ -19,6 +19,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <Eigen/Dense>
 #include <Eigen/SparseCholesky>
 #include <Eigen/SparseLU>
 #ifdef _OPENMP
@@ -1353,7 +1354,8 @@ TEST(UAMGLibrary, MergeOffDiag)
 	EXPECT_THROW(fhhos4::MergeOffDiag(A_TF_diag, A_TF_offd, A_TF_offdColumns.data(), matrix(4, 3, {}), A_FT_offd, A_FT_offdColumns.data(), A_FF_diag, A_FF_offd, A_FF_offdColumns.data(), 2, 1), fhhos4::Error);
 }
 
-// CellBlockSize(), FaceBlockSize(): the DoFs of a cell and a face from the parameters; refused before they are set
+// CellBlockSize(), FaceBlockSize(): the DoFs of a cell and a face from the parameters (VectorComponents not set: 1);
+// refused before they are set (the space too: P and Q differ here), or inferred by a setup
 TEST(UAMGLibrary, BlockSizes)
 {
 	fhhos4::Solver solver;
@@ -1361,6 +1363,8 @@ TEST(UAMGLibrary, BlockSizes)
 	solver.Dimension = 3;
 	solver.FaceDegree = 2;
 	solver.CellDegree = 1;
+	EXPECT_THROW(solver.FaceBlockSize(), fhhos4::Error);
+	solver.PolynomialSpace = fhhos4::PolynomialSpace::P;
 	EXPECT_EQ(solver.FaceBlockSize(), 6); // P^2 in 2D
 	EXPECT_EQ(solver.CellBlockSize(), 4); // P^1 in 3D
 	solver.PolynomialSpace = fhhos4::PolynomialSpace::Q;
@@ -1369,6 +1373,120 @@ TEST(UAMGLibrary, BlockSizes)
 	solver.VectorComponents = 2;
 	EXPECT_EQ(solver.FaceBlockSize(), 18);
 	EXPECT_EQ(solver.CellBlockSize(), 16);
+}
+
+// The toy system ⊗ (C_TT, C_TF, G) with random C_TT (symmetric positive definite) and C_TF, cellDoFs x cellDoFs and
+// cellDoFs x faceDoFs, G = C_TF^T C_TT^{-1} C_TF: the condensed matrix A ⊗ G, symmetric positive definite; the blocks
+// dense (no coefficient 0)
+Blocks DenseBlocks(const HybridSystem& system, int cellDoFs, int faceDoFs)
+{
+	std::mt19937 generator(cellDoFs);
+	std::uniform_real_distribution<double> coefficient(0.5, 1);
+	Eigen::MatrixXd B = Eigen::MatrixXd::NullaryExpr(cellDoFs, cellDoFs, [&]() { return coefficient(generator); });
+	Eigen::MatrixXd C_TT = B * B.transpose() + cellDoFs * Eigen::MatrixXd::Identity(cellDoFs, cellDoFs);
+	Eigen::MatrixXd C_TF = Eigen::MatrixXd::NullaryExpr(cellDoFs, faceDoFs, [&]() { return coefficient(generator); });
+	Eigen::MatrixXd G = C_TF.transpose() * C_TT.llt().solve(C_TF);
+	return Kron(Blocks{ system.A_TT, system.A_TF, system.A_FT, system.A_FF }, C_TT, C_TF, G);
+}
+
+// The discretization inferred from the blocks (ADR-0023), only VectorComponents set: the parameters of the system,
+// written into the solver, and the iterations of the solver with all of them set. At degree 0 (Dimension and
+// PolynomialSpace not needed: printed so at Verbosity 1, set to 2 and P); 3 DoFs per cell and per face (the toy system ⊗
+// dense blocks: 2D, P, k = 2, l = 1, the only discretization of these DoFs). Dimension and the degrees set (ToySolver()):
+// the space alone, from the sizes (4 DoFs per cell and 2 per face in 2D at k = l = 1: Q), VectorComponents 1. Refused:
+// VectorComponents not set; an ambiguity (64 DoFs per cell and 9 per face: 3D Q k=2 l=3, or 2D Q k=8 l=7), nothing
+// written, Dimension proposed, which then resolves it.
+TEST(UAMGLibrary, InferredDiscretization)
+{
+	auto solve = [](fhhos4::Solver& solver, const Blocks& blocks, const HybridSystem& system)
+	{
+		solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		Eigen::VectorXd b_T = Eigen::VectorXd::Ones(blocks.A_TT.rows()), b_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
+		Eigen::VectorXd x_T(blocks.A_TT.rows()), x_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
+		fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F);
+		EXPECT_TRUE(result.Converged);
+		return result.Iterations;
+	};
+	auto inferred = []()
+	{
+		fhhos4::Solver solver = ToySolver();
+		solver.Dimension = -1;
+		solver.FaceDegree = -1;
+		solver.CellDegree = -1;
+		solver.VectorComponents = 1;
+		return solver;
+	};
+	auto expect = [](const fhhos4::Solver& solver, int dimension, fhhos4::PolynomialSpace space, int faceDegree, int cellDegree)
+	{
+		EXPECT_EQ(solver.Dimension, dimension);
+		EXPECT_TRUE(solver.PolynomialSpace == space);
+		EXPECT_EQ(solver.FaceDegree, faceDegree);
+		EXPECT_EQ(solver.CellDegree, cellDegree);
+		EXPECT_EQ(solver.VectorComponents, 1);
+	};
+	fhhos4::PolynomialSpace P = fhhos4::PolynomialSpace::P, Q = fhhos4::PolynomialSpace::Q;
+	EXPECT_TRUE(fhhos4::Solver().PolynomialSpace == fhhos4::PolynomialSpace::Inferred);
+	EXPECT_EQ(fhhos4::Solver().VectorComponents, -1);
+
+	HybridSystem system(32);
+	Blocks degree0{ system.A_TT, system.A_TF, system.A_FT, system.A_FF };
+	fhhos4::Solver set = ToySolver(), fromTheBlocks = inferred();
+	int iterations = solve(set, degree0, system);
+	expect(set, 2, P, 0, 0);
+	fromTheBlocks.Verbosity = 1;
+	testing::internal::CaptureStdout();
+	EXPECT_EQ(solve(fromTheBlocks, degree0, system), iterations);
+	std::string output = testing::internal::GetCapturedStdout();
+	EXPECT_NE(output.find("fhhos4: inferred from the blocks, 1 DoF per cell and 1 per face (1 component): Dimension 2 (not needed), PolynomialSpace P (not needed), FaceDegree 0, CellDegree 0\n"), std::string::npos) << output;
+	expect(fromTheBlocks, 2, P, 0, 0);
+
+	Blocks three = DenseBlocks(system, 3, 3);
+	set.FaceDegree = 2;
+	set.CellDegree = 1;
+	fromTheBlocks = inferred();
+	EXPECT_EQ(solve(fromTheBlocks, three, system), solve(set, three, system));
+	expect(fromTheBlocks, 2, P, 2, 1);
+	EXPECT_EQ(fromTheBlocks.CellBlockSize(), 3);
+	EXPECT_EQ(fromTheBlocks.FaceBlockSize(), 3);
+
+	fhhos4::Solver degrees = ToySolver();
+	degrees.FaceDegree = 1;
+	degrees.CellDegree = 1;
+	solve(degrees, DenseBlocks(system, 4, 2), system);
+	expect(degrees, 2, Q, 1, 1);
+
+	fhhos4::Solver noComponents = inferred();
+	noComponents.VectorComponents = -1;
+	try
+	{
+		noComponents.SetupSym(three.A_TT, three.A_TF, three.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		ADD_FAILURE() << "VectorComponents not set accepted";
+	}
+	catch (const fhhos4::Error& e)
+	{
+		EXPECT_NE(std::string(e.what()).find("set VectorComponents"), std::string::npos) << e.what();
+	}
+
+	HybridSystem small(4);
+	Blocks ambiguous = DenseBlocks(small, 64, 9);
+	fhhos4::Solver ambiguity = inferred();
+	try
+	{
+		ambiguity.SetupSym(ambiguous.A_TT, ambiguous.A_TF, ambiguous.A_FF, small.CellInterpOfOne, small.FaceInterpOfOne);
+		ADD_FAILURE() << "an ambiguity accepted";
+	}
+	catch (const fhhos4::Error& e)
+	{
+		EXPECT_EQ(std::string(e.what()), "fhhos4: 64 DoFs per cell and 9 per face (1 component) fit discretizations that need different solvers:\n"
+		                                 "  Dimension 3, Q, face degree 2, cell degree 3\n"
+		                                 "  Dimension 2, Q, face degree 8, cell degree 7\n"
+		                                 "Set Dimension (2 or 3).");
+	}
+	EXPECT_EQ(ambiguity.Dimension, -1);
+	EXPECT_FALSE(ambiguity.IsSetUp());
+	ambiguity.Dimension = 3;
+	solve(ambiguity, ambiguous, small);
+	expect(ambiguity, 3, Q, 2, 3);
 }
 
 // L1Theta: the theta of the l1 Gauss-Seidel smoothers, here on 4 threads (the rows coupled to other chunks have l1
@@ -1585,16 +1703,23 @@ TEST(UAMGLibrary, Errors)
 	q.PolynomialSpace = fhhos4::PolynomialSpace::Q;
 	EXPECT_NO_THROW(q.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne));
 
-	// Parameters not set, or invalid
-	fhhos4::Solver noDimension = ToySolver();
-	noDimension.Dimension = -1;
-	EXPECT_THROW(noDimension.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
-	fhhos4::Solver noFaceDegree = ToySolver();
-	noFaceDegree.FaceDegree = -1;
-	EXPECT_THROW(noFaceDegree.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
-	fhhos4::Solver noCellDegree = ToySolver();
-	noCellDegree.CellDegree = -1;
-	EXPECT_THROW(noCellDegree.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	// Parameters not set: inferred from the blocks, VectorComponents then required; invalid: Dimension other than 2 or
+	// 3, negative degrees, CellDegree outside FaceDegree - 1 to FaceDegree + 1 (also when all are set)
+	for (int fhhos4::Solver::* parameter : { &fhhos4::Solver::Dimension, &fhhos4::Solver::FaceDegree, &fhhos4::Solver::CellDegree })
+	{
+		fhhos4::Solver notSet = ToySolver();
+		notSet.*parameter = -1;
+		EXPECT_THROW(notSet.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+		notSet.VectorComponents = 1;
+		EXPECT_NO_THROW(notSet.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne));
+		fhhos4::Solver invalid = ToySolver();
+		invalid.*parameter = parameter == &fhhos4::Solver::Dimension ? 4 : -2;
+		EXPECT_THROW(invalid.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	}
+	fhhos4::Solver cellDegree2 = ToySolver();
+	cellDegree2.CellDegree = 2;
+	EXPECT_THROW(cellDegree2.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	EXPECT_THROW(cellDegree2.CellBlockSize(), fhhos4::Error);
 	fhhos4::Solver wrongCycle = ToySolver();
 	wrongCycle.Cycle = static_cast<fhhos4::Cycle>(42); // out of the enum
 	EXPECT_THROW(wrongCycle.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);

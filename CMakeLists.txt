@@ -225,6 +225,7 @@ if(ENABLE_PETSC_PC)
 		INSTALL_RPATH "$ORIGIN"
 		INSTALL_RPATH_USE_LINK_PATH ON)
 	target_link_libraries(fhhos4_petsc PUBLIC fhhos4_lib PRIVATE PkgConfig::PETSC)
+	target_include_directories(fhhos4_petsc PRIVATE ${CMAKE_SOURCE_DIR}/src) # Solver/DiscretizationInference.h: header-only
 	install(TARGETS fhhos4_petsc EXPORT fhhos4Targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT library)
 	install(FILES library/include/fhhos4_petsc.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT library)
 	message(STATUS "ENABLE_PETSC_PC: ON (PETSc ${PETSC_VERSION})")

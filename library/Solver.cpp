@@ -9,6 +9,7 @@
 #include "fhhos4.h"
 #include "ProgramArgumentsDefaults.h"
 #include "Solver/AlgebraicSolverFactory.h"
+#include "Solver/DiscretizationInference.h"
 #include "Solver/LibraryParameters.h"
 #include "Solver/DistributedStaticCondensation.h"
 #include "Solver/StaticCondensation.h"
@@ -224,20 +225,90 @@ namespace fhhos4
 			return "";
 		}
 
-		// The DoFs of a cell and of a face, from Dimension, the degrees, PolynomialSpace and VectorComponents (checked)
+		// The parameters of the discretization as set (-1, PolynomialSpace::Inferred: not set), checked
+		DiscretizationInference::Discretization DiscretizationParametersSet(const Solver& s)
+		{
+			if (s.Dimension != -1 && s.Dimension != 2 && s.Dimension != 3)
+				Utils::FatalError("fhhos4::Solver: Dimension must be 2 or 3 (-1: inferred from the blocks), got " + to_string(s.Dimension) + ".");
+			if (s.FaceDegree < -1)
+				Utils::FatalError("fhhos4::Solver: FaceDegree must be >= 0 (-1: inferred from the blocks), got " + to_string(s.FaceDegree) + ".");
+			if (s.CellDegree < -1)
+				Utils::FatalError("fhhos4::Solver: CellDegree must be >= 0 (-1: inferred from the blocks), got " + to_string(s.CellDegree) + ".");
+			if (s.FaceDegree >= 0 && s.CellDegree >= 0 && abs(s.CellDegree - s.FaceDegree) > 1)
+				Utils::FatalError("fhhos4::Solver: CellDegree must be FaceDegree - 1, FaceDegree or FaceDegree + 1, got " + to_string(s.CellDegree) + " with FaceDegree " + to_string(s.FaceDegree) + ".");
+			if (s.PolynomialSpace != fhhos4::PolynomialSpace::Inferred)
+				LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace); // refuses a value out of the enum
+			if (s.VectorComponents < 1 && s.VectorComponents != -1)
+				Utils::FatalError("fhhos4::Solver: VectorComponents must be >= 1 (1 for a scalar problem), got " + to_string(s.VectorComponents) + ".");
+			return { s.Dimension, s.PolynomialSpace, s.FaceDegree, s.CellDegree };
+		}
+
+		// The DoFs of a cell and of a face, from Dimension, the degrees, PolynomialSpace and VectorComponents (-1: 1), set
+		// or inferred by a setup (checked)
 		pair<int, int> BlockSizes(const Solver& s)
 		{
-			if (s.Dimension != 2 && s.Dimension != 3)
-				Utils::FatalError("fhhos4::Solver: set Dimension (2 or 3) before the setup, got " + to_string(s.Dimension) + ".");
-			if (s.FaceDegree < 0)
-				Utils::FatalError("fhhos4::Solver: set FaceDegree (>= 0) before the setup, got " + to_string(s.FaceDegree) + ".");
-			if (s.CellDegree < 0)
-				Utils::FatalError("fhhos4::Solver: set CellDegree (>= 0) before the setup, got " + to_string(s.CellDegree) + ".");
-			if (s.VectorComponents < 1)
-				Utils::FatalError("fhhos4::Solver: VectorComponents must be >= 1 (1 for a scalar problem), got " + to_string(s.VectorComponents) + ".");
+			DiscretizationParametersSet(s);
+			if (s.Dimension == -1 || s.FaceDegree == -1 || s.CellDegree == -1 || s.PolynomialSpace == fhhos4::PolynomialSpace::Inferred)
+				Utils::FatalError("fhhos4::Solver: the DoFs per cell and face need Dimension, FaceDegree, CellDegree and PolynomialSpace: set them, or call a setup first, which infers those not set from the blocks.");
 			bool q = LibraryParameters::ProgramPolynomialSpace(s.PolynomialSpace);
-			return { s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension, s.CellDegree, q),
-			         s.VectorComponents * Utils::PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, q) };
+			int components = s.VectorComponents == -1 ? 1 : s.VectorComponents;
+			return { components * (int)PolynomialSpaceDimension(s.Dimension, s.CellDegree, q), components * (int)PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, q) };
+		}
+
+		// The parameters of the discretization not set, inferred from the blocks (ADR-0023) and written into s (printed at
+		// Verbosity >= 1). Dimension or a degree not set: from the stored entries of A_TT and A_TF of all the processes
+		// (DiscretizationInference.h), VectorComponents then required. Otherwise PolynomialSpace alone, from the sizes the
+		// setup checks (DoFs of no space: P, which these checks then refuse, with the sizes it needs). nCells, nFaces: the
+		// coefficients of the interpolations of 1; nFaceDoFs: the face DoFs of the process (the columns of A_TF on one
+		// process, the rows of A_FF on several). Collective.
+		void InferDiscretization(Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, Eigen::Index nCells, Eigen::Index nFaces, Eigen::Index nFaceDoFs, const Communicator& comm)
+		{
+			using namespace DiscretizationInference;
+			Discretization set;
+			bool degreesSet = false;
+			CollectiveCheck(comm, [&]()
+			{
+				set = DiscretizationParametersSet(s);
+				degreesSet = set.Dimension != -1 && set.FaceDegree != -1 && set.CellDegree != -1;
+				if (!degreesSet && s.VectorComponents == -1)
+					Utils::FatalError("fhhos4::Solver: set VectorComponents (1 for a scalar unknown): Dimension, FaceDegree or CellDegree is inferred from the blocks, whose DoFs per cell and face don't give the number of components.");
+				LibraryParameters::ProgramPCoarsening(s.PCoarsening); // refuses a value out of the enum
+			});
+			if (degreesSet && s.VectorComponents == -1)
+				s.VectorComponents = 1;
+			if (degreesSet && set.PolynomialSpace != fhhos4::PolynomialSpace::Inferred)
+				return;
+			int cellBlockSize, faceBlockSize;
+			if (degreesSet) // the largest of the processes: those without cells or faces have none
+			{
+				cellBlockSize = (int)comm.Max(nCells > 0 && A_TT.rows() % nCells == 0 ? (int64_t)(A_TT.rows() / nCells) : (int64_t)0);
+				faceBlockSize = (int)comm.Max(nFaces > 0 && nFaceDoFs % nFaces == 0 ? (int64_t)(nFaceDoFs / nFaces) : (int64_t)0);
+			}
+			else
+			{
+				BlockAnalysis local;
+				CollectiveCheck(comm, [&]() { local = AnalyzeBlocks(A_TT, A_TF); });
+				tie(cellBlockSize, faceBlockSize) = CombineAnalyses(comm.AllGatherV(vector<BlockAnalysis>{ local }), MemberNames);
+				CollectiveCheck(comm, [&]()
+				{
+					if (nCells * cellBlockSize != A_TT.rows() || nFaces * faceBlockSize != nFaceDoFs)
+						Utils::FatalError("fhhos4::Solver: the blocks have " + to_string(cellBlockSize) + " DoFs per cell and " + to_string(faceBlockSize) + " per face (the stored entries of A_TT and A_TF), but the interpolations of 1 have " + to_string(nCells) + " cells for the " + to_string(A_TT.rows()) + " rows of A_TT, and " + to_string(nFaces) + " faces for " + to_string(nFaceDoFs) + " face DoFs: store the zeros inside the blocks of each cell, or set Dimension, FaceDegree and CellDegree.");
+				});
+			}
+			Inference inference = DiscretizationInference::InferDiscretization(cellBlockSize, faceBlockSize, s.VectorComponents, set, s.PCoarsening);
+			if (inference.Solvers != 1 && degreesSet)
+			{
+				s.PolynomialSpace = fhhos4::PolynomialSpace::P;
+				return;
+			}
+			if (inference.Solvers != 1)
+				Utils::FatalError(Message(inference, MemberNames));
+			s.Dimension = inference.Result.Dimension;
+			s.PolynomialSpace = inference.Result.PolynomialSpace;
+			s.FaceDegree = inference.Result.FaceDegree;
+			s.CellDegree = inference.Result.CellDegree;
+			if (s.Verbosity >= 1 && comm.IsRoot())
+				cout << Description(inference, MemberNames) << endl;
 		}
 	}
 
@@ -587,13 +658,14 @@ namespace fhhos4
 		}
 		if (faceGhostGlobalNumbers.Count != 0 || cellGhostGlobalNumbers.Count != 0)
 			Utils::FatalError("fhhos4::Solver: faceGhostGlobalNumbers or cellGhostGlobalNumbers on one process (Comm): the ghosts are the faces and cells of other processes." + ForgottenComm(*this));
-		_impl->CheckParameters(*this, symmetric);
 		// The inputs, read in place, checked before the previous setup is replaced
 		unique_ptr<BorrowedSparseMatrix> a_TT = Borrow(A_TT, "A_TT"), a_TF = Borrow(A_TF, "A_TF");
 		unique_ptr<BorrowedSparseMatrix> a_FT = A_FT ? Borrow(*A_FT, "A_FT") : nullptr;
 		unique_ptr<BorrowedSparseMatrix> a_FF = Borrow(A_FF, "A_FF");
 		if (a_FF->cols() > a_FF->rows()) // the columns of ghost faces: the rows of a process of a distributed system
 			Utils::FatalError("fhhos4::Solver: A_FF (" + to_string(a_FF->rows()) + " x " + to_string(a_FF->cols()) + ") has more columns than rows: on one process (Comm), it is square." + ForgottenComm(*this));
+		InferDiscretization(*this, *a_TT, *a_TF, cellInterpOfOne.Size, faceInterpOfOne.Size, a_TF->cols(), _impl->Comm);
+		_impl->CheckParameters(*this, symmetric);
 		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
 		_impl->CheckInputs(*this, *a_TT, *a_TF, a_FT.get(), *a_FF, cellOne, faceOne);
 		_impl->Setup(*this, *a_TT, *a_TF, std::move(a_FT), *a_FF, cellOne, faceOne);
@@ -609,7 +681,6 @@ namespace fhhos4
 		shared_ptr<const IndexMap> faces;
 		CollectiveCheck(comm, [&]()
 		{
-			_impl->CheckParameters(*this, symmetric);
 			for (auto [ghosts, name] : { pair(&faceGhostGlobalNumbers, "faceGhostGlobalNumbers"), pair(&cellGhostGlobalNumbers, "cellGhostGlobalNumbers") })
 				if (ghosts->Count < 0 || (ghosts->Count > 0 && !ghosts->Numbers))
 					Utils::FatalError(string("fhhos4::Solver: ") + name + ": a negative Count, or no Numbers.");
@@ -621,6 +692,8 @@ namespace fhhos4
 				a_FT = Borrow(*A_FT, "A_FT");
 			a_FF = Borrow(A_FF, "A_FF");
 		});
+		InferDiscretization(*this, *a_TT, *a_TF, cellInterpOfOne.Size, faceInterpOfOne.Size, a_FF->rows(), comm);
+		CollectiveCheck(comm, [&]() { _impl->CheckParameters(*this, symmetric); });
 		int cbs = _impl->CellBlockSize, fbs = _impl->FaceBlockSize;
 		CollectiveCheck(comm, [&]()
 		{

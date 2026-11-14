@@ -331,7 +331,8 @@ NB_MODULE(fhhos4, m)
 
 	nb::enum_<fhhos4::PolynomialSpace>(m, "PolynomialSpace")
 		.value("P", fhhos4::PolynomialSpace::P)
-		.value("Q", fhhos4::PolynomialSpace::Q);
+		.value("Q", fhhos4::PolynomialSpace::Q)
+		.value("Inferred", fhhos4::PolynomialSpace::Inferred);
 	nb::enum_<fhhos4::PCoarsening>(m, "PCoarsening")
 		.value("Minus2", fhhos4::PCoarsening::Minus2)
 		.value("Minus1", fhhos4::PCoarsening::Minus1)

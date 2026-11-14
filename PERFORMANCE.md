@@ -1178,6 +1178,29 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   each cell). Further steps would change the interface: read a full symmetric `A_FF` as such (no transpose, -0.1 s),
   or let the library overwrite `A_FF` with `A` (no second face matrix: also the peak memory).
 
+- **The discretization inferred from the blocks** (2026-11-14, ADR-0023; Release, on AC power): its cost, the analysis
+  of the stored entries of `A_TT` and `A_TF` (`DiscretizationInference.h`) when `Dimension` or a degree is not set.
+  HArDCore3D's `hho-diffusion`, gcube 32^3, k = l = 1, 2, 8 threads, patched for the measurement (reverted; scripts in
+  `build/bench_inference/`, PETSc's in `build-python-petsc/bench_inference/`): `SetupSym()` with `Dimension` and the
+  degrees set (the space from the sizes) against only `VectorComponents` set, interleaved, best of 3; the analysis alone
+  timed in the client on its blocks (best of 5 in each run). The analysis alone, by version (in parentheses, of the
+  setup: 0.30 s at k=1, 0.78-0.89 s at k=2):
+
+  | Version | k=1 | k=2 |
+  |---|---|---|
+  | `std::gcd()` at each boundary of the runs, sequential | 3.6 ms (1.2%) | 4.4-9.8 ms (0.5-1.1%) |
+  | a boundary that is a multiple of the GCD so far: a remainder, no `gcd()` | 0.72-0.83 ms (0.25%) | 3.5-5.9 ms (0.4-0.7%) |
+  | the cells in parallel (OpenMP, 8 threads): the final version | 0.08-0.27 ms (0.05%) | 0.17-0.64 ms (0.05%) |
+
+  The first version spent ~13 `gcd()` of ~100 cycles per cell; the second is bound by the latency of the strided reads
+  at k=2 (one first row per cell, every 1440 bytes of `A_TF`'s 47 MB), which the threads overlap. End to end, the setups
+  with and without the inference are within the noise: k=1 0.318 / 0.307 s, k=2 0.780 / 0.750 s (set / inferred, best
+  of 3). Several processes, the PETSc preconditioner (its copy of the header compiled without OpenMP: sequential on each
+  process), `examples/petsc_preconditioner.cpp`'s HHO (2D, 512 x 512 squares, k = l = 2), 3 processes x 2 threads:
+  `KSPSetUp()` 2.34 / 2.44 s (the options given / only `-pc_fhhos4_vector_components 1`, best of 3: within the noise,
+  2.34-2.76 s), the analysis alone as the preconditioner does it (the diagonal parts, the gather; the slowest process,
+  best of 5) 6.8-7.3 ms (0.3%).
+
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from

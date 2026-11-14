@@ -1,6 +1,7 @@
 #pragma once
 #include <mutex>
 #include "UncondensedLevel.h"
+#include "../../../Utils/PolynomialSpaceDimension.h"
 #include "../Multigrid.h"
 #include "../../Direct/EigenSparseCholesky.h"
 #include "../../Direct/MUMPS.h"
@@ -449,8 +450,8 @@ protected:
 		UncondensedLevel* coarse;
 		if (coarseningType == CoarseningType::P)
 		{
-			int coarseCellBlockSize = VectorComponents * Utils::PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
-			int coarseFaceBlockSize = VectorComponents * Utils::PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
+			int coarseCellBlockSize = VectorComponents * (int)PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
+			int coarseFaceBlockSize = VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
 			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
 		}
 		else

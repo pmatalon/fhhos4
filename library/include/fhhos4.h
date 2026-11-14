@@ -215,9 +215,10 @@ namespace fhhos4
 	// The polynomial space of the bases of the cells and faces (Solver::PolynomialSpace)
 	enum class PolynomialSpace
 	{
-		P, // P^k: the polynomials of degree at most k; (k + n)! / (k! n!) functions in n variables
-		Q  // Q^k: the polynomials of degree at most k in each variable (tensor products, on quadrilaterals and hexahedra);
-		   // (k + 1)^n functions in n variables
+		P,       // P^k: the polynomials of degree at most k; (k + n)! / (k! n!) functions in n variables
+		Q,       // Q^k: the polynomials of degree at most k in each variable (tensor products, on quadrilaterals and
+		         // hexahedra); (k + 1)^n functions in n variables
+		Inferred // not set (the default): determined by the setup from the blocks (see Solver::Dimension)
 	};
 
 	// The p-coarsening (Solver::PCoarsening): the degrees of the p-levels, from FaceDegree down to 0, before the h-levels
@@ -301,19 +302,29 @@ namespace fhhos4
 	public:
 		//------------- Discretization: to set -------------//
 
+		// Those not set (-1, PolynomialSpace::Inferred: the defaults) are inferred by the setup from the stored entries of
+		// A_TT and A_TF, their pattern, not their values: the DoFs per cell and per face (the same in every cell and face;
+		// the zeros inside the blocks of each cell must be stored; a face between two cells, on several processes two
+		// cells of the same process), which give the dimension, the space and the degrees. Any ambiguity is an error, whose
+		// message names the parameter to set: DoFs that fit discretizations needing different solvers (e.g. 64 per cell and
+		// 9 per face: Q in 3D at k = 2, l = 3, or in 2D at k = 8, l = 7, whose p-levels differ); and so are DoFs that fit
+		// none. The setup writes the values found into these members (printed at Verbosity >= 1), which later setups then
+		// read: no inference. Dimension and the degrees set, the space alone is inferred, from the sizes of the
+		// interpolations of 1 (no stored zeros needed).
 		int Dimension = -1;  // 2 or 3
 		int FaceDegree = -1; // k: degree of the polynomials on the faces
-		int CellDegree = -1; // l: degree of the polynomials in the cells (k - 1, k or k + 1 in HHO)
+		int CellDegree = -1; // l: degree of the polynomials in the cells: k - 1, k or k + 1 (those of HHO), refused otherwise
 		// The polynomial space of the cells and faces, P^l and P^k, or Q^l and Q^k: their numbers of DoFs, and those of the
 		// p-levels
-		fhhos4::PolynomialSpace PolynomialSpace = fhhos4::PolynomialSpace::P;
+		fhhos4::PolynomialSpace PolynomialSpace = fhhos4::PolynomialSpace::Inferred;
 		// The number of components of the unknown (>= 1): 1 for a scalar problem, n for a vector-valued one (e.g. the
 		// vector Laplacian, n = Dimension). The DoFs of each cell and face block are those of the scalar basis times each
 		// unit vector, interleaved by component (array of structures): phi_i e_c is the DoF n i + c of the block. The
 		// interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face. The coarse levels
 		// keep the n constants of each block (the translations), not the rotations: the rigid body modes of elasticity
-		// are not in them.
-		int VectorComponents = 1;
+		// are not in them. Never inferred (the DoFs per cell and face don't tell it): -1 (the default) is 1 if Dimension and
+		// the degrees are set (the setup writes 1), and refused if one of them is inferred.
+		int VectorComponents = -1;
 		// The matrix is singular, its kernel spanned by the interpolation of 1 (cellInterpOfOne, faceInterpOfOne: the
 		// constant functions; with VectorComponents n, the constant of each component: the n translations, e.g. the pure
 		// Neumann vector Laplacian, not elasticity, whose kernel has the rotations too), e.g. the pure Neumann problem:
@@ -426,7 +437,8 @@ namespace fhhos4
 		//   with the index type SparseIndex) or an Eigen::Map of one (SparseMatrixMap), read in place, never copied. Other
 		//   Eigen matrices convert by Eigen, a copy: fhhos4::SparseMatrix B = A; (a symmetric column-major one:
 		//   TransposedView(A), no copy). The setups check the sizes and structure of the inputs against Dimension, the
-		//   degrees and VectorComponents, and their CSR arrays (one pass on the indices);
+		//   degrees and VectorComponents (inferring those not set from the blocks first), and their CSR arrays (one pass
+		//   on the indices);
 		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
 		//   faces, one coefficient per cell and per face (in the order of the blocks of rows and columns of A_TF). The
 		//   bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose degree is
@@ -549,7 +561,7 @@ namespace fhhos4
 		int NumberOfLevels() const;
 
 		// The DoFs of a cell (resp. face) that the setups expect, from Dimension, CellDegree (FaceDegree), PolynomialSpace
-		// and VectorComponents, set first (refused otherwise): e.g. the block sizes of MergeOffDiag()
+		// and VectorComponents, set or inferred by a setup (refused otherwise): e.g. the block sizes of MergeOffDiag()
 		int CellBlockSize() const;
 		int FaceBlockSize() const;
 

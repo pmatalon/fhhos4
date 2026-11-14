@@ -1,7 +1,7 @@
 # The library: how it is built
 
 For the library's users: `README_library.md`. This file is for changing the library. Decisions: `docs/adr/` (0002-0006,
-0008, 0013, 0020). Its measurements: `PERFORMANCE.md`.
+0008, 0013, 0020, 0023). Its measurements: `PERFORMANCE.md`.
 
 ## Target and files
 
@@ -16,10 +16,12 @@ For the library's users: `README_library.md`. This file is for changing the libr
 
 ## Interface
 
-- `Solver`: parameters as public members; `Dimension`, `FaceDegree` and `CellDegree` must be set; `PolynomialSpace`: P
-  (default) or Q, which gives the block sizes of the cells, faces and p-levels; `VectorComponents` (default 1)
-  multiplies them (a vector-valued unknown, interleaved: see `docs/uamg.md`); `CellBlockSize()`/`FaceBlockSize()`
-  give these block sizes (`BlockSizes()`, the setup's computation). `Result`, `Error`.
+- `Solver`: parameters as public members; `Dimension`, `FaceDegree`, `CellDegree` (k - 1 to k + 1) and
+  `PolynomialSpace` (P or Q), which give the block sizes of the cells, faces and p-levels: set, or inferred by the setup
+  from the blocks (-1, `PolynomialSpace::Inferred`, the defaults: see below); `VectorComponents` multiplies them (a
+  vector-valued unknown, interleaved: see `docs/uamg.md`; -1, the default: 1 when the three are set, refused
+  otherwise); `CellBlockSize()`/`FaceBlockSize()` give these block sizes once set or inferred (`BlockSizes()`, the
+  setup's computation). `Result`, `Error`.
 - `SetupSym()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonSym()` with `A_FT` too,
   then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells (`StaticCondensation.h`) and computes the
   cell unknowns. `CondensedMatrix()` (one process), and `Solve(b, x)` on it (right-hand sides condensed by the caller).
@@ -60,6 +62,30 @@ For the library's users: `README_library.md`. This file is for changing the libr
   `UAMGProlongation` in `Utils/Types.h`; the CLI codes in `SmootherFactory`, the coarse solver stays a solver code):
   `Solver/LibraryParameters.h` maps them both ways (one table per parameter; `CoarseSolver::MUMPS`: `mumpsch` or
   `mumpslu` for the symmetry of the matrix), for `library/Solver.cpp` and `LibraryUAMG.cpp`.
+
+## The discretization inferred from the blocks
+
+ADR-0023. `src/Solver/DiscretizationInference.h`, header-only, without MPI nor PETSc (also compiled into the PETSc
+preconditioner); its messages start with `fhhos4: `, worded with the names of the members (`MemberNames`) or of
+PETSc's options:
+- `AnalyzeBlocks()`, on the blocks of a process: the DoFs per cell n_T, the first closed diagonal block of the stored
+  entries of `A_TT` (full or lower-only), equal to the last one; the GCD of the boundaries of the runs of consecutive
+  columns of the first row of each cell of `A_TF` (multiples of n_F; the cells in parallel with OpenMP, sequential in
+  the PETSc preconditioner); whether a column is in the rows of two cells (a face between them, which makes that GCD
+  n_F; usually among the first cells).
+- `CombineAnalyses()`, the analyses of the processes: n_T the same on those with cells, the GCD of their GCDs, a face
+  between two cells somewhere.
+- `InferDiscretization()`: the readings (`Readings()`: the discretizations that the library takes with these DoFs and
+  the parameters set), grouped by solver (`SolverKey()`: k >= 1, and the block sizes of the p-levels of degree >= 1
+  below the finest); one solver resolves, several are an ambiguity, with the parameter to propose; `Message()`,
+  `Description()`.
+
+`library/Solver.cpp`, `InferDiscretization()`, in both setups after the CSR checks of the inputs and before
+`CheckParameters()` (which needs the block sizes): the four parameters set, nothing; the three set, the space alone from
+the sizes of the interpolations of 1 (the largest of the processes; no reading: P, which the checks of the sizes then
+refuse, with the sizes they expect); otherwise the analysis of each process (`CollectiveCheck()`), gathered
+(`AllGatherV()`), combined, checked against the sizes of the interpolations of 1, and inferred. The values found are
+written into the members (`DiscretizationParametersSet()` checks those set: `CellDegree` k - 1 to k + 1 on every path).
 
 ## In the program
 
@@ -107,12 +133,17 @@ iterations and residuals exactly.
 run path `$ORIGIN` (the programs that load it don't link `libfhhos4`: found next to it); its header
 `library/include/fhhos4_petsc.h` (`PCFHHOS4`, `PetscDLLibraryRegister_fhhos4_petsc()`: the function PETSc calls when
 `-dll_append` loads the library). One file in PETSc's style, on PETSc's interface for the implementations of
-preconditioners (`petsc/private/pcimpl.h`) and `fhhos4.h` only, to move into PETSc (`src/ksp/pc/impls`).
-- Setup (`PCSetUp_FHHOS4()`): the operator a 2 x 2 MATNEST of AIJ blocks, the cells first; the block sizes from
-  `Solver::CellBlockSize()`/`FaceBlockSize()`; the checks collective (`CheckOnAll()`: PETSc's errors are raised on the
-  process that detects them, the others would wait in the next collective call): the DoFs of whole cells and faces on
-  each process, the interpolations of 1 from the near null space (its first vector, or the constant one: the first DoF
-  of each block; the others 0, to 1e-10 relative). PETSc's arrays read in place (`MatGetRowIJ()`,
+preconditioners (`petsc/private/pcimpl.h`), `fhhos4.h` and `src/Solver/DiscretizationInference.h` (header-only,
+compiled into it: moving into PETSc, `src/ksp/pc/impls`, means installing this header too).
+- Setup (`PCSetUp_FHHOS4()`): the operator a 2 x 2 MATNEST of AIJ blocks, the cells first; the options of the
+  discretization not given inferred first (`InferDiscretization()`: `AnalyzeBlocks()` on the diagonal parts of `A_TT`
+  and `A_TF`, its own `MPI_Allgather()`, the messages with the options' names; written into the solver's members; the
+  dimension and the degrees given, the space alone, without analysis if P and Q have the same DoFs and solver, P if the
+  stored entries don't give it, as `Solver::Setup()`); the
+  block sizes from `Solver::CellBlockSize()`/`FaceBlockSize()`; the checks collective (`CheckOnAll()`: PETSc's errors
+  are raised on the process that detects them, the others would wait in the next collective call): the DoFs of whole
+  cells and faces on each process, the interpolations of 1 from the near null space (its first vector, or the constant
+  one: the first DoF of each block; the others 0, to 1e-10 relative). PETSc's arrays read in place (`MatGetRowIJ()`,
   `MatSeqAIJGetArrayRead()`; `MatMPIAIJGetSeqAIJ()` on several processes), released after the setup. One process: the
   blocks as Eigen maps of PETSc's arrays (copies by Eigen if `PetscInt` is not `SparseIndex`), `A_FT` copied (the solves
   read it). Several: `A_TT`'s diagonal part, the others by `MergeOffDiag()` (its errors local: reduced before the

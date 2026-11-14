@@ -134,7 +134,7 @@ fhhos4::Solver solver;
 solver.Dimension = 3;  // space dimension
 solver.FaceDegree = k; // polynomial degree in the faces
 solver.CellDegree = k; // polynomial degree in the cells
-// solver.PolynomialSpace = fhhos4::PolynomialSpace::Q; // bases of Q^k instead of P^k
+solver.PolynomialSpace = fhhos4::PolynomialSpace::P; // or Q: bases of Q^k instead of P^k
 // solver.VectorComponents = 3; // a vector-valued unknown of 3 components (see Inputs)
 
 #if FHHOS4_MPI // 1 if the library is compiled with MPI (fhhos4_version.h)
@@ -175,9 +175,22 @@ It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
   largest partial degree; except with `PCoarsening::ToZero`) **with a constant first function** `phi_0`:
   `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
   cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
-- **The dimension and the degrees**: `Dimension` (2 or 3), `FaceDegree` (k) and `CellDegree` (l) must be set, and
-  `PolynomialSpace` for bases of Q^k. The setup checks the sizes and structure of the inputs against them (full
-  polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k; times `VectorComponents`).
+- **The dimension and the degrees**: set `Dimension` (2 or 3), `FaceDegree` (k), `CellDegree` (l: k - 1, k or k + 1,
+  refused otherwise) and `PolynomialSpace` (P or Q). The setup checks the sizes and structure of the inputs against them
+  (full polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k; times `VectorComponents`).
+- **Left unset** (`-1`, `PolynomialSpace::Inferred`: the defaults), they are inferred by the setup from the blocks,
+  which is handy to try the library: from the stored entries of `A_TT` and `A_TF`, the setup reads the DoFs per cell and
+  per face, and finds the discretizations that have them. **Set `VectorComponents` then** (`1` for a scalar unknown):
+  the DoFs don't tell it. It assumes
+  - the same degrees in every cell and face, `CellDegree` k - 1, k or k + 1;
+  - **the zeros inside the blocks of each cell stored**: the setup reads where the entries are, not their values;
+  - a face between two cells (on several processes: of the same process).
+
+  If different discretizations have these DoFs and would need different solvers (e.g. 64 DoFs per cell and 9 per
+  face: Q in 3D with k = 2 and l = 3, or in 2D with k = 8 and l = 7), the setup stops with an error that names the
+  parameter to set; so it does if none has them. Otherwise, it writes the values found into these parameters (printed
+  with `Verbosity = 1`). With `Dimension` and the degrees set, `PolynomialSpace` alone is inferred, from the sizes of
+  the inputs (no stored zeros needed), and `VectorComponents` is 1 if not set.
 - **A vector-valued unknown** of `n` components: `VectorComponents = n`. Each cell and face block holds the scalar basis
   times each unit vector, **interleaved by component** (array of structures): `phi_i e_c` is the DoF `n i + c` of the
   block. The interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face.
@@ -327,6 +340,11 @@ solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) 
   the DoFs of whole cells and faces. The setup copies the blocks into the format of the library (`MergeOffDiag()`, see
   [Other matrix formats](#other-matrix-formats)) but `A_TT`, read in place. The vectors: plain (`MatCreateVecs()` of
   the MATNEST) or nested (`VECNEST`, the cells then the faces).
+- **The discretization**: give its options (the table below); or, to try the preconditioner, only
+  `-pc_fhhos4_vector_components` (`1` for a scalar unknown): the others are then inferred from the blocks, under the
+  assumptions of [Inputs](#inputs), and an ambiguity names the option to give. With the dimension and the degrees
+  given, the space too is read from the blocks, unless P and Q have the same DoFs (e.g. at degree 0); P if the blocks
+  don't tell.
 - **The interpolation of 1** (no default): the near null space of the operator, `MatSetNearNullSpace()`, with the vector
   of the coefficients of 1 on your bases (at any scale; a vector-valued unknown: that of the first component first).
   At degree 0 on one component, it can be the constant vector (`MatNullSpaceCreate(comm, PETSC_TRUE, 0, NULL, ...)`).
@@ -338,9 +356,9 @@ solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) 
 
 | Option | Default | Parameter |
 |---|---|---|
-| `-pc_fhhos4_dimension`, `-pc_fhhos4_face_degree`, `-pc_fhhos4_cell_degree` | none: required | `Dimension`, `FaceDegree`, `CellDegree` |
-| `-pc_fhhos4_polynomial_space p\|q` | `p` | `PolynomialSpace` |
-| `-pc_fhhos4_vector_components` | `1` | `VectorComponents` |
+| `-pc_fhhos4_dimension`, `-pc_fhhos4_face_degree`, `-pc_fhhos4_cell_degree` | inferred from the blocks (see [Inputs](#inputs)) | `Dimension`, `FaceDegree`, `CellDegree` |
+| `-pc_fhhos4_polynomial_space p\|q` | inferred from the blocks | `PolynomialSpace` |
+| `-pc_fhhos4_vector_components` | none: required if one of the three above is not given; `1` otherwise | `VectorComponents` |
 | `-pc_fhhos4_symmetric` | from the operator | the symmetric setup |
 | `-pc_fhhos4_cycle k\|v\|w` | `k` | `Cycle` |
 | `-pc_fhhos4_krylov none\|fcg\|gcr` | `none`: one cycle | `Krylov` in each application: the whole solve of the library, with `-ksp_type preonly` |
@@ -371,6 +389,7 @@ solver = fhhos4.Solver()
 solver.Dimension = 3
 solver.FaceDegree = k
 solver.CellDegree = k
+solver.PolynomialSpace = fhhos4.PolynomialSpace.P
 solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # e.g. scipy.sparse.csr_array, NumPy vectors
 x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
 result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
@@ -464,8 +483,9 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 
 | Parameter | Default | Values |
 |---|---|---|
-| `PolynomialSpace` | `PolynomialSpace::P` | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
-| `VectorComponents` | `1` | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
+| `Dimension`, `FaceDegree`, `CellDegree` | `-1`: inferred from the blocks (see [Inputs](#inputs)) | `2` or `3`; k `>= 0`; l = k - 1, k or k + 1 |
+| `PolynomialSpace` | `PolynomialSpace::Inferred`: from the blocks | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
+| `VectorComponents` | `-1`: required if `Dimension` or a degree is inferred, `1` otherwise | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `SingularMatrix` | `false` | `true`: the kernel is the interpolation of 1 of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
 | `Krylov` | `FCG` if symmetric, `GCR` if non-symmetric | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#use-as-a-preconditioner))</li></ul> |
 | `Restart` | `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |

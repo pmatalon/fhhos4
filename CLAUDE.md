@@ -73,7 +73,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-399 tests, ~9 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+407 tests, ~9 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, the full Neumann problem (`FullNeumann*`, 2D), and the library (`UAMGLibrary*`,
@@ -142,9 +142,10 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 interface `library/include/fhhos4.h`: `Solver` (parameters as public members), `SetupSym()`/
 `SetupNonSym()` from the blocks of the uncondensed system (ADR-0002), then `Solve(b_T, b_F, x_T, x_F)`. Inputs
 are Eigen matrices only (ADR-0004), read in place, never copied (ADR-0003); inputs whose wrong value silently breaks
-the solver have no default (ADR-0005); the Krylov method is inside (ADR-0006); the library's defaults are not the
-program's (ADR-0008). Its path must not include mesh or discretization headers, nor read `Utils::ProgramArgs`
-(ADR-0001).
+the solver have no default (ADR-0005); the dimension, degrees and space not set are inferred from the stored pattern
+of the blocks, an ambiguity being an error (ADR-0023); the Krylov method is inside (ADR-0006); the library's defaults
+are not the program's (ADR-0008). Its path must not include mesh or discretization headers, nor read
+`Utils::ProgramArgs` (ADR-0001).
 
 ## Version
 

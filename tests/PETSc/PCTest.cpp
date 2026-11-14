@@ -3,6 +3,7 @@
 // process giving the rows of its cells and faces to a MATNEST of AIJ blocks (MATSEQAIJ on one process, MATMPIAIJ on
 // several), solved by PETSc's Krylov methods preconditioned by fhhos4, against the library's solve of the whole system
 // on one process. The results printed by the first process; a test fails if it fails on one process.
+#include <random>
 #include <sstream>
 #include <gtest/gtest.h>
 #include <petscksp.h>
@@ -40,6 +41,32 @@ namespace
 		PetscCallAbort(PETSC_COMM_WORLD, MatSeqAIJSetPreallocationCSR(A, i.data(), j.data(), rows.valuePtr()));
 		PetscCallAbort(PETSC_COMM_WORLD, MatMPIAIJSetPreallocationCSR(A, i.data(), j.data(), rows.valuePtr()));
 		return A;
+	}
+
+	// The MATNEST of the rows of the process of the blocks of a global system (cellDoFs DoFs per cell, faceDoFs per face):
+	// [[A_TT, A_TF], [A_FT, A_FF]], its AIJ blocks in blocks
+	Mat Nest(const SparseMatrix (&globals)[4], const IndexMap& cells, const IndexMap& faces, int cellDoFs, int faceDoFs, Mat (&blocks)[4])
+	{
+		const IndexMap* maps[2] = { &cells, &faces };
+		int dofs[2] = { cellDoFs, faceDoFs };
+		for (int k = 0; k < 4; k++)
+		{
+			int row = k / 2, col = k % 2;
+			blocks[k] = AIJ(globals[k].middleRows(dofs[row] * maps[row]->Begin, dofs[row] * maps[row]->NOwned), dofs[col] * maps[col]->NOwned);
+		}
+		Mat P;
+		PetscCallAbort(PETSC_COMM_WORLD, MatCreateNest(PETSC_COMM_WORLD, 2, nullptr, 2, nullptr, blocks, &P));
+		return P;
+	}
+
+	// The message of the last error raised by PETSc (StoreError(): returned, not printed)
+	std::string LastError;
+
+	PetscErrorCode StoreError(MPI_Comm, int, const char*, const char*, PetscErrorCode n, PetscErrorType p, const char* message, void*)
+	{
+		if (p == PETSC_ERROR_INITIAL)
+			LastError = message;
+		return n;
 	}
 
 	// The parts of a vector of the operator on the cells and faces of the process
@@ -122,14 +149,8 @@ namespace
 			ExpectedIterations = reference(asymmetry == 0, ExpectedX_T, ExpectedX_F);
 			Vector x_T, x_F;
 			ExpectedNonSymIterations = asymmetry == 0 ? reference(false, x_T, x_F) : ExpectedIterations;
-			const IndexMap* maps[4][2] = { { &cells, &cells }, { &cells, &faces }, { &faces, &cells }, { &faces, &faces } };
-			const SparseMatrix* globals[4] = { &system.Global.A_TT, &system.Global.A_TF, &system.Global.A_FT, &system.Global.A_FF };
-			for (int k = 0; k < 4; k++)
-			{
-				SparseMatrix rows = OnEachComponent(*globals[k], c).middleRows(c * maps[k][0]->Begin, c * maps[k][0]->NOwned);
-				Blocks[k] = AIJ(rows, c * maps[k][1]->NOwned);
-			}
-			PetscCallAbort(PETSC_COMM_WORLD, MatCreateNest(PETSC_COMM_WORLD, 2, nullptr, 2, nullptr, Blocks, &P));
+			SparseMatrix globals[4] = { OnEachComponent(system.Global.A_TT, c), OnEachComponent(system.Global.A_TF, c), OnEachComponent(system.Global.A_FT, c), OnEachComponent(system.Global.A_FF, c) };
+			P = Nest(globals, cells, faces, c, c, Blocks);
 			if (symmetricFlag)
 				PetscCallAbort(PETSC_COMM_WORLD, MatSetOption(P, MAT_SYMMETRIC, PETSC_TRUE));
 			if (nestVectors)
@@ -208,7 +229,7 @@ namespace
 			PetscCallAbort(PETSC_COMM_WORLD, VecDuplicate(b, &x));
 			// The setup in KSPSolve(), its work vectors like b: KSPSetUp() before would create them from the MATNEST (plain
 			// vectors), into which PETSc can't copy VECNEST ones
-			PetscCallAbort(PETSC_COMM_WORLD, PetscPushErrorHandler(PetscReturnErrorHandler, nullptr));
+			PetscCallAbort(PETSC_COMM_WORLD, PetscPushErrorHandler(StoreError, nullptr));
 			result.ErrorCode = KSPSolve(ksp, b, x);
 			PetscCallAbort(PETSC_COMM_WORLD, PetscPopErrorHandler());
 			if (result.ErrorCode == PETSC_SUCCESS)
@@ -294,13 +315,112 @@ TEST(PETScPC, PreonlyAndConstantNearNullSpace)
 	EXPECT_LE(result.Error, 1e-8);
 }
 
-// Refused on all the processes: the degrees not given, no near null space, a near null space that is not the
-// interpolation of 1 (the constant vector on 2 components), the DoFs of the processes not whole blocks (7 components:
-// neither the 3600 cells nor the 7080 faces are multiples of 7), a monolithic operator
+// The discretization inferred from the blocks (ADR-0023), only -pc_fhhos4_vector_components given: the iterations with
+// all the options of the discretization given, symmetric or not
+TEST(PETScPC, InferredDiscretization)
+{
+	PETScSystem symmetric(0, 1, true), nonsymmetric(0.3, 1, false);
+	PETScSystem::Result given = symmetric.Solve(KSPFCG, "givensym_", Degrees);
+	PETScSystem::Result inferred = symmetric.Solve(KSPFCG, "inferredsym_", " -pc_fhhos4_vector_components 1");
+	ExpectSolves(inferred, symmetric.ExpectedIterations);
+	EXPECT_EQ(inferred.Iterations, given.Iterations);
+	given = nonsymmetric.Solve(KSPFGMRES, "givennonsym_", Degrees);
+	inferred = nonsymmetric.Solve(KSPFGMRES, "inferrednonsym_", " -pc_fhhos4_vector_components 1");
+	ExpectSolves(inferred, nonsymmetric.ExpectedIterations);
+	EXPECT_EQ(inferred.Iterations, given.Iterations);
+}
+
+// An ambiguity of the inference (only -pc_fhhos4_vector_components 1): blocks of 64 DoFs per cell and 9 per face (the
+// system ⊗ dense blocks: 3D Q k=2 l=3, or 2D Q k=8 l=7, whose p-levels differ), refused on all the processes, the
+// message naming the option to give. With it, or with the dimension and the degrees without the space (read from the
+// blocks: Q), the inference resolves: the setup goes on, to the near null space, not given here.
+TEST(PETScPC, Ambiguity)
+{
+	int n = 4;
+	CartesianHybridSystem global(n, 0);
+	PartitionedSystem system(global, n, PartitionShape::Blocks, World());
+	std::mt19937 generator(5);
+	std::uniform_real_distribution<double> coefficient(0.5, 1);
+	Eigen::MatrixXd C_TT = Eigen::MatrixXd::NullaryExpr(64, 64, [&]() { return coefficient(generator); });
+	Eigen::MatrixXd C_TF = Eigen::MatrixXd::NullaryExpr(64, 9, [&]() { return coefficient(generator); });
+	Eigen::MatrixXd C_FF = Eigen::MatrixXd::NullaryExpr(9, 9, [&]() { return coefficient(generator); });
+	SparseMatrix globals[4] = { Kron(system.Global.A_TT, C_TT), Kron(system.Global.A_TF, C_TF), Kron(system.Global.A_FT, Eigen::MatrixXd(C_TF.transpose())), Kron(system.Global.A_FF, C_FF) };
+	Mat blocks[4], P = Nest(globals, *system.Cells, *system.Faces, 64, 9, blocks);
+	Vec b, x;
+	PetscCallAbort(PETSC_COMM_WORLD, MatCreateVecs(P, &x, &b));
+	PetscCallAbort(PETSC_COMM_WORLD, VecSet(b, 1));
+	// The error of the setup with these options (prefix), its message in LastError
+	auto setUp = [&](const string& prefix, const string& options)
+	{
+		KSP ksp;
+		PC pc;
+		PetscCallAbort(PETSC_COMM_WORLD, KSPCreate(PETSC_COMM_WORLD, &ksp));
+		PetscCallAbort(PETSC_COMM_WORLD, KSPSetOptionsPrefix(ksp, prefix.c_str()));
+		PetscCallAbort(PETSC_COMM_WORLD, KSPSetOperators(ksp, P, P));
+		PetscCallAbort(PETSC_COMM_WORLD, KSPSetType(ksp, KSPFCG));
+		PetscCallAbort(PETSC_COMM_WORLD, KSPGetPC(ksp, &pc));
+		PetscCallAbort(PETSC_COMM_WORLD, PCSetType(pc, PCFHHOS4));
+		istringstream in(options);
+		string token, prefixed;
+		while (in >> token)
+			prefixed += (token[0] == '-' ? "-" + prefix + token.substr(1) : token) + " ";
+		PetscCallAbort(PETSC_COMM_WORLD, PetscOptionsInsertString(nullptr, prefixed.c_str()));
+		PetscCallAbort(PETSC_COMM_WORLD, KSPSetFromOptions(ksp));
+		PetscCallAbort(PETSC_COMM_WORLD, PetscPushErrorHandler(StoreError, nullptr));
+		LastError.clear();
+		PetscErrorCode error = KSPSolve(ksp, b, x);
+		PetscCallAbort(PETSC_COMM_WORLD, PetscPopErrorHandler());
+		PetscCallAbort(PETSC_COMM_WORLD, KSPDestroy(&ksp));
+		return error;
+	};
+	EXPECT_NE(setUp("ambiguity_", "-pc_fhhos4_vector_components 1"), PETSC_SUCCESS);
+	EXPECT_EQ(LastError, "fhhos4: 64 DoFs per cell and 9 per face (1 component) fit discretizations that need different solvers:\n"
+	                     "  Dimension 3, Q, face degree 2, cell degree 3\n"
+	                     "  Dimension 2, Q, face degree 8, cell degree 7\n"
+	                     "Set -pc_fhhos4_dimension (2 or 3).");
+	for (auto [prefix, options] : { pair<string, string>{ "dimension_", "-pc_fhhos4_vector_components 1 -pc_fhhos4_dimension 3" },
+	                                { "degrees_", "-pc_fhhos4_dimension 3 -pc_fhhos4_face_degree 2 -pc_fhhos4_cell_degree 3" } })
+	{
+		EXPECT_NE(setUp(prefix, options), PETSC_SUCCESS);
+		EXPECT_NE(LastError.find("near null space"), string::npos) << options << ": " << LastError;
+	}
+	// 2 uncoupled components, P k = l = 1 (6 DoFs per cell, 4 per face), the zeros between them not stored: the stored
+	// entries give no discretization, so with the dimension and the degrees given, the space is P, as in Solver::Setup()
+	auto uncoupled = [&](int rows, int cols)
+	{
+		Eigen::MatrixXd C = Eigen::MatrixXd::Zero(2 * rows, 2 * cols);
+		for (int component = 0; component < 2; component++)
+			C.block(component * rows, component * cols, rows, cols) = Eigen::MatrixXd::NullaryExpr(rows, cols, [&]() { return coefficient(generator); });
+		return C;
+	};
+	Eigen::MatrixXd U_TF = uncoupled(3, 2);
+	SparseMatrix uncoupledGlobals[4] = { Kron(system.Global.A_TT, uncoupled(3, 3)), Kron(system.Global.A_TF, U_TF), Kron(system.Global.A_FT, Eigen::MatrixXd(U_TF.transpose())), Kron(system.Global.A_FF, uncoupled(2, 2)) };
+	PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&x));
+	PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&b));
+	PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&P));
+	for (Mat& A : blocks)
+		PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&A));
+	P = Nest(uncoupledGlobals, *system.Cells, *system.Faces, 6, 4, blocks);
+	PetscCallAbort(PETSC_COMM_WORLD, MatCreateVecs(P, &x, &b));
+	PetscCallAbort(PETSC_COMM_WORLD, VecSet(b, 1));
+	EXPECT_NE(setUp("spacep_", "-pc_fhhos4_vector_components 2 -pc_fhhos4_dimension 2 -pc_fhhos4_face_degree 1 -pc_fhhos4_cell_degree 1"), PETSC_SUCCESS);
+	EXPECT_NE(LastError.find("near null space"), string::npos) << LastError;
+	PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&x));
+	PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&b));
+	PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&P));
+	for (Mat& A : blocks)
+		PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&A));
+}
+
+// Refused on all the processes: the degrees not given (inferred) without -pc_fhhos4_vector_components, no near null
+// space, a near null space that is not the interpolation of 1 (the constant vector on 2 components), the DoFs of the
+// processes not whole blocks (7 components: neither the 3600 cells nor the 7080 faces are multiples of 7), a monolithic
+// operator
 TEST(PETScPC, Errors)
 {
 	PETScSystem system(0, 1, true);
 	EXPECT_NE(system.Solve(KSPFCG, "nodegree_", " -pc_fhhos4_dimension 2").ErrorCode, PETSC_SUCCESS);
+	EXPECT_NE(LastError.find("give -pc_fhhos4_vector_components"), string::npos) << LastError;
 	PETScSystem noNearNullSpace(0, 1, true, NearNullSpace::None);
 	EXPECT_NE(noNearNullSpace.Solve(KSPFCG, "nonullspace_", Degrees).ErrorCode, PETSC_SUCCESS);
 	PETScSystem constant(0, 2, true, NearNullSpace::Constant);

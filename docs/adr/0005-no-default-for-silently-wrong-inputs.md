@@ -1,7 +1,9 @@
 # No default for an input whose wrong value silently breaks the solver
 
 The interpolations of 1 of the cells and faces, `Dimension`, `FaceDegree` and `CellDegree` have no default: the
-caller must give them (2026-10-14, 2026-10-19). A wrong interpolation of 1 does not fail, it
+caller must give them (2026-10-14, 2026-10-19), or, since 2026-11-14, leave the dimension and the degrees to the
+inference from the blocks (ADR-0023), which is not a default: a value is either determined or refused. A wrong
+interpolation of 1 does not fail, it
 slows U-AMG down or makes it diverge (L2-orthonormal bases with c = 1: Cube-tet n=16, k=0, 26 -> 44 iterations; graded
 meshes fail), and it cannot be recovered from the blocks (ambiguity c*h, h discrete harmonic). "It's too risky to
 leave the user the possibility to leave the solver with very wrong values." A compact form (one constant for all) only
@@ -15,8 +17,10 @@ with vectors: the kernel is the near-kernel the solver already has (the interpol
 kernel given apart would have to equal it; for elasticity, the rigid body modes, and a kernel that is a part of them
 (sliding conditions) would need vectors then (ADR-0020).
 
-`VectorComponents` defaults to 1 (a scalar unknown): forgotten for a vector-valued one, the interpolations of 1 (one
-coefficient per cell and face) have the wrong size for the blocks, and the setup refuses them.
+`VectorComponents` is 1 when not set (a scalar unknown) if `Dimension` and the degrees are set: forgotten for a
+vector-valued one, the interpolations of 1 (one coefficient per cell and face) have the wrong size for the blocks, and
+the setup refuses them. If one of them is inferred, `VectorComponents` is required (ADR-0023, 2026-11-14): the DoFs per
+cell and face don't give it.
 
 `Comm` (with MPI) had no default from 2026-10-20 to 2026-10-30. Not set, it now means one process, with no MPI call
 (the user: the conda and Spack packages are built with MPI by default, and a code that doesn't use MPI must not have to

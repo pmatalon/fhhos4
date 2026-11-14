@@ -26,6 +26,8 @@ NumPy arrays read in place (`nb::try_cast` without conversion; the vectors `noco
 - `PySolver` derives from `fhhos4::Solver` and keeps the views the solves read (`A`, `A_FT`), replaced only after a
   successful setup: the checks of a setup run before it resets the previous one, which still reads them;
 - `CondensedMatrix()`: a copy (`ToCSR()`); the setups, solves and helpers release the GIL.
+- The parameters are the members of `fhhos4::Solver` (`def_rw`), with their defaults: the discretization not set
+  (`PolynomialSpace.Inferred`, -1) is inferred by the C++ setup (ADR-0023), which writes the values found into them.
 
 Built with `-DENABLE_PYTHON=ON` (in the library section of `CMakeLists.txt`, also with `ENABLE_PROGRAM=OFF`) into
 `<build>/python`, not installed. Test: `ctest -R Python` (`PythonModule`: `library/python/tests/test_module.py`, the

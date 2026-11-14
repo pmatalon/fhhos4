@@ -306,7 +306,8 @@ def test_parameters():
     assert solver.Krylov == fhhos4.Krylov.Default and solver.Cycle == fhhos4.Cycle.K
     assert solver.PCoarsening == fhhos4.PCoarsening.Minus2 and solver.Tolerance == 1e-8
     assert solver.Prolongation == fhhos4.Prolongation.HarmonicExtension
-    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.P and not solver.SingularMatrix and solver.VectorComponents == 1
+    assert solver.PolynomialSpace == fhhos4.PolynomialSpace.Inferred and not solver.SingularMatrix and solver.VectorComponents == -1
+    assert solver.Dimension == -1 and solver.FaceDegree == -1 and solver.CellDegree == -1
     assert solver.Restart == -1 and solver.L1Theta == 0.5
     solver.L1Theta = 1.0
     assert solver.L1Theta == 1.0
@@ -321,15 +322,57 @@ def test_parameters():
     assert fhhos4.Version().startswith("1.")
 
 
+def test_inferred_discretization():
+    """The discretization inferred from the blocks, only VectorComponents set: the iterations with all the parameters
+    set, the values written into the solver; refused: VectorComponents not set, an ambiguity (64 DoFs per cell and 9 per
+    face: 3D Q k=2 l=3 or 2D Q k=8 l=7, the blocks of the toy system kron dense ones), whose message proposes
+    Dimension"""
+    system = HybridSystem(32)
+    reference, solver = ToySolver(), fhhos4.Solver()
+    solver.VectorComponents = 1
+    solver.Tolerance = reference.Tolerance
+    results = []
+    for s in (reference, solver):
+        s.PreSmoother = fhhos4.Smoother.BlockGaussSeidel
+        s.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+        results.append(s.Solve(system.b_T, system.b_F, x_T, x_F))
+    assert results[0].Converged and results[1].Iterations == results[0].Iterations, results
+    assert (solver.Dimension, solver.PolynomialSpace, solver.FaceDegree, solver.CellDegree) == (2, fhhos4.PolynomialSpace.P, 0, 0)
+    assert (solver.CellBlockSize(), solver.FaceBlockSize()) == (1, 1)
+    try:
+        fhhos4.Solver().SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        assert False, "VectorComponents not set accepted"
+    except fhhos4.Error as e:
+        assert "set VectorComponents" in str(e)
+    small = HybridSystem(4)
+    rng = np.random.default_rng(3)
+    C_TT = rng.uniform(0.5, 1, (64, 64))
+    C_TT = C_TT @ C_TT.T + 64 * np.eye(64)
+    C_TF = rng.uniform(0.5, 1, (64, 9))
+    def dense(M, C):
+        K = sp.kron(M, C, format="csr")
+        K.sort_indices()
+        return K
+    ambiguous = fhhos4.Solver()
+    ambiguous.VectorComponents = 1
+    try:
+        ambiguous.SetupSym(dense(small.A_TT, C_TT), dense(small.A_TF, C_TF), dense(small.A_FF, C_TF.T @ np.linalg.solve(C_TT, C_TF)), small.CellInterpOfOne, small.FaceInterpOfOne)
+        assert False, "an ambiguity accepted"
+    except fhhos4.Error as e:
+        assert str(e).endswith("Set Dimension (2 or 3)."), str(e)
+    assert ambiguous.Dimension == -1
+
+
 def test_errors():
     system = HybridSystem(8)
-    # Dimension not set
+    # The discretization inferred, but VectorComponents not set: it is not inferred
     solver = fhhos4.Solver()
     try:
         solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
-        assert False, "Dimension not set accepted"
+        assert False, "VectorComponents not set accepted"
     except fhhos4.Error as e:
-        assert "Dimension" in str(e)
+        assert "VectorComponents" in str(e)
     assert isinstance(fhhos4.Error("message"), RuntimeError)
     # Vectors: float64 only, not converted
     solver = ToySolver()

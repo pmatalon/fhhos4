@@ -3,15 +3,18 @@
 // faces). One application: one cycle (Krylov::None, MaxIterations 1), i.e. the condensation of the residual, one cycle
 // on the condensed system, and the cell unknowns. The default K-cycle is non-linear: PETSc's Krylov method must be
 // flexible (fcg, fgmres, gcr). Written in PETSc's style, on PETSc's interface for the implementations of
-// preconditioners and the public header of the library only, so as to move into PETSc (src/ksp/pc/impls) later.
+// preconditioners and the public header of the library, with its inference of the discretization (header-only,
+// compiled into this library), so as to move into PETSc (src/ksp/pc/impls) later.
 #include <petsc/private/pcimpl.h>
 #include <fhhos4>
 #include "fhhos4_petsc.h"
+#include "Solver/DiscretizationInference.h"
 #include <cmath>
 #include <new>
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <vector>
 
 static_assert(std::is_same<PetscScalar, double>::value, "fhhos4: a PETSc with real double-precision scalars");
 
@@ -182,6 +185,92 @@ namespace
 		PetscFunctionReturn(PETSC_SUCCESS);
 	}
 
+	// The options of the parameters in the messages of the inference of the discretization
+	const DiscretizationInference::ParameterNames Options = { "-pc_fhhos4_dimension", "-pc_fhhos4_polynomial_space", "-pc_fhhos4_face_degree", "-pc_fhhos4_cell_degree",
+	                                                          "-pc_fhhos4_vector_components", "p", "q" };
+
+	// The parameters of the discretization whose options are not given (Dimension, FaceDegree, CellDegree -1,
+	// PolynomialSpace::Inferred), inferred from the stored entries of the diagonal parts of A_TT and A_TF (the cells and
+	// the own faces of each process; Solver/DiscretizationInference.h, ADR-0023) and written into the solver;
+	// -pc_fhhos4_vector_components required unless the dimension and the degrees are given. Collective.
+	PetscErrorCode InferDiscretization(fhhos4::Solver& s, Mat A_TT, Mat A_TF, MPI_Comm comm)
+	{
+		using namespace DiscretizationInference;
+		Discretization set = { s.Dimension, s.PolynomialSpace, s.FaceDegree, s.CellDegree };
+		bool degreesSet = s.Dimension != -1 && s.FaceDegree != -1 && s.CellDegree != -1;
+		Block tt, tf;
+		BlockAnalysis local;
+		PetscMPIInt size;
+		std::string error;
+		bool allOk;
+		PetscFunctionBegin;
+		if (degreesSet && s.PolynomialSpace != fhhos4::PolynomialSpace::Inferred)
+			PetscFunctionReturn(PETSC_SUCCESS);
+		int components = s.VectorComponents >= 1 ? s.VectorComponents : 1;
+		if (degreesSet) // the space alone: no analysis if P and Q have the same DoFs and solver (e.g. k = 0)
+		{
+			Inference ofP = DiscretizationInference::InferDiscretization(components * (int)PolynomialSpaceDimension(s.Dimension, s.CellDegree, false),
+			                                                             components * (int)PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, false), components, set, s.PCoarsening);
+			if (ofP.Solvers == 1 && std::find(ofP.NotNeeded.begin(), ofP.NotNeeded.end(), Parameter::PolynomialSpace) != ofP.NotNeeded.end())
+			{
+				s.PolynomialSpace = fhhos4::PolynomialSpace::P;
+				s.VectorComponents = components;
+				PetscFunctionReturn(PETSC_SUCCESS);
+			}
+		}
+		PetscCheck(degreesSet || s.VectorComponents >= 1, comm, PETSC_ERR_ARG_WRONGSTATE,
+		           "fhhos4: give -pc_fhhos4_vector_components (1 for a scalar unknown): -pc_fhhos4_dimension, -pc_fhhos4_face_degree or -pc_fhhos4_cell_degree is not given, inferred from the blocks, whose DoFs per cell and face don't give the number of components");
+		PetscCall(tt.Get(A_TT));
+		PetscCall(tf.Get(A_TF));
+		try
+		{
+			local = AnalyzeBlocks(tt.Diag.Eigen(), tf.Diag.Eigen());
+		}
+		catch (const fhhos4::Error& e)
+		{
+			error = e.what();
+		}
+		PetscCall(tt.Restore());
+		PetscCall(tf.Restore());
+		PetscCall(AllOk(comm, error.empty(), &allOk));
+		if (!allOk && error.empty())
+			error = "fhhos4: an input is wrong on another process (see its error)";
+		Inference inference;
+		if (allOk)
+		{
+			PetscCallMPI(MPI_Comm_size(comm, &size));
+			std::vector<BlockAnalysis> analyses(size);
+			PetscCallMPI(MPI_Allgather(&local, sizeof(BlockAnalysis), MPI_BYTE, analyses.data(), sizeof(BlockAnalysis), MPI_BYTE, comm));
+			try // the same on all the processes
+			{
+				auto [cellBlockSize, faceBlockSize] = CombineAnalyses(analyses, Options);
+				inference = DiscretizationInference::InferDiscretization(cellBlockSize, faceBlockSize, components, set, s.PCoarsening);
+				if (inference.Solvers != 1)
+					error = Message(inference, Options);
+			}
+			catch (const fhhos4::Error& e)
+			{
+				error = e.what();
+			}
+		}
+		if (degreesSet && !error.empty()) // the stored entries don't give the space: P, as Solver::Setup() (on all the processes)
+		{
+			s.PolynomialSpace = fhhos4::PolynomialSpace::P;
+			s.VectorComponents = components;
+			PetscFunctionReturn(PETSC_SUCCESS);
+		}
+		PetscCheck(error.empty(), comm, PETSC_ERR_ARG_WRONG, "%s", error.c_str());
+		s.Dimension = inference.Result.Dimension;
+		s.PolynomialSpace = inference.Result.PolynomialSpace;
+		s.FaceDegree = inference.Result.FaceDegree;
+		s.CellDegree = inference.Result.CellDegree;
+		if (s.VectorComponents == -1)
+			s.VectorComponents = 1;
+		if (s.Verbosity >= 1)
+			PetscCall(PetscPrintf(comm, "%s\n", Description(inference, Options).c_str()));
+		PetscFunctionReturn(PETSC_SUCCESS);
+	}
+
 	PetscErrorCode PCSetUp_FHHOS4(PC pc)
 	{
 		PC_FHHOS4* ctx = (PC_FHHOS4*)pc->data;
@@ -225,6 +314,7 @@ namespace
 			PetscCall(SubMatrix(P, 1, 0, "A_FT", &A_FT));
 
 		// The DoFs of each process: whole cells and faces
+		PetscCall(InferDiscretization(solver, A_TT, A_TF, comm));
 		try
 		{
 			cbs = solver.CellBlockSize();
@@ -348,7 +438,7 @@ namespace
 
 	const char* const Cycles[] = { "v", "w", "k" };      // fhhos4::Cycle
 	const char* const Krylovs[] = { "none", "fcg", "gcr" }; // fhhos4::Krylov None, FCG, GCR
-	const char* const Spaces[] = { "p", "q" };            // fhhos4::PolynomialSpace
+	const char* const Spaces[] = { "p", "q", "inferred" }; // fhhos4::PolynomialSpace
 
 	PetscErrorCode PCSetFromOptions_FHHOS4(PC pc, PetscOptionItems PetscOptionsObject)
 	{
@@ -359,19 +449,19 @@ namespace
 		PetscBool set;
 		PetscFunctionBegin;
 		PetscOptionsHeadBegin(PetscOptionsObject, "fhhos4 options (U-AMG for hybrid discretizations)");
-		PetscCall(PetscOptionsInt("-pc_fhhos4_dimension", "Dimension of the mesh: 2 or 3 (no default)", "PCFHHOS4", s.Dimension, &value, &set));
+		PetscCall(PetscOptionsInt("-pc_fhhos4_dimension", "Dimension of the mesh: 2 or 3 (default: inferred from the blocks)", "PCFHHOS4", s.Dimension, &value, &set));
 		if (set)
 			s.Dimension = (int)value;
-		PetscCall(PetscOptionsInt("-pc_fhhos4_face_degree", "Degree of the polynomials on the faces (no default)", "PCFHHOS4", s.FaceDegree, &value, &set));
+		PetscCall(PetscOptionsInt("-pc_fhhos4_face_degree", "Degree of the polynomials on the faces (default: inferred from the blocks)", "PCFHHOS4", s.FaceDegree, &value, &set));
 		if (set)
 			s.FaceDegree = (int)value;
-		PetscCall(PetscOptionsInt("-pc_fhhos4_cell_degree", "Degree of the polynomials in the cells (no default)", "PCFHHOS4", s.CellDegree, &value, &set));
+		PetscCall(PetscOptionsInt("-pc_fhhos4_cell_degree", "Degree of the polynomials in the cells: k - 1, k or k + 1 (default: inferred from the blocks)", "PCFHHOS4", s.CellDegree, &value, &set));
 		if (set)
 			s.CellDegree = (int)value;
-		PetscCall(PetscOptionsEList("-pc_fhhos4_polynomial_space", "Space of the cell and face bases: p (degree <= k), q (degree <= k in each variable)", "PCFHHOS4", Spaces, 2, Spaces[(int)s.PolynomialSpace], &value, &set));
+		PetscCall(PetscOptionsEList("-pc_fhhos4_polynomial_space", "Space of the cell and face bases: p (degree <= k), q (degree <= k in each variable), inferred from the blocks (the default)", "PCFHHOS4", Spaces, 3, Spaces[(int)s.PolynomialSpace], &value, &set));
 		if (set)
 			s.PolynomialSpace = (fhhos4::PolynomialSpace)value;
-		PetscCall(PetscOptionsInt("-pc_fhhos4_vector_components", "Components of the unknown, interleaved in each block", "PCFHHOS4", s.VectorComponents, &value, &set));
+		PetscCall(PetscOptionsInt("-pc_fhhos4_vector_components", "Components of the unknown, interleaved in each block (required if the dimension or a degree is inferred; default: 1 otherwise)", "PCFHHOS4", s.VectorComponents, &value, &set));
 		if (set)
 			s.VectorComponents = (int)value;
 		PetscCall(PetscOptionsBool("-pc_fhhos4_symmetric", "Symmetric matrix (default: MatIsSymmetricKnown() or MatIsSPDKnown() of the operator)", "PCFHHOS4", ctx->Symmetric, &ctx->Symmetric, &ctx->SymmetricSet));
@@ -404,7 +494,7 @@ namespace
 		if (ascii)
 		{
 			PetscCall(PetscViewerASCIIPrintf(viewer, "  fhhos4 U-AMG: Dimension %d, FaceDegree %d, CellDegree %d, PolynomialSpace %s, VectorComponents %d\n", s.Dimension, s.FaceDegree, s.CellDegree,
-			                                 s.PolynomialSpace == fhhos4::PolynomialSpace::Q ? "Q" : "P", s.VectorComponents));
+			                                 s.PolynomialSpace == fhhos4::PolynomialSpace::Q ? "Q" : s.PolynomialSpace == fhhos4::PolynomialSpace::P ? "P" : "inferred", s.VectorComponents));
 			PetscCall(PetscViewerASCIIPrintf(viewer, "  %s-cycle%s\n", s.Cycle == fhhos4::Cycle::K ? "K" : s.Cycle == fhhos4::Cycle::V ? "V" : "W",
 			                                 s.Cycle == fhhos4::Cycle::K ? ": non-linear, the Krylov method must be flexible (fcg, fgmres, gcr)" : ""));
 			if (s.Krylov == fhhos4::Krylov::None)

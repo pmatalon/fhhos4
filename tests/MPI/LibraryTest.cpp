@@ -104,9 +104,11 @@ TwoParts Split(const fhhos4::SparseMatrix& rows, int64_t begin, int64_t end)
 // (the blocks ⊗ I_n, VectorComponents = n; the ghosts are the same faces and cells). mixedPrecision, blockCSR:
 // MixedPrecision and BlockCSRStorage of both solvers (the defaults: true, false). mergeOffDiag: the blocks of each
 // process in two parts (Split(), as PETSc stores them), merged by MergeOffDiag() (the ghosts
-// by increasing global number), checked against the test's. shape: the partition. Returns the iterations on the
-// processes; setupLog: the printouts of their setup (Verbosity 2, on the root process) if not null.
-int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool mergeOffDiag = false, PartitionShape shape = PartitionShape::Blocks)
+// by increasing global number), checked against the test's. shape: the partition. inferred: the distributed solver with
+// only VectorComponents set (the discretization inferred from the blocks of the processes), checked after the setup.
+// Returns the iterations on the processes; setupLog: the printouts of their setup (Verbosity 2, on the root process)
+// if not null.
+int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double asymmetry = 0, bool singular = false, int components = 1, bool mixedPrecision = true, string* setupLog = nullptr, bool blockCSR = false, bool mergeOffDiag = false, PartitionShape shape = PartitionShape::Blocks, bool inferred = false)
 {
 	int n = 60;
 	CartesianHybridSystem global(n, asymmetry, singular);
@@ -184,10 +186,18 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 		solver.Verbosity = 2;
 		testing::internal::CaptureStdout();
 	}
+	if (inferred)
+	{
+		solver.Dimension = -1;
+		solver.FaceDegree = -1;
+		solver.CellDegree = -1;
+	}
 	if (asymmetry == 0)
 		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, faceGhostGlobalNumbers);
 	else
 		solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, faceGhostGlobalNumbers, cellGhostGlobalNumbers);
+	EXPECT_EQ(solver.FaceBlockSize(), c);
+	EXPECT_EQ(solver.CellBlockSize(), c);
 	if (setupLog)
 	{
 		*setupLog = testing::internal::GetCapturedStdout();
@@ -317,6 +327,24 @@ TEST(DistributedLibrary, EmptyProcess)
 		GTEST_SKIP() << "several processes";
 	for (double asymmetry : { 0.0, 0.3 })
 		ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, 2, true, nullptr, false, false, PartitionShape::StripsWithFirstProcessEmpty);
+}
+
+// The discretization inferred from the blocks of the processes (only VectorComponents set; ADR-0023), on blocks of
+// processes and with a process that owns no cell (no opinion: it receives the result), symmetric or not: the
+// iterations with all the parameters set
+TEST(DistributedLibrary, InferredDiscretization)
+{
+	for (double asymmetry : { 0.0, 0.3 })
+	{
+		for (PartitionShape shape : { PartitionShape::Blocks, PartitionShape::StripsWithFirstProcessEmpty })
+		{
+			if (shape == PartitionShape::StripsWithFirstProcessEmpty && World().Size() == 1)
+				continue;
+			int set = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, 1, true, nullptr, false, false, shape);
+			int inferred = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, 1, true, nullptr, false, false, shape, true);
+			EXPECT_EQ(inferred, set) << "asymmetry " << asymmetry;
+		}
+	}
 }
 
 // MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxRows at MinRowsPerProcess * P rows (on

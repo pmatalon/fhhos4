@@ -67,7 +67,9 @@ program too: `-DENABLE_PROGRAM=ON`).
   `SweepRhs()` (`b - Offd x`, in the precision of the level); the float copies of the finest and p-levels'
   operators without `Diag` (`Cast<float>(false)`), the h-levels' keep theirs (assembled).
 - Library: `Solver::Comm` (not set: one process, no MPI call; `MUMPS` then needs MPI initialized; forgotten on several
-  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows), `SetupSym(..., GhostGlobalNumbers faceGhostGlobalNumbers)` (local columns: own faces then
+  processes: `ForgottenComm()` ends the errors of distributed inputs, ghosts or `A_FF` with more columns than rows; the
+  discretization not set inferred from the blocks of each process, one gather: `docs/library.md`),
+  `SetupSym(..., GhostGlobalNumbers faceGhostGlobalNumbers)` (local columns: own faces then
   ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full: a triangular one refused, `CheckTriangles()`),
   `SetupNonSym(..., faceGhostGlobalNumbers, cellGhostGlobalNumbers)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
@@ -117,7 +119,9 @@ program too: `-DENABLE_PROGRAM=ON`).
 `fhhos4_mpi_tests` (`tests/MPI`, own `main()`, `ctest -R MPI_np`: 1-4 processes, also in the release workflow;
 `tests/support/PartitionedSystem.h`;
 `MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host; `LibraryTest.cpp`'s
-`EmptyProcess`: the library with an empty first process, NGSolve's, in block CSR);
+`EmptyProcess`: the library with an empty first process, NGSolve's, in block CSR; `InferredDiscretization`: the
+discretization inferred from the blocks of the processes, with an empty first process too, in the iterations of all
+set);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; 3D k=0
 `-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses
