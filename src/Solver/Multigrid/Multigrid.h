@@ -28,6 +28,12 @@ public:
 	// (each cycle corrects the residual of the current x: iterative refinement), x. With the options that the single
 	// precision doesn't support (see UncondensedAMG::MixedPrecisionApplies()), the levels are in double.
 	bool MixedPrecision = false;
+
+	// After the setup: the levels are in single precision (MixedPrecision, applied)
+	bool LevelsInSinglePrecision() const
+	{
+		return _mixedPrecision;
+	}
 	int MatrixMaxSizeForCoarsestLevel;
 	// On several processes, the coarsening also stops at this many rows per process on average (0: no such stop): the
 	// aggregation stays within each process, so MatrixMaxSizeForCoarsestLevel may be out of reach on many of them

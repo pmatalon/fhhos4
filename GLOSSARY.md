@@ -28,8 +28,19 @@ the scalar basis times each unit vector, interleaved by component: phi_i e_c is 
 
 **Interpolation of 1**:
 The coefficient c of each cell and each face such that the constant function 1 = c phi_0, phi_0 being the first basis
-function.
+function. Inside the multigrid, one coefficient per cell and per face; given to the library on all the DoFs (the other
+coefficients zero), as its near null space.
 _Avoid_: scaling, constant value
+
+**Near null space**:
+The functions that the operator almost cancels, which the multigrid must keep on its coarse levels, given to the
+library interpolated on the bases of the cells and of the faces (one column per function, one row per DoF): the
+function 1 (a scalar unknown), the constant of each component (a vector-valued one), the rigid body modes (elasticity).
+_Avoid_: kernel (the null space of a singular matrix), near-kernel
+
+**Rigid body modes**:
+The displacements without deformation, the near null space of elasticity: the translations (the constants of the
+components) and the rotations (of degree 1); 3 in 2D, 6 in 3D.
 
 **Blocks**:
 The four parts of the uncondensed system: `A_TT` (cell-cell, block-diagonal), `A_TF` (cell-face), `A_FT` (face-cell),

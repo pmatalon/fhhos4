@@ -10,8 +10,9 @@ What NGSolve showed, likely true of other frameworks:
   of `PyCSRView`.
 - Bases not ordered by degree (e.g. Dubiner's order): the caller sorts the DoFs of each cell and face by degree in the
   DoF lists of `ExtractBlocksSym()`, otherwise the p-levels silently use the wrong low-order space
-  (`PCoarsening::ToZero` is the fallback, slower from k = 3). phi_0 may differ from 1: the interpolations of 1 are
-  1/phi_0.
+  (`PCoarsening::ToZero` is the fallback, slower from k = 3). phi_0 may differ from 1: the near null space is the framework's
+  own interpolation of 1 on all the DoFs (a NumPy vector; several functions: an array of one column each, in Fortran
+  order, read in place, `ToNearNullSpace()`).
 - On several processes: a process may own nothing (NGSolve's rank 0 holds no element), and the framework's matrices
   are sub-assembled (a shared face's row holds the local contributions only): the caller merges them onto the owners.
   Time the collective calls after a barrier, otherwise a process waits inside the setup for the others' preparation.

@@ -15,6 +15,13 @@
 
 using namespace fhhos4_tests;
 
+// The near null space of c components at degree 0 (c DoFs per cell and face): the constant of each component, one
+// column each (1 on its DoF of each block)
+static Eigen::MatrixXd Constants(Eigen::Index nBlocks, int c)
+{
+	return Eigen::MatrixXd::Identity(c, c).replicate(nBlocks, 1);
+}
+
 namespace
 {
 	const Communicator& World()
@@ -127,7 +134,7 @@ namespace
 			const IndexMap& cells = *system.Cells;
 			const IndexMap& faces = *system.Faces;
 			Vector b_T = OnEachComponent(Vector::LinSpaced(global.A_TT.rows(), 1, 2), c), b_F = Vector::Zero(c * global.S.rows());
-			Vector cellOnes = Vector::Ones(global.A_TT.rows()), faceOnes = Vector::Ones(global.S.rows());
+			Eigen::MatrixXd cellOnes = Constants(global.A_TT.rows(), c), faceOnes = Constants(global.S.rows(), c);
 			fhhos4::SparseMatrix A_TT = OnEachComponent(system.Global.A_TT, c), A_TF = OnEachComponent(system.Global.A_TF, c);
 			fhhos4::SparseMatrix A_FT = OnEachComponent(system.Global.A_FT, c), A_FF = OnEachComponent(system.Global.A_FF, c);
 			auto reference = [&](bool symmetric, Vector& x_T, Vector& x_F)

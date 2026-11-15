@@ -85,7 +85,7 @@ case. The constants are the first n DoFs of each block: the rescaling by the int
 block, that of the scalar basis) applies to them (`UncondensedLevel::VectorComponents`, `ScaleConstantDoFs()`,
 `ScaleConstantRows()`). The couplings of the aggregation are the traces of the blocks of `A_TF`, summed over the
 components; the h-levels have n DoFs per face (the block smoothers, block CSR). The coarse levels hold the n constants
-(the translations), not the rotations: the near-kernel of elasticity is not in them. `SingularMatrix`: the kernel of the
+(the translations), not the rotations, unless they are given (next section). `SingularMatrix`: the kernel of the
 n constants, a pinned DoF for each on the coarsest level (`SingularSolver`): the pure Neumann vector Laplacian, not
 elasticity (its kernel has the rotations). `Prolongation::Reconstruction`: the n rows of the constants of the
 reconstruction of the coarse cell go to the n constants of each removed face (`CoarseningPass::ComputeProlongation()`;
@@ -93,6 +93,25 @@ coupled components: coupled rows). Checked by `UAMGLibrary.VectorComponents` and
 ⊗ I_n give the scalar iterations and solution on each component, with both prolongations (`CoarseMatrixMaxRows` times
 n: it counts rows); `CoupledComponents`, the blocks ⊗ C: the direct solution; on several processes,
 `DistributedLibrary.VectorComponents` (the blocks of each process ⊗ I_n, the ghosts unchanged; singular too).
+
+## Near null space beyond the constants (elasticity)
+
+`UncondensedAMG::ConstantsPerBlock` = m > 0 (the library only, `fhhos4::Solver` with more near null space functions
+than components: the rigid body modes, m = 3 in 2D, 6 in 3D): the first m DoFs of each block are these functions, in
+bases where each has the coordinate 1 on every cell and face (the change of basis is the library's:
+`docs/library.md`, "The near null space"), as the constant of a scalar unknown after the rescaling by its
+interpolation of 1. They take the place of the n constants:
+- the last p-level (degree 0 in the code) keeps the first m DoFs of each block (`CreateCoarseLevel()`), instead of
+  the n constants: the functions are of degree <= 1, within the first DoFs of the blocks of degree 1, so the p-levels
+  above extract as usual (k, k - 2, ..., then the functions; k = 1 and 2: the functions directly);
+- the h-levels have m DoFs per face, and the passes treat them as constants (`UncondensedLevel::VectorComponents` and
+  `CoarseningPass::VectorComponents` = m): the injection of the kept faces copies the same m coordinates, i.e. the
+  same global function, to all the fine faces of a coarse face.
+
+Keeping the degree 1 on the h-levels without them (`-hp-cs h`) does not carry the rotations: the injection gives all
+the fine faces of a coarse face the same coefficients, and the constant part of a rotation differs from one face to
+another. Checked by `UAMGLibrary.NearNullSpaceBeyondTheConstants` (algebraic: a third function on 2 components);
+elasticity itself only on Disk++'s `linear_elasticity` (`docs/clients.md`).
 
 ## Non-symmetric matrices
 

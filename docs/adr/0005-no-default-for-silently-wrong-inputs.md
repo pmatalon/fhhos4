@@ -1,6 +1,8 @@
 # No default for an input whose wrong value silently breaks the solver
 
-The interpolations of 1 of the cells and faces, `Dimension`, `FaceDegree` and `CellDegree` have no default: the
+The near null space on the cells and faces (the interpolation of 1; since 2026-11-14 on all the DoFs, one column per
+function, the checks of its coefficients catching wrong bases and block sizes: one coefficient per cell and face
+before), `Dimension`, `FaceDegree` and `CellDegree` have no default: the
 caller must give them (2026-10-14, 2026-10-19), or, since 2026-11-14, leave the dimension and the degrees to the
 inference from the blocks (ADR-0023), which is not a default: a value is either determined or refused. A wrong
 interpolation of 1 does not fail, it
@@ -18,8 +20,8 @@ kernel given apart would have to equal it; for elasticity, the rigid body modes,
 (sliding conditions) would need vectors then (ADR-0020).
 
 `VectorComponents` is 1 when not set (a scalar unknown) if `Dimension` and the degrees are set: forgotten for a
-vector-valued one, the interpolations of 1 (one coefficient per cell and face) have the wrong size for the blocks, and
-the setup refuses them. If one of them is inferred, `VectorComponents` is required (ADR-0023, 2026-11-14): the DoFs per
+vector-valued one, the near null space (one column per component) has too many columns for one component, or is
+not the interpolation of a constant on the blocks of one component, and the setup refuses it. If one of them is inferred, `VectorComponents` is required (ADR-0023, 2026-11-14): the DoFs per
 cell and face don't give it.
 
 `Comm` (with MPI) had no default from 2026-10-20 to 2026-10-30. Not set, it now means one process, with no MPI call

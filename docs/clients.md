@@ -9,7 +9,7 @@ from their sources or documentation unless marked "unchecked".
 |---|---|---|---|---|---|
 | The program | in the repository (`-s libuamg`) | itself, Eigen CSR (triplets) | blocks | yes (GMSH parts) | `SetupSym()`/`SetupNonSym()`; on several processes `DistributedHybridSystem` copies into the library's layout (no copy planned) |
 | HArDCore3D | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()` (diffusion), `SetupNonSym()` (diffusion-advection-reaction) |
-| Disk++ | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()`, `VectorComponents` (vector Laplacian) |
+| Disk++ | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()`, `VectorComponents` (vector Laplacian), the rigid body modes (linear elasticity) |
 | NGSolve | client (the adapter, Python) | itself (`ngla`), CSR; partial rows on several processes | monolithic matrix (product space) | optional | `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; on several processes the adapter sums the shared rows itself |
 | PETSc users | target: the preconditioner (`mpi/12`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | `-pc_type fhhos4` (`ENABLE_PETSC_PC`: `MergeOffDiag()` from `MatMPIAIJGetSeqAIJ()`); `MatCreateSubMatrix()` then the merge for a monolithic matrix; `SplitVector()`/`JoinVector()` |
 | DOLFINx | target (`mpi/04`) | itself (`MatrixCSR`) or PETSc (AIJ, MATNEST) | blocks or monolithic matrix | always | through PETSc: as PETSc users; native `MatrixCSR`: to study |
@@ -27,8 +27,11 @@ cells and faces first in its local numbering, the blocks given as their first ro
 **HArDCore3D.** Assembles the four blocks and the right-hand sides in its own loops, the columns of the Dirichlet faces
 apart (moved to the right-hand sides). L2-orthonormal bases: the interpolations of 1 are not ones.
 
-**Disk++.** `assemble_uncondensed()` beside its condensed assembly (`poisson_solver`, `vector_laplacian`). Hierarchical
-monomials, phi_0 = 1. Its condensed matrix is symmetric only to rounding.
+**Disk++.** `assemble_uncondensed()` beside its condensed assembly (`poisson_solver`, `vector_laplacian`,
+`linear_elasticity`). Hierarchical monomials, phi_0 = 1. Its condensed matrix is symmetric only to rounding.
+`linear_elasticity` (Di Pietro-Ern, k >= 1) gives the near null space by its own projection (`project_function()`) of
+the translations and, with `-r`, of the rotations about the origin, on each cell and each face in the system; its
+vectors pass the library's checks. The only elasticity the library is run on.
 
 **NGSolve.** HDG is one bilinear form on a product space: a monolithic matrix (uint64 row pointers, int32 columns, read
 in place), its DoFs sorted by degree by the adapter (Dubiner order). On several processes `local_mat` holds partial

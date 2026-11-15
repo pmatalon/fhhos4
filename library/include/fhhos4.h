@@ -80,6 +80,15 @@ namespace fhhos4
 			double* Data;
 			std::int64_t Size;
 		};
+
+		// The near null space vectors: the columns of a dense column-major matrix, read in place
+		struct ConstMatrixView
+		{
+			const double* Data;
+			std::int64_t Rows;
+			std::int64_t Cols;
+			std::int64_t OuterStride; // between the first coefficients of two consecutive columns
+		};
 	}
 
 	// The implementation: the arrays given to the compiled functions, and what they return (the Python module uses them
@@ -309,8 +318,8 @@ namespace fhhos4
 		// message names the parameter to set: DoFs that fit discretizations needing different solvers (e.g. 64 per cell and
 		// 9 per face: Q in 3D at k = 2, l = 3, or in 2D at k = 8, l = 7, whose p-levels differ); and so are DoFs that fit
 		// none. The setup writes the values found into these members (printed at Verbosity >= 1), which later setups then
-		// read: no inference. Dimension and the degrees set, the space alone is inferred, from the sizes of the
-		// interpolations of 1 (no stored zeros needed).
+		// read: no inference. Dimension and the degrees set, the space alone is inferred, from the stored entries
+		// too: Q if they show its DoFs, P otherwise.
 		int Dimension = -1;  // 2 or 3
 		int FaceDegree = -1; // k: degree of the polynomials on the faces
 		int CellDegree = -1; // l: degree of the polynomials in the cells: k - 1, k or k + 1 (those of HHO), refused otherwise
@@ -320,18 +329,18 @@ namespace fhhos4
 		// The number of components of the unknown (>= 1): 1 for a scalar problem, n for a vector-valued one (e.g. the
 		// vector Laplacian, n = Dimension). The DoFs of each cell and face block are those of the scalar basis times each
 		// unit vector, interleaved by component (array of structures): phi_i e_c is the DoF n i + c of the block. The
-		// interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face. The coarse levels
-		// keep the n constants of each block (the translations), not the rotations: the rigid body modes of elasticity
-		// are not in them. Never inferred (the DoFs per cell and face don't tell it): -1 (the default) is 1 if Dimension and
-		// the degrees are set (the setup writes 1), and refused if one of them is inferred.
+		// coarse levels keep the functions of the near null space given to the setup: the n constants of each block
+		// (the translations), or the rigid body modes of elasticity (with the rotations). Never inferred (the DoFs per
+		// cell and face don't tell it): -1 (the default) is 1 if Dimension and the degrees are set (the setup writes 1),
+		// and refused if one of them is inferred.
 		int VectorComponents = -1;
-		// The matrix is singular, its kernel spanned by the interpolation of 1 (cellInterpOfOne, faceInterpOfOne: the
-		// constant functions; with VectorComponents n, the constant of each component: the n translations, e.g. the pure
+		// The matrix is singular, its kernel spanned by the constants (cellNearNullSpace, faceNearNullSpace: the
+		// interpolation of 1; with VectorComponents n, the constant of each component: the n translations, e.g. the pure
 		// Neumann vector Laplacian, not elasticity, whose kernel has the rotations too), e.g. the pure Neumann problem:
-		// SetupSym() only. The setup checks that the interpolation of 1 is in the kernel; each solve projects the condensed
+		// SetupSym() only. The setup checks that the constants are in the kernel; each solve projects the condensed
 		// right-hand side onto the image of the matrix (the data of a pure Neumann problem are compatible up to the
 		// rounding or quadrature errors; at Verbosity >= 1, a message if the component removed is larger). The solution is
-		// defined up to a multiple of the interpolation of 1 (a constant; one per component): shift it to the
+		// defined up to a constant (one per component): shift it to the
 		// normalization you want (e.g. zero mean).
 		bool SingularMatrix = false;
 
@@ -412,7 +421,8 @@ namespace fhhos4
 		                   // binding (OMP_PROC_BIND, OMP_PLACES) is set. On several processes (MPI): the cores divided
 		                   // among the processes of Comm that run on the same CPUs (not bound to distinct cores)
 		int Verbosity = 0; // 0: nothing; 1: one line per setup (number of levels, time) and per solve (iterations,
-		                   // residual, time); 2: all the messages of fhhos4, with the residual at each iteration.
+		                   // residual, time); 2: all the messages of fhhos4, with the precision of the levels (single or
+		                   // double, and why if MixedPrecision is not applied) and the residual at each iteration.
 		                   // On several processes: the messages of the process of rank 0.
 
 #if FHHOS4_MPI
@@ -439,12 +449,24 @@ namespace fhhos4
 		//   TransposedView(A), no copy). The setups check the sizes and structure of the inputs against Dimension, the
 		//   degrees and VectorComponents (inferring those not set from the blocks first), and their CSR arrays (one pass
 		//   on the indices);
-		// - cellInterpOfOne, faceInterpOfOne: the interpolation of the function 1 on the polynomial bases of the cells and
-		//   faces, one coefficient per cell and per face (in the order of the blocks of rows and columns of A_TF). The
-		//   bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose degree is
-		//   the largest partial degree; not needed with PCoarsening::ToZero) with a constant first function phi_0:
-		//   1 = c phi_0, i.e. c = 1/phi_0. phi_0 may differ from one cell or face to another (e.g. L2-orthonormal bases:
-		//   c = sqrt(|T|) on a cell T); c = 1 everywhere if phi_0 = 1.
+		// - cellNearNullSpace, faceNearNullSpace: the near null space of the operator, the functions that the multigrid
+		//   must keep on its coarse levels, interpolated on the polynomial bases of the cells and of the faces: one
+		//   column per function, one row per DoF (the rows of A_TF for the cells, its columns for the faces; on several
+		//   processes, those of the process), the same functions in the same order in both. What the calling code's own
+		//   interpolation gives, and PETSc's MatSetNearNullSpace() takes. A vector is a matrix of one column.
+		//   - A scalar unknown: one column, the interpolation of the function 1.
+		//   - A vector-valued unknown of n components (VectorComponents): n columns, the constants e_1, ..., e_n in this
+		//     order (the translations); or, for linear elasticity, the rigid body modes, the translations and the
+		//     rotations (3 columns in 2D, 6 in 3D), in any order or any basis of the space they span: required for the
+		//     solver to converge unless the displacement is imposed on the whole boundary. With the rotations:
+		//     SetupSym() on one process only, FaceDegree and CellDegree >= 1, no SingularMatrix, a Krylov method (not
+		//     Krylov::None); the setup works on a copy of the blocks, and the levels are in double precision
+		//     (MixedPrecision is ignored).
+		//   The bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose
+		//   degree is the largest partial degree; with PCoarsening::ToZero, only the degree 0 first, or the degrees 0
+		//   and 1 with the rotations) with a constant first function phi_0, of any scale, which may differ from one
+		//   cell or face to another (e.g. L2-orthonormal bases): the coefficients of a constant are then zero but the
+		//   first of each block (of each component), those of a rotation zero beyond the degree 1 (checked).
 
 		//----------------------------- Setups and solves -----------------------------//
 
@@ -460,15 +482,15 @@ namespace fhhos4
 		// the columns of A_TF and A_FF are numbered locally, in one numbering of the faces of the process: its own
 		// faces (those of the rows of A_FF, in their order), then its ghosts, the other faces of its rows (of its
 		// cells, and those coupled to its faces in A_FF through the cells of other processes), whose global numbers are
-		// faceGhostGlobalNumbers; the interpolations of 1 on its cells and faces. Each face belongs to a process that
+		// faceGhostGlobalNumbers; the near null space on the DoFs of its cells and faces. Each face belongs to a process that
 		// owns one of its cells (e.g. the one of the smaller rank); a process may own no cell nor face. Then Solve()
 		// with the vectors of the cells and faces of the process. On one process, faceGhostGlobalNumbers is empty.
 		template <typename TT, typename TF, typename FF>
 		void SetupSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FF>& A_FF,
-		                    const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
+		                    const Eigen::Ref<const Eigen::MatrixXd>& cellNearNullSpace, const Eigen::Ref<const Eigen::MatrixXd>& faceNearNullSpace,
 		                    const GhostGlobalNumbers& faceGhostGlobalNumbers = GhostGlobalNumbers())
 		{
-			Setup(true, detail::LibraryView(A_TT), detail::LibraryView(A_TF), nullptr, detail::LibraryView(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhostGlobalNumbers);
+			Setup(true, detail::LibraryView(A_TT), detail::LibraryView(A_TF), nullptr, detail::LibraryView(A_FF), In(cellNearNullSpace), In(faceNearNullSpace), faceGhostGlobalNumbers);
 		}
 
 		// Setup for a non-symmetric system (e.g. convection-diffusion), whose symmetric part is positive definite: as
@@ -490,11 +512,11 @@ namespace fhhos4
 		template <typename TT, typename TF, typename FT, typename FF>
 		void SetupNonSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT,
 		                       const Eigen::SparseCompressedBase<FF>& A_FF,
-		                       const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne,
+		                       const Eigen::Ref<const Eigen::MatrixXd>& cellNearNullSpace, const Eigen::Ref<const Eigen::MatrixXd>& faceNearNullSpace,
 		                       const GhostGlobalNumbers& faceGhostGlobalNumbers = GhostGlobalNumbers(), const GhostGlobalNumbers& cellGhostGlobalNumbers = GhostGlobalNumbers())
 		{
 			detail::CSRView a_FT = detail::LibraryView(A_FT);
-			Setup(false, detail::LibraryView(A_TT), detail::LibraryView(A_TF), &a_FT, detail::LibraryView(A_FF), In(cellInterpOfOne), In(faceInterpOfOne), faceGhostGlobalNumbers, cellGhostGlobalNumbers);
+			Setup(false, detail::LibraryView(A_TT), detail::LibraryView(A_TF), &a_FT, detail::LibraryView(A_FF), In(cellNearNullSpace), In(faceNearNullSpace), faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 		}
 
 		template <typename TT, typename TF, typename FF, int Options, typename Index>
@@ -569,13 +591,18 @@ namespace fhhos4
 		// The implementation of the setups, on the arrays of the matrices (also for the Python module). A_FT: null for a
 		// symmetric matrix; faceGhostGlobalNumbers, cellGhostGlobalNumbers (A_FT): on several processes.
 		void Setup(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
-		           detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+		           detail::ConstMatrixView cellNearNullSpace, detail::ConstMatrixView faceNearNullSpace, const GhostGlobalNumbers& faceGhostGlobalNumbers,
 		           const GhostGlobalNumbers& cellGhostGlobalNumbers = GhostGlobalNumbers());
 		detail::CSRView CondensedMatrixView() const;
 
 		static detail::ConstVectorView In(const Eigen::Ref<const Eigen::VectorXd>& v)
 		{
 			return { v.data(), (std::int64_t)v.size() };
+		}
+
+		static detail::ConstMatrixView In(const Eigen::Ref<const Eigen::MatrixXd>& m)
+		{
+			return { m.data(), (std::int64_t)m.rows(), (std::int64_t)m.cols(), (std::int64_t)m.outerStride() };
 		}
 
 		static detail::VectorView Out(Eigen::Ref<Eigen::VectorXd> v)
@@ -588,7 +615,7 @@ namespace fhhos4
 		std::unique_ptr<Impl> _impl;
 
 		void SetupDistributed(bool symmetric, const detail::CSRView& A_TT, const detail::CSRView& A_TF, const detail::CSRView* A_FT, const detail::CSRView& A_FF,
-		                      detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+		                      detail::ConstMatrixView cellNearNullSpace, detail::ConstMatrixView faceNearNullSpace, const GhostGlobalNumbers& faceGhostGlobalNumbers,
 		                      const GhostGlobalNumbers& cellGhostGlobalNumbers);
 		Result SolveCondensed(detail::ConstVectorView b, detail::VectorView x);
 		Result SolveUncondensed(detail::ConstVectorView b_T, detail::ConstVectorView b_F, detail::VectorView x_T, detail::VectorView x_F);
@@ -780,8 +807,8 @@ namespace fhhos4
 
 	// A copy: on several processes, the blocks of the rows of a process (see SetupSym()) stored in two parts each, as
 	// PETSc (MPIAIJ: MatMPIAIJGetSeqAIJ()) and hypre (ParCSR: diag, offd, col_map_offd) store them, merged into the
-	// local columns that SetupSym() reads, with the ghost faces: for SetupSym(A_TT, b.A_TF, b.A_FF, cellInterpOfOne,
-	// faceInterpOfOne, b.FaceGhostGlobalNumbers). The two parts of each block: _diag, the columns of the faces of the
+	// local columns that SetupSym() reads, with the ghost faces: for SetupSym(A_TT, b.A_TF, b.A_FF, cellNearNullSpace,
+	// faceNearNullSpace, b.FaceGhostGlobalNumbers). The two parts of each block: _diag, the columns of the faces of the
 	// process (its faces in the order of the rows of A_FF, faceBlockSize DoFs each), and _offd, the other columns,
 	// whose column j is the face DoF of global number _offdColumns[j], strictly increasing (PETSc's garray, hypre's
 	// col_map_offd); the DoF k of the face f has the global number f * faceBlockSize + k, the faces numbered as in
@@ -800,7 +827,7 @@ namespace fhhos4
 	}
 
 	// A copy: as the MergeOffDiag() above, with A_FT (the rows of the faces of the process), for SetupNonSym(A_TT, b.A_TF,
-	// b.A_FT, b.A_FF, cellInterpOfOne, faceInterpOfOne, b.FaceGhostGlobalNumbers, b.CellGhostGlobalNumbers): its
+	// b.A_FT, b.A_FF, cellNearNullSpace, faceNearNullSpace, b.FaceGhostGlobalNumbers, b.CellGhostGlobalNumbers): its
 	// diagonal part, the columns of the cells of the process (the rows of A_TF, cellBlockSize DoFs each); its
 	// off-diagonal columns, cell DoFs numbered as the face DoFs. Its local columns: the cells of the process, then its
 	// ghost cells (CellGhostGlobalNumbers) by increasing global number.

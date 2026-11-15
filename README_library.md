@@ -82,6 +82,7 @@ directory of the library in the RPATH of the executable. A library compiled with
       - [x] with translation kernel (e.g. pure Neumann diffusion)
       - [ ] user-defined kernel vectors (e.g. for elasticity problems)
 - [x] Vector-valued unknowns
+   - [x] Linear elasticity, with the rigid body modes given as the near null space (one process)
 - [x] `P` and `Q` polynomial spaces in the cells and faces
 - [x] Arbitrary polynomial degree:
    - [x] Hierarchical bases **ordered by degree**
@@ -142,9 +143,9 @@ solver.PolynomialSpace = fhhos4::PolynomialSpace::P; // or Q: bases of Q^k inste
 solver.Comm = MPI_COMM_WORLD;
 // The blocks: the rows of the cells and faces of this process, the columns of the faces numbered locally (see With MPI)
 std::vector<std::int64_t> faceGhostGlobalNumbers = ...; // or a std::span, an Eigen vector, GhostGlobalNumbers(n, p)
-solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
+solver.SetupSym(A_TT, A_TF, A_FF, cellNearNullSpace, faceNearNullSpace, faceGhostGlobalNumbers);
 #else
-solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
+solver.SetupSym(A_TT, A_TF, A_FF, cellNearNullSpace, faceNearNullSpace);
 #endif
 
 Eigen::VectorXd x_T(b_T.size()), x_F = Eigen::VectorXd::Zero(b_F.size()); // with MPI: of the process
@@ -175,12 +176,24 @@ It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
   strictly increasing in each row (sorted, no duplicates; checked). **The matrices are read in place, never copied nor
   converted**: assemble them in this format. Any other Eigen sparse matrix converts by Eigen, in one line, a copy that
   stays visible in your code: `fhhos4::SparseMatrix B = A;` (see below).
-- **The interpolation of the function 1** on the cell and face bases: one coefficient per cell (`cellInterpOfOne`, in
-  the order of the blocks of rows of `A_TF`) and per face (`faceInterpOfOne`, blocks of columns). The bases must be
-  **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d whose degree is the
-  largest partial degree; except with `PCoarsening::ToZero`) **with a constant first function** `phi_0`:
-  `1 = c phi_0`, i.e. `c = 1/phi_0`, which may vary from one
-  cell or face to another (e.g. L2-orthonormal bases: `c = sqrt(|T|)` on a cell `T`); `c = 1` everywhere if `phi_0 = 1`.
+- **The near null space** of the operator, interpolated on the cell and face bases: `cellNearNullSpace` and
+  `faceNearNullSpace`, one row per DoF (the rows of `A_TF` for the cells, its columns for the faces) and one column per
+  function, the same functions in both. It is what your own interpolation gives, and what PETSc's
+  `MatSetNearNullSpace()` takes. An Eigen vector is a matrix of one column.
+  - **A scalar unknown**: one column, the interpolation of the function 1.
+  - **A vector-valued unknown** of `n` components: `n` columns, the interpolations of the constants `e_1`, ..., `e_n`,
+    in this order.
+  - **Linear elasticity**: the rigid body modes, i.e. the translations and the rotations (3 columns in 2D, 6 in 3D),
+    in any order, or any basis of the space they span. Without the rotations, the solver only converges if the
+    displacement is imposed on the whole boundary. With them: `SetupSym()` on one process, `FaceDegree` and
+    `CellDegree` at least 1, no `SingularMatrix`, a Krylov method; the setup works on a copy of the blocks, and
+    the levels are in double precision (`MixedPrecision` is ignored).
+
+  The bases must be **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d
+  whose degree is the largest partial degree; with `PCoarsening::ToZero`, only the degree 0 first, or the degrees 0 and
+  1 for the rotations) **with a constant first function** `phi_0`, of any scale, which may vary from one cell or face
+  to another (e.g. L2-orthonormal bases). The setup checks it on the near null space: the interpolation of a constant
+  has one non-zero coefficient per cell and per face, the first (of its component).
 - **The dimension and the degrees**: set `Dimension` (2 or 3), `FaceDegree` (k), `CellDegree` (l: k - 1, k or k + 1,
   refused otherwise) and `PolynomialSpace` (P or Q). The setup checks the sizes and structure of the inputs against them
   (full polynomial spaces: P^l in the cells and P^k on the faces, or Q^l and Q^k; times `VectorComponents`).
@@ -195,11 +208,11 @@ It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
   If different discretizations have these DoFs and would need different solvers (e.g. 64 DoFs per cell and 9 per
   face: Q in 3D with k = 2 and l = 3, or in 2D with k = 8 and l = 7), the setup stops with an error that names the
   parameter to set; so it does if none has them. Otherwise, it writes the values found into these parameters (printed
-  with `Verbosity = 1`). With `Dimension` and the degrees set, `PolynomialSpace` alone is inferred, from the sizes of
-  the inputs (no stored zeros needed), and `VectorComponents` is 1 if not set.
+  with `Verbosity = 1`). With `Dimension` and the degrees set, `PolynomialSpace` alone is inferred, from the stored
+  entries too (P if they don't tell), and `VectorComponents` is 1 if not set.
 - **A vector-valued unknown** of `n` components: `VectorComponents = n`. Each cell and face block holds the scalar basis
   times each unit vector, **interleaved by component** (array of structures): `phi_i e_c` is the DoF `n i + c` of the
-  block. The interpolations of 1 stay those of the scalar bases, one coefficient per cell and per face.
+  block.
 
 ### With MPI
 
@@ -229,7 +242,7 @@ Each process gives `SetupSym()` the following (the `FHHOS4_MPI` branch of the ex
 - `faceGhostGlobalNumbers`: the global numbers of its ghost faces (faces, not DoFs), in the order of their local
   numbers. The faces are numbered as PETSc and hypre require for their distributed matrices: those of each process
   contiguously, in rank order.
-- The vectors `b_T`, `b_F`, `x_T`, `x_F` and the interpolations of 1: the values on its own cells and faces.
+- The vectors `b_T`, `b_F`, `x_T`, `x_F` and the near null space: the values on its own cells and faces.
 
 For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the faces 10 to 19. If the rows of rank 0
 contain the faces 15 and 12 of rank 1, rank 0 numbers them locally 10 and 11 (or 11 and 10) and gives
@@ -269,7 +282,7 @@ What changes for a non-symmetric matrix (e.g. convection-diffusion):
 
 - The block `A_FT` too, given to `SetupNonSym()`:
   ```cpp
-  solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne);
+  solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellNearNullSpace, faceNearNullSpace);
   ```
 - The same algorithm runs, with GCR instead of FCG, and Gauss-Seidel smoothers that follow the direction of the flow
   (downwind order). The default smoother, `L1HybridBlockGaussSeidel`, converges whatever the numbers of threads and
@@ -284,7 +297,7 @@ What changes for a non-symmetric matrix (e.g. convection-diffusion):
   the only block with ghost cells. Their global numbers, `cellGhostGlobalNumbers`, number the cells as
   `faceGhostGlobalNumbers` the faces:
   ```cpp
-  solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers,
+  solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellNearNullSpace, faceNearNullSpace, faceGhostGlobalNumbers,
                      cellGhostGlobalNumbers);
   ```
   On each process, the Gauss-Seidel smoothers follow the downwind order of its own faces.
@@ -298,7 +311,7 @@ method working on the condensed system:
 ```cpp
 solver.Krylov = fhhos4::Krylov::None;                 // disable Krylov method in fhhos4
 solver.MaxIterations = 1;                             // one cycle per application
-solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
+solver.SetupSym(A_TT, A_TF, A_FF, cellNearNullSpace, faceNearNullSpace);
 Eigen::VectorXd b(b_F.size());
 solver.CondenseRHS(b_T, b_F, b);                      // b: the condensed right-hand side
 
@@ -351,8 +364,10 @@ solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) 
   assumptions of [Inputs](#inputs), and an ambiguity names the option to give. With the dimension and the degrees
   given, the space too is read from the blocks, unless P and Q have the same DoFs (e.g. at degree 0); P if the blocks
   don't tell.
-- **The interpolation of 1** (no default): the near null space of the operator, `MatSetNearNullSpace()`, with the vector
-  of the coefficients of 1 on your bases (at any scale; a vector-valued unknown: that of the first component first).
+- **The near null space** of the operator (no default), `MatSetNearNullSpace()`: the vectors of [Inputs](#inputs), on
+  all the DoFs (a scalar unknown: the interpolation of 1 on your bases; a vector-valued one: of the constant of each
+  component; elasticity on one process: the rigid body modes interpolated on your bases, orthonormalized as PETSc
+  requires: any basis of their span is accepted. Not `MatNullSpaceCreateRigidBody()`, whose vectors are nodal values).
   At degree 0 on one component, it can be the constant vector (`MatNullSpaceCreate(comm, PETSC_TRUE, 0, NULL, ...)`).
 - **Symmetric or not**: the symmetric setup if the operator is known to be symmetric
   (`MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE)`, or `MAT_SPD`) or with `-pc_fhhos4_symmetric`, the non-symmetric one
@@ -397,7 +412,8 @@ solver.Dimension = 3
 solver.FaceDegree = k
 solver.CellDegree = k
 solver.PolynomialSpace = fhhos4.PolynomialSpace.P
-solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne)  # e.g. scipy.sparse.csr_array, NumPy vectors
+# e.g. scipy.sparse.csr_array; the near null space: NumPy vectors, or arrays of one column per function in Fortran order
+solver.SetupSym(A_TT, A_TF, A_FF, cellNearNullSpace, faceNearNullSpace)
 x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
 result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 ```
@@ -445,7 +461,7 @@ framework in its own numbering):
 fhhos4::DoFLists<std::int64_t> cells{ nCells, cellOffsets, cellDoFs }, faces{ nFaces, faceOffsets, faceDoFs };
 Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, std::int64_t>> M(n, n, nnz, rowPointers, columns, values);
 fhhos4::HybridBlocks blocks = fhhos4::ExtractBlocksSym(M, cells, faces); // A_TT, A_TF, A_FF: one parallel pass
-solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellInterpOfOne, faceInterpOfOne);
+solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellNearNullSpace, faceNearNullSpace);
 fhhos4::SplitVector(b, cells, faces, b_T, b_F); // b: in the numbering of M
 solver.Solve(b_T, b_F, x_T, x_F);
 fhhos4::JoinVector(x_T, x_F, cells, faces, x); // the DoFs of x in no list unchanged (e.g. the Dirichlet values)
@@ -466,7 +482,7 @@ fhhos4::JoinVector(x_T, x_F, cells, faces, x); // the DoFs of x in no list uncha
 // diag: the columns of the faces of the process; offd: the others, compressed, whose global DoF numbers are
 // offdColumns (PETSc's garray, hypre's col_map_offd)
 fhhos4::DistributedBlocks b = fhhos4::MergeOffDiag(A_TF_diag, A_TF_offd, A_TF_offdColumns, A_FF_diag, A_FF_offd, A_FF_offdColumns, faceBlockSize);
-solver.SetupSym(A_TT_diag, b.A_TF, b.A_FF, cellInterpOfOne, faceInterpOfOne, b.FaceGhostGlobalNumbers);
+solver.SetupSym(A_TT_diag, b.A_TF, b.A_FF, cellNearNullSpace, faceNearNullSpace, b.FaceGhostGlobalNumbers);
 ```
 
 - The global DoF numbers: the DoF k of the face f is `f * faceBlockSize + k`, the faces numbered in rank order (as
@@ -493,7 +509,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `VectorComponents` | `-1`: required if `Dimension` or a degree is inferred, `1` otherwise | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `Dimension`, `FaceDegree`, `CellDegree` | `-1`: inferred from the blocks (see [Inputs](#inputs)) | `2` or `3`; k `>= 0`; l = k - 1, k or k + 1 |
 | `PolynomialSpace` | `PolynomialSpace::Inferred`: from the blocks | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
-| `SingularMatrix` | `false` | `true`: the kernel is the interpolation of 1 of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
+| `SingularMatrix` | `false` | `true`: the kernel is the constant of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
 | `Krylov` | `FCG` if symmetric, `GCR` if non-symmetric | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#use-as-a-preconditioner))</li></ul> |
 | `Restart` | `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
 | `Tolerance` | `1e-8` | Relative residual of the condensed system at which `Solve()` stops |
@@ -513,7 +529,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `BlockCSRStorage` | `false` | Level operators stored by blocks of faces when `FaceDegree >= 1` (faster smoothing). Always so in mixed precision; in double, costs a copy of the condensed matrix. Chebyshev and Gauss-Seidel smoothers |
 | `Threads` | `0`: OpenMP's setting, at most one per physical core unless `OMP_NUM_THREADS` or OpenMP's binding is set (shared among the processes on the same CPUs) | Number of threads |
 | `Comm` | (MPI only) `MPI_COMM_NULL`: one process, no MPI call (MPI may be uninitialized, except with `CoarseSolver::MUMPS`) | <ul><li>`MPI_COMM_SELF`: one process</li><li>the communicator of a distributed system</li></ul> |
-| `Verbosity` | `0`: silent | <ul><li>`1`: one line per setup and per solve</li><li>`2`: all messages, with the residual at each iteration</li></ul> |
+| `Verbosity` | `0`: silent | <ul><li>`1`: one line per setup and per solve</li><li>`2`: all messages, with the precision of the levels (and why if `MixedPrecision` is not applied) and the residual at each iteration</li></ul> |
 
 ## Constraints
 

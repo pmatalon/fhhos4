@@ -18,8 +18,10 @@ Python, PETSc). The documentation still tells the users to set them.
   any reading. Up to k = 10, one parameter always resolves an ambiguity.
 - **`VectorComponents` is never inferred**: not from the sizes (39 of 112 common configurations ambiguous), nor from the
   number of near-kernel vectors (elasticity: 3 in 2D, 6 in 3D). It is required when `Dimension` or a degree is inferred.
-  With the three set, it is 1 if not set, and the space alone comes from the sizes the setup checks anyway (the rows of
-  `A_TT` per coefficient of the interpolation of 1): no stored zeros needed, the clients that set them unchanged.
+  With the three set, it is 1 if not set, and the space alone comes from the stored entries too: Q if they show its
+  DoFs, P otherwise (since 2026-11-14: the near null space is given on all the DoFs, and no longer gives the number of
+  cells and faces; before, from the rows of `A_TT` per coefficient of the interpolation of 1, without stored zeros).
+  A wrong space is then refused by the checks of the sizes or of the near null space.
 
 An inferred value is not a default (ADR-0005): it is determined by the blocks, or refused.
 
@@ -39,8 +41,8 @@ An inferred value is not a default (ADR-0005): it is determined by the blocks, o
   discretization, the checks of the sizes refuse it.
 - On several processes, each process analyzes its own cells and faces, then one gather; a process with no cell has no
   opinion. The DoFs per face need a face between two cells of a process: without one (one cell per process), an error.
-- The PETSc preconditioner has no sizes of the interpolations of 1 per cell and face (its near null space is the
-  interpolation of 1 on all the DoFs): with the dimension and the degrees given, it reads the space from the stored
+- The PETSc preconditioner, as the setups since 2026-11-14, has no number of cells and faces (the near null space is
+  on all the DoFs): with the dimension and the degrees given, it reads the space from the stored
   entries too, unless P and Q have the same DoFs and solver (e.g. k = 0), where the space doesn't matter; P if they
   don't give it (as the setups, which never refuse the dimension and the degrees without the space).
 - The PETSc preconditioner includes an internal header (`src/Solver/DiscretizationInference.h`, header-only, compiled

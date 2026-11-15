@@ -6,6 +6,13 @@
 
 using namespace fhhos4_tests;
 
+// The near null space of c components at degree 0 (c DoFs per cell and face): the constant of each component, one
+// column each (1 on its DoF of each block)
+static Eigen::MatrixXd Constants(Eigen::Index nBlocks, int c)
+{
+	return Eigen::MatrixXd::Identity(c, c).replicate(nBlocks, 1);
+}
+
 namespace
 {
 	const Communicator& World()
@@ -129,7 +136,7 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 		solver.VectorComponents = c;
 		solver.MixedPrecision = mixedPrecision;
 		solver.BlockCSRStorage = blockCSR;
-		Vector cellOnes = Vector::Ones(global.A_TT.rows()), faceOnes = Vector::Ones(global.S.rows());
+		Eigen::MatrixXd cellOnes = Constants(global.A_TT.rows(), c), faceOnes = Constants(global.S.rows(), c);
 		fhhos4::SparseMatrix A_TT = OnEachComponent(system.Global.A_TT, c), A_TF = OnEachComponent(system.Global.A_TF, c);
 		fhhos4::SparseMatrix A_FT = OnEachComponent(system.Global.A_FT, c), A_FF = OnEachComponent(system.Global.A_FF, c);
 		if (asymmetry == 0)
@@ -180,7 +187,7 @@ int ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation prolongation, double a
 	solver.VectorComponents = c;
 	solver.MixedPrecision = mixedPrecision;
 	solver.BlockCSRStorage = blockCSR;
-	Vector cellOnes = Vector::Ones(cells.NOwned), faceOnes = Vector::Ones(faces.NOwned);
+	Eigen::MatrixXd cellOnes = Constants(cells.NOwned, c), faceOnes = Constants(faces.NOwned, c);
 	if (setupLog)
 	{
 		solver.Verbosity = 2;

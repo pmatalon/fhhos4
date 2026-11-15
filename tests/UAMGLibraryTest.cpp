@@ -779,6 +779,18 @@ Blocks Kron(const Blocks& blocks, const Eigen::MatrixXd& C_TT, const Eigen::Matr
 // the n constants of each block are rescaled. At degree 0 and with faces of degree 1 (a second face function, coupled
 // to no cell: a p-level), symmetric or not, with both prolongations (Reconstruction: the n constants of the coarse cell
 // on the removed faces).
+// The near null space of the library on nDoFs DoFs, from the interpolation of 1 on the scalar basis of each block (one
+// coefficient per block): one column per component, the constant of the component c on the DoF c of each block
+static Eigen::MatrixXd Constants(const Eigen::VectorXd& interpOfOne, Eigen::Index nDoFs, int components = 1)
+{
+	Eigen::Index blockSize = nDoFs / interpOfOne.size();
+	Eigen::MatrixXd constants = Eigen::MatrixXd::Zero(nDoFs, components);
+	for (Eigen::Index b = 0; b < interpOfOne.size(); b++)
+		for (int c = 0; c < components; c++)
+			constants(b * blockSize + c, c) = interpOfOne[b];
+	return constants;
+}
+
 TEST(UAMGLibrary, VectorComponents)
 {
 	int n = 32;
@@ -806,9 +818,9 @@ TEST(UAMGLibrary, VectorComponents)
 				uamg.VectorComponents = components;
 				uamg.CoarseMatrixMaxRows *= components; // the coarsening stops on the rows: the same levels
 				if (system.Symmetric)
-					uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+					uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, Constants(system.CellInterpOfOne, blocks.A_TT.rows(), components), Constants(system.FaceInterpOfOne, blocks.A_TF.cols(), components));
 				else
-					uamg.SetupNonSym(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+					uamg.SetupNonSym(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, Constants(system.CellInterpOfOne, blocks.A_TT.rows(), components), Constants(system.FaceInterpOfOne, blocks.A_TF.cols(), components));
 				x_T.resize(blocks.A_TT.rows());
 				x_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
 				return uamg.Solve(OnEachComponent(b_T, components), OnEachComponent(b_F, components), x_T, x_F);
@@ -856,7 +868,7 @@ TEST(UAMGLibrary, SingularVectorComponents)
 			uamg.Prolongation = prolongation;
 			uamg.VectorComponents = components;
 			uamg.CoarseMatrixMaxRows *= components;
-			uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, Constants(system.CellInterpOfOne, blocks.A_TT.rows(), components), Constants(system.FaceInterpOfOne, blocks.A_TF.cols(), components));
 			x_T.resize(blocks.A_TT.rows());
 			x_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
 			return uamg.Solve(OnEachComponent(b_T, components), OnEachComponent(rhs_F, components), x_T, x_F);
@@ -894,7 +906,7 @@ TEST(UAMGLibrary, CoupledComponents)
 	uamg.CellDegree = 0;
 	uamg.VectorComponents = 2;
 	uamg.Tolerance = 1e-10;
-	auto setup = [&](fhhos4::Solver& solver) { solver.SetupSym(coupled.A_TT, coupled.A_TF, coupled.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne); };
+	auto setup = [&](fhhos4::Solver& solver) { solver.SetupSym(coupled.A_TT, coupled.A_TF, coupled.A_FF, Constants(system.CellInterpOfOne, coupled.A_TT.rows(), 2), Constants(system.FaceInterpOfOne, coupled.A_TF.cols(), 2)); };
 	Eigen::VectorXd b = Eigen::VectorXd::Random(coupled.A_FF.rows());
 	ColMajorMatrix A = Kron(system.A, C); // the condensed matrix: A ⊗ C
 	Eigen::VectorXd exact = Eigen::SimplicialLDLT<ColMajorMatrix>(A).solve(b);
@@ -1400,7 +1412,7 @@ TEST(UAMGLibrary, InferredDiscretization)
 {
 	auto solve = [](fhhos4::Solver& solver, const Blocks& blocks, const HybridSystem& system)
 	{
-		solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, Constants(system.CellInterpOfOne, blocks.A_TT.rows()), Constants(system.FaceInterpOfOne, blocks.A_TF.cols()));
 		Eigen::VectorXd b_T = Eigen::VectorXd::Ones(blocks.A_TT.rows()), b_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
 		Eigen::VectorXd x_T(blocks.A_TT.rows()), x_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
 		fhhos4::Result result = solver.Solve(b_T, b_F, x_T, x_F);
@@ -1459,7 +1471,7 @@ TEST(UAMGLibrary, InferredDiscretization)
 	noComponents.VectorComponents = -1;
 	try
 	{
-		noComponents.SetupSym(three.A_TT, three.A_TF, three.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		noComponents.SetupSym(three.A_TT, three.A_TF, three.A_FF, Constants(system.CellInterpOfOne, three.A_TT.rows()), Constants(system.FaceInterpOfOne, three.A_TF.cols()));
 		ADD_FAILURE() << "VectorComponents not set accepted";
 	}
 	catch (const fhhos4::Error& e)
@@ -1472,7 +1484,7 @@ TEST(UAMGLibrary, InferredDiscretization)
 	fhhos4::Solver ambiguity = inferred();
 	try
 	{
-		ambiguity.SetupSym(ambiguous.A_TT, ambiguous.A_TF, ambiguous.A_FF, small.CellInterpOfOne, small.FaceInterpOfOne);
+		ambiguity.SetupSym(ambiguous.A_TT, ambiguous.A_TF, ambiguous.A_FF, Constants(small.CellInterpOfOne, ambiguous.A_TT.rows()), Constants(small.FaceInterpOfOne, ambiguous.A_TF.cols()));
 		ADD_FAILURE() << "an ambiguity accepted";
 	}
 	catch (const fhhos4::Error& e)
@@ -1827,4 +1839,77 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 	EXPECT_EQ(omp_get_max_threads(), threadsBefore); // Threads = 0: at most one per physical core during the calls only
 #endif
 	std::cout.precision(precision);
+}
+
+// More near null space functions than the constants of the components (the rigid body modes of elasticity): the
+// multigrid set up in the bases whose first DoFs are these functions, the Krylov method on the system as given. On the
+// toy system ⊗ dense blocks, 2 components at degree 1 (6 DoFs per cell, 4 per face), with a third function of degree
+// <= 1: the solution of the system, as with the constants alone, and the levels with 3 DoFs per face. Refused: a
+// function with a coefficient of degree 2, SingularMatrix, no Krylov method, the degree 0.
+TEST(UAMGLibrary, NearNullSpaceBeyondTheConstants)
+{
+	HybridSystem system(32);
+	Blocks blocks = DenseBlocks(system, 6, 4);
+	Eigen::Index nCellDoFs = blocks.A_TT.rows();
+	Eigen::Index nFaceDoFs = blocks.A_FF.rows();
+	auto solver = []()
+	{
+		fhhos4::Solver uamg = ToySolver();
+		uamg.FaceDegree = 1;
+		uamg.CellDegree = 1;
+		uamg.VectorComponents = 2;
+		return uamg;
+	};
+	auto withThirdFunction = [](const Eigen::MatrixXd& constants)
+	{
+		std::srand(7);
+		Eigen::MatrixXd functions(constants.rows(), 3);
+		functions << constants, Eigen::VectorXd::Random(constants.rows());
+		return functions;
+	};
+	Eigen::MatrixXd cellConstants = Constants(system.CellInterpOfOne, nCellDoFs, 2);
+	Eigen::MatrixXd faceConstants = Constants(system.FaceInterpOfOne, nFaceDoFs, 2);
+	Eigen::MatrixXd cellFunctions = withThirdFunction(cellConstants);
+	Eigen::MatrixXd faceFunctions = withThirdFunction(faceConstants);
+	Eigen::VectorXd b_T = Eigen::VectorXd::Random(nCellDoFs);
+	Eigen::VectorXd b_F = Eigen::VectorXd::Random(nFaceDoFs);
+
+	fhhos4::Solver reference = solver();
+	reference.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellConstants, faceConstants);
+	Eigen::VectorXd referenceX_T(nCellDoFs);
+	Eigen::VectorXd referenceX_F = Eigen::VectorXd::Zero(nFaceDoFs);
+	EXPECT_TRUE(reference.Solve(b_T, b_F, referenceX_T, referenceX_F).Converged);
+
+	fhhos4::Solver uamg = solver();
+	uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions, faceFunctions);
+	Eigen::VectorXd x_T(nCellDoFs);
+	Eigen::VectorXd x_F = Eigen::VectorXd::Zero(nFaceDoFs);
+	fhhos4::Result result = uamg.Solve(b_T, b_F, x_T, x_F);
+	EXPECT_TRUE(result.Converged);
+	EXPECT_LT((x_F - referenceX_F).norm(), 1e-7 * referenceX_F.norm());
+	EXPECT_LT((x_T - referenceX_T).norm(), 1e-7 * referenceX_T.norm());
+	// The condensed matrix is that of the system as given
+	Eigen::VectorXd Ax(nFaceDoFs), referenceAx(nFaceDoFs);
+	uamg.ApplyCondensedMatrix(x_F, Ax);
+	reference.ApplyCondensedMatrix(x_F, referenceAx);
+	EXPECT_EQ(Ax, referenceAx);
+
+	fhhos4::Solver cellDegree2 = solver();
+	cellDegree2.CellDegree = 2;
+	Blocks blocks2 = DenseBlocks(system, 12, 4);
+	Eigen::MatrixXd cellFunctions2 = Eigen::MatrixXd::Zero(blocks2.A_TT.rows(), 3);
+	for (Eigen::Index T = 0; T < blocks2.A_TT.rows() / 12; T++)
+		cellFunctions2.block(T * 12, 0, 6, 3) = cellFunctions.block(T * 6, 0, 6, 3);
+	EXPECT_NO_THROW(cellDegree2.SetupSym(blocks2.A_TT, blocks2.A_TF, blocks2.A_FF, cellFunctions2, faceFunctions));
+	cellFunctions2(6, 2) = 1;
+	EXPECT_THROW(cellDegree2.SetupSym(blocks2.A_TT, blocks2.A_TF, blocks2.A_FF, cellFunctions2, faceFunctions), fhhos4::Error);
+
+	fhhos4::Solver singular = solver();
+	singular.SingularMatrix = true;
+	EXPECT_THROW(singular.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions, faceFunctions), fhhos4::Error);
+	fhhos4::Solver noKrylov = solver();
+	noKrylov.Krylov = fhhos4::Krylov::None;
+	EXPECT_THROW(noKrylov.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions, faceFunctions), fhhos4::Error);
+	// Two columns that are not the constants of the components
+	EXPECT_THROW(solver().SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions.rightCols(2), faceFunctions.rightCols(2)), fhhos4::Error);
 }

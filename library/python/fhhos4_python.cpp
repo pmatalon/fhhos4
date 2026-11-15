@@ -250,10 +250,10 @@ namespace
 
 		// The setups of the library on the views of the arrays (fhhos4::Solver::Setup())
 		void SetupViews(bool symmetric, const fhhos4::detail::CSRView& A_TT, const fhhos4::detail::CSRView& A_TF, const fhhos4::detail::CSRView* A_FT,
-		                const fhhos4::detail::CSRView& A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne,
+		                const fhhos4::detail::CSRView& A_FF, const fhhos4::detail::ConstMatrixView& cellNearNullSpace, const fhhos4::detail::ConstMatrixView& faceNearNullSpace,
 		                const fhhos4::GhostGlobalNumbers& faceGhostGlobalNumbers = fhhos4::GhostGlobalNumbers(), const fhhos4::GhostGlobalNumbers& cellGhostGlobalNumbers = fhhos4::GhostGlobalNumbers())
 		{
-			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, In(cellInterpOfOne), In(faceInterpOfOne), faceGhostGlobalNumbers, cellGhostGlobalNumbers);
+			Setup(symmetric, A_TT, A_TF, A_FT, A_FF, cellNearNullSpace, faceNearNullSpace, faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 		}
 
 		fhhos4::detail::CSRView CondensedView() const
@@ -272,6 +272,20 @@ namespace
 			Kept = std::move(kept);
 		}
 	};
+
+	// The near null space functions on the DoFs of the cells or of the faces (the setups): a float64 NumPy array, read in
+	// place, of one dimension (one function), or of two, one column per function, in Fortran order (the columns
+	// contiguous)
+	using NearNullSpaceArray = nb::ndarray<const double, nb::device::cpu>;
+
+	fhhos4::detail::ConstMatrixView ToNearNullSpace(const NearNullSpaceArray& array, const char* name)
+	{
+		if (array.ndim() == 1 && (array.shape(0) <= 1 || array.stride(0) == 1))
+			return { array.data(), (std::int64_t)array.shape(0), 1, (std::int64_t)array.shape(0) };
+		if (array.ndim() == 2 && (array.shape(0) <= 1 || array.stride(0) == 1) && (array.shape(1) <= 1 || array.stride(1) >= (std::int64_t)array.shape(0)))
+			return { array.data(), (std::int64_t)array.shape(0), (std::int64_t)array.shape(1), array.shape(1) <= 1 ? (std::int64_t)array.shape(0) : (std::int64_t)array.stride(1) };
+		throw nb::type_error((std::string("fhhos4: ") + name + " must be a contiguous array of float64 of one dimension (one function), or of two in Fortran order (one column per function: np.asfortranarray()), not converted").c_str());
+	}
 
 	// The global numbers of the ghost faces or cells (the setups on several processes): an int64 NumPy array, read in
 	// place (only by the setup), or None (no ghosts)
@@ -535,22 +549,24 @@ NB_MODULE(fhhos4, m)
 
 		// Setups from the blocks of the system. faceGhostGlobalNumbers, cellGhostGlobalNumbers: on several processes,
 		// the global numbers of the ghost faces and cells (int64 arrays)
-		.def("SetupSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhostGlobalNumbers)
+		.def("SetupSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FF, const NearNullSpaceArray& cellNearNullSpace, const NearNullSpaceArray& faceNearNullSpace, nb::handle faceGhostGlobalNumbers)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ff = a_FF.Native("A_FF");
 				fhhos4::GhostGlobalNumbers ghosts = ToGhostGlobalNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers");
-				s.Run([&] { s.SetupViews(true, tt, tf, nullptr, ff, cellInterpOfOne, faceInterpOfOne, ghosts); }, {});
+				fhhos4::detail::ConstMatrixView cells = ToNearNullSpace(cellNearNullSpace, "cellNearNullSpace"), faces = ToNearNullSpace(faceNearNullSpace, "faceNearNullSpace");
+				s.Run([&] { s.SetupViews(true, tt, tf, nullptr, ff, cells, faces, ghosts); }, {});
 			},
-			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none())
-		.def("SetupNonSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const ConstVector& cellInterpOfOne, const ConstVector& faceInterpOfOne, nb::handle faceGhostGlobalNumbers, nb::handle cellGhostGlobalNumbers)
+			"A_TT"_a, "A_TF"_a, "A_FF"_a, "cellNearNullSpace"_a.noconvert(), "faceNearNullSpace"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none())
+		.def("SetupNonSym", [](PySolver& s, nb::handle A_TT, nb::handle A_TF, nb::handle A_FT, nb::handle A_FF, const NearNullSpaceArray& cellNearNullSpace, const NearNullSpaceArray& faceNearNullSpace, nb::handle faceGhostGlobalNumbers, nb::handle cellGhostGlobalNumbers)
 			{
 				PyCSRView a_TT = ToView(A_TT, "A_TT"), a_TF = ToView(A_TF, "A_TF"), a_FT = ToView(A_FT, "A_FT"), a_FF = ToView(A_FF, "A_FF");
 				fhhos4::detail::CSRView tt = a_TT.Native("A_TT"), tf = a_TF.Native("A_TF"), ft = a_FT.Native("A_FT"), ff = a_FF.Native("A_FF");
 				fhhos4::GhostGlobalNumbers fGhosts = ToGhostGlobalNumbers(faceGhostGlobalNumbers, "faceGhostGlobalNumbers"), cGhosts = ToGhostGlobalNumbers(cellGhostGlobalNumbers, "cellGhostGlobalNumbers");
-				s.Run([&] { s.SetupViews(false, tt, tf, &ft, ff, cellInterpOfOne, faceInterpOfOne, fGhosts, cGhosts); }, { a_FT });
+				fhhos4::detail::ConstMatrixView cells = ToNearNullSpace(cellNearNullSpace, "cellNearNullSpace"), faces = ToNearNullSpace(faceNearNullSpace, "faceNearNullSpace");
+				s.Run([&] { s.SetupViews(false, tt, tf, &ft, ff, cells, faces, fGhosts, cGhosts); }, { a_FT });
 			},
-			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellInterpOfOne"_a.noconvert(), "faceInterpOfOne"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none(), "cellGhostGlobalNumbers"_a = nb::none())
+			"A_TT"_a, "A_TF"_a, "A_FT"_a, "A_FF"_a, "cellNearNullSpace"_a.noconvert(), "faceNearNullSpace"_a.noconvert(), "faceGhostGlobalNumbers"_a = nb::none(), "cellGhostGlobalNumbers"_a = nb::none())
 		// x_T, x_F: NumPy vectors of float64, written in place (x_F: the initial guess on input)
 		.def("Solve", [](PySolver& s, const ConstVector& b_T, const ConstVector& b_F, Vector x_T, Vector x_F)
 			{ return s.Solve(b_T, b_F, x_T, x_F); },

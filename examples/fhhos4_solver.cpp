@@ -122,10 +122,15 @@ int main(int argc, char** argv)
 	A_TF.setFromTriplets(TF.begin(), TF.end());
 	A_FF.setFromTriplets(FF.begin(), FF.end());
 
-	// The interpolations of 1, one coefficient per cell and face: that of its first function, 1. The source 1: its
-	// integral on the first function of each cell (1): its measure.
-	Eigen::VectorXd cellInterpOfOne = Eigen::VectorXd::Ones(nCells);
-	Eigen::VectorXd faceInterpOfOne = Eigen::VectorXd::Ones(nFaces);
+	// The near null space: the function 1 interpolated on the bases of the cells and of the faces, i.e. 1 on the
+	// first function of each cell and face (the constant 1), 0 on the others. The source 1: its integral on the first
+	// function of each cell (1): its measure.
+	Eigen::VectorXd cellNearNullSpace = Eigen::VectorXd::Zero(nCells * nT);
+	Eigen::VectorXd faceNearNullSpace = Eigen::VectorXd::Zero(nFaces * nF);
+	for (std::int64_t T = 0; T < nCells; T++)
+		cellNearNullSpace[T * nT] = 1;
+	for (std::int64_t F = 0; F < nFaces; F++)
+		faceNearNullSpace[F * nF] = 1;
 	Eigen::VectorXd b_T = Eigen::VectorXd::Zero(nCells * nT);
 	Eigen::VectorXd b_F = Eigen::VectorXd::Zero(nFaces * nF);
 	for (std::int64_t T = firstCell; T < lastCell; T++)
@@ -141,9 +146,9 @@ int main(int argc, char** argv)
 		solver.Tolerance = 1e-8;
 #if FHHOS4_MPI
 		solver.Comm = MPI_COMM_WORLD;
-		solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne, ghostGlobalNumbers);
+		solver.SetupSym(A_TT, A_TF, A_FF, cellNearNullSpace, faceNearNullSpace, ghostGlobalNumbers);
 #else
-		solver.SetupSym(A_TT, A_TF, A_FF, cellInterpOfOne, faceInterpOfOne);
+		solver.SetupSym(A_TT, A_TF, A_FF, cellNearNullSpace, faceNearNullSpace);
 #endif
 		Eigen::VectorXd x_T(nCells * nT);
 		Eigen::VectorXd x_F = Eigen::VectorXd::Zero(nFaces * nF);

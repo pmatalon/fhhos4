@@ -2178,6 +2178,67 @@ Kept as they were written there; some repeat entries of "Done" in another form.
   n=4/8/12/16: k0 15/22/25/26, k1 22/26/27/28, k2 29/33/35 (n=16 k=2 not run: memory). Disk++'s solver time (setup and
   solve) and peak RSS against the direct solver: triangles n=64 k2 0.20 s / 281 MB vs 0.27 s / 413 MB; tetrahedra n=8
   k1 0.25 s / 268 MB vs 1.00 s / 796 MB, k2 0.99 s / 1.04 GB vs 4.78 s / 2.13 GB.
+- **Disk++ linear elasticity, translations only** (`linear_elasticity -s fhhos4`: `VectorComponents = Dimension`, the
+  coarse levels without the rotations, the library's defaults, 1e-10, at most 200 iterations, the default threads,
+  2026-11-14, `~/code/diskpp/build/bench_vector/logs_elast/before_1114.txt`; mu = 1; the meshes of the vector
+  Laplacian above, and beams [0,8]x[0,1] (triangles) and [0,4]x[0,1]^2 (tetrahedra), n elements per unit length; the
+  L2 errors, or the norm of the solution on the beams, of its direct solver to the printed digits). The baseline
+  before the rigid body modes on the coarse levels. Iterations:
+  - Dirichlet everywhere (the app's u), lambda = 1: triangles n=16/32/64/128 k1 30/33/34/36, k2 31/34/36 (n=128 not
+    run); tetrahedra n=4/8 k1 29/34, k2 35/40. Disk++'s solver time (setup and solve): triangles n=64 k1 0.27 s, k2
+    0.35 s; tetrahedra n=8 k1 0.33 s, k2 1.13 s.
+  - Dirichlet everywhere, lambda = 1000: triangles n=16 k1 192, all the others not converged; tetrahedra n=4 k1 133,
+    k2 135, n=8 not converged.
+  - Beam clamped at x = 0, free elsewhere, under its weight, lambda = 1: not converged on any mesh (triangles n=8/16/32,
+    tetrahedra n=2/4, k1 and k2; relative residual 7e-10 on triangles n=8 k1, 4e-10 on tetrahedra n=2 k1).
+  - Degree 1 kept on all the h-levels (no p-level; a temporary switch in the library, removed; the same day,
+    `logs_elast/hp_h_*`), still translations only, k1, against the lines above: no better. Dirichlet, lambda = 1:
+    triangles n=16/32/64 36/55/62 (30/33/34), tetrahedra n=4/8 26/42 (29/34), slower (tetrahedra n=8: 0.60 s vs
+    0.33 s). Beam: not converged, but tetrahedra n=2 (114). lambda = 1000, triangles n=32: not converged.
+  - With the rigid body modes in the near null space (`linear_elasticity -r`: the rotations about the origin,
+    2026-11-14, the library's implementation, its levels in double precision; `logs_elast/after/times_double_1114.txt`,
+    best of 3, the default threads, on AC). Iterations and time of the setup + the solve, translations only -> with
+    the rotations (x: the time ratio, below 1 = faster with the rotations; -: not converged in 200 iterations).
+    - Beam, triangles, to 1e-6: k1 n=16 155 -> 21 (0.40 s -> 0.19 s, x0.47), n=32 120 -> 21 (1.31 -> 0.77, x0.59),
+      n=64 145 -> 23 (5.86 -> 3.81, x0.65); k2 n=16 110 -> 17 (0.46 -> 0.26, x0.56), n=32 138 -> 17 (2.12 -> 1.15,
+      x0.54). The iterations no longer grow with n.
+    - Beam, tetrahedra n=4, to 1e-8: k1 178 -> 34 (0.77 s -> 0.65 s, x0.85), k2 - -> 33 (2.28 s without converging
+      -> 1.77 s).
+    - Dirichlet everywhere, lambda = 1, to 1e-8: fewer iterations but slower. Triangles n=64: k1 28 -> 21 (0.19 s ->
+      0.38 s, x2.0), k2 29 -> 15 (0.28 -> 0.52, x1.9); tetrahedra n=8: k1 28 -> 22 (0.26 -> 0.98, x3.7), k2 32 -> 21
+      (0.92 -> 2.54, x2.8).
+    - Why slower per unknown: the setup costs 3.5 to 6 times more (the copies of the blocks in the other bases,
+      triangles n=64 k1 0.047 s -> 0.18 s, tetrahedra n=8 k1 0.076 -> 0.48), and an iteration about 2 (2D) to 3.4
+      (3D) times more: 3 or 6 DoFs per face on the h-levels instead of 2 or 3, in double precision, and the Krylov
+      method recomputes A x (no residual from the cycle).
+    - Single precision on the levels (the first implementation, as the prototype): the beam of triangles n=64 k1
+      diverges (relative residual 185 after 200 iterations; 23 iterations in double), and n=32 k1 takes 37 iterations
+      instead of 21. The true residual on the 2D beams stalls around 1e-7 to 1e-9 with or without the rotations, in
+      double too (n=32 k1: 4.9e-8 after 200 iterations): hence 1e-6 above; not investigated (conditioning of the
+      beam?). The counts "to 1e-8" of the prototype read FCG's recurrence residual, 8 times below the true one at
+      the recomputation: discarded.
+  - Larger problems, against Disk++'s direct solver (sequential MUMPS LU on the condensed system; 2026-11-15, one
+    run each, 8 threads, on AC, runs killed under 4 GB of available memory, about 5 GB of RSS: "killed";
+    `build/bench_vector/run_large.sh`, `logs_elast/large/summary.txt`). Disk++'s solver time (setup and solve) and
+    peak RSS of the whole run: MUMPS / translations only (iterations) / with the rotations (iterations); x: the time
+    ratio against MUMPS, below 1 = faster than MUMPS.
+    - Beam, triangles, to 1e-6: n=64 k1 (395k unknowns) 1.78 s, 1.1 GB / 6.94 s (145), 0.95 GB, x3.9 / 4.41 s (23),
+      1.5 GB, x2.5; n=64 k2 (593k) 3.14 s, 2.3 GB / 10.3 s (157), 2.2 GB, x3.3 / 6.80 s (18), 3.5 GB, x2.2; n=128 k1
+      (1.58M) 7.91 s, 4.5 GB / 24.0 s (135), 3.7 GB, x3.0 / 19.6 s (25), 5.8 GB, x2.5.
+    - Beam, tetrahedra, to 1e-8: n=8 k1 (230k) 5.01 s, 2.6 GB / 7.62 s (188), 1.1 GB, x1.5 / 7.83 s (34), 2.1 GB,
+      x1.6; n=8 k2 (461k) killed / 18.4 s (193), 4.5 GB / killed; n=12 k1 (767k) killed / 24.3 s (188), 3.8 GB /
+      killed.
+    - Dirichlet everywhere, lambda = 1, to 1e-8: triangles n=128 k1 (196k) 0.84 s, 0.76 GB / 1.01 s (30), 0.48 GB,
+      x1.2 / 2.35 s (21), 0.77 GB, x2.8; k2 (293k) 1.92 s, 1.2 GB / 2.01 s (32), 1.1 GB, x1.05 / 3.57 s (16), 1.8 GB,
+      x1.9; tetrahedra n=12 k1 (179k) 5.19 s, 2.3 GB / 1.51 s (29), 0.91 GB, x0.29 / 5.35 s (23), 1.7 GB, x1.03;
+      n=12 k2 (358k) killed / 4.41 s (34), 3.6 GB / killed; n=16 k1 (429k) killed / 3.22 s (30), 2.2 GB / 11.6 s
+      (23), 3.9 GB.
+    - Reading: in 2D MUMPS wins everywhere at these sizes (as on diffusion). In 3D with the translations only,
+      fhhos4 wins on Dirichlet (x0.29, 2.5 times less memory) and runs where MUMPS no longer fits. With the
+      rotations, the iterations stay flat (23-25 in 2D, 34 in 3D) but the setup dominates (triangles n=128 k1: 9.9 s
+      of setup for 9.75 s of solve; 3.8 s of setup with the translations only) and the memory is 1.5 to 1.8 times
+      that of the translations only: the copies of the blocks in the other bases (ADR-0003's exception) are the
+      first thing to remove.
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

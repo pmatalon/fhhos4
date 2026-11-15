@@ -46,8 +46,8 @@ class HybridSystem:
         invDiag = sp.diags(1 / self.A_TT.diagonal())
         self.A = (self.A_FF - self.A_FT @ invDiag @ self.A_TF).tocsr()
         self.A.sort_indices()  # SciPy's products don't sort the columns: the CSR format of the library requires it
-        self.CellInterpOfOne = np.ones(nCells)
-        self.FaceInterpOfOne = np.ones(nFaces)
+        self.CellNearNullSpace = np.ones(nCells)
+        self.FaceNearNullSpace = np.ones(nFaces)
         self.b_T = np.ones(nCells)  # unit source in the cells
         self.b_F = np.zeros(nFaces)
         self.b = -self.A_FT @ (invDiag @ self.b_T)  # right-hand side of the condensed system
@@ -77,7 +77,7 @@ def ToSciPy(M):
 def test_uncondensed_symmetric():
     system = HybridSystem(32)
     solver = ToySolver()
-    solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
     assert solver.IsSetUp() and solver.NumberOfLevels() > 1
     x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
     result = solver.Solve(system.b_T, system.b_F, x_T, x_F)
@@ -92,7 +92,7 @@ def test_uncondensed_nonsymmetric():
     system = HybridSystem(32, asymmetry=0.3)
     solver = ToySolver()
     A_FT = system.A_FT.copy()
-    solver.SetupNonSym(system.A_TT, system.A_TF, A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    solver.SetupNonSym(system.A_TT, system.A_TF, A_FT, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
     # The solves read A_FT: the solver keeps its arrays, the caller's object may go
     del A_FT
     gc.collect()
@@ -112,8 +112,10 @@ def test_components():
     vector.VectorComponents = 2
     for solver in (scalar, vector):
         solver.PreSmoother = fhhos4.Smoother.BlockGaussSeidel  # no estimate of lambdaMax: the same smoothing
-    scalar.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
-    vector.SetupSym(kron(system.A_TT), kron(system.A_TF), kron(system.A_FF), system.CellInterpOfOne, system.FaceInterpOfOne)
+    scalar.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
+    # The near null space: the constant of each component, one column each (in Fortran order, read in place)
+    constants = lambda n: np.asfortranarray(np.kron(np.ones((n, 1)), np.identity(2)))
+    vector.SetupSym(kron(system.A_TT), kron(system.A_TF), kron(system.A_FF), constants(system.CellNearNullSpace.size), constants(system.FaceNearNullSpace.size))
     x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
     y_T, y_F = np.zeros(2 * system.b_T.size), np.zeros(2 * system.b_F.size)
     r = scalar.Solve(system.b_T, system.b_F, x_T, x_F)
@@ -130,9 +132,9 @@ def test_prolongations():
         solver = ToySolver()
         solver.Prolongation = prolongation
         if asymmetry == 0:
-            solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         else:
-            solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         assert solver.NumberOfLevels() > 1
         x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
         result = solver.Solve(system.b_T, system.b_F, x_T, x_F)
@@ -147,9 +149,9 @@ def test_condensed_system():
         system = HybridSystem(32, asymmetry)
         solver = ToySolver()
         if asymmetry == 0:
-            solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         else:
-            solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         x = np.zeros(system.b.size)
         result = solver.Solve(system.b, x)
         assert result.Converged and RelativeError(x, spla.spsolve(system.A.tocsc(), system.b)) < 1e-8
@@ -171,13 +173,13 @@ def test_failed_setup_keeps_the_previous_one():
     system = HybridSystem(32, asymmetry=0.3)
     solver = ToySolver()
     A_FT = system.A_FT.copy()
-    solver.SetupNonSym(system.A_TT, system.A_TF, A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    solver.SetupNonSym(system.A_TT, system.A_TF, A_FT, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
     del A_FT
     x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
     solver.Solve(system.b_T, system.b_F, x_T, x_F)
     other = HybridSystem(8)
     try:
-        solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, other.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, other.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         assert False, "A_FF of the wrong size accepted"
     except fhhos4.Error:
         pass
@@ -205,19 +207,19 @@ def test_other_formats():
     int64 = system.A_TF.copy()
     int64.indices, int64.indptr = int64.indices.astype(np.int64), int64.indptr.astype(np.int64)
     for A_TF, A_FF, what in [(system.A_TF, csc, "a CSC matrix"), (system.A_TF, coo, "a COO matrix"), (int64, system.A_FF, "int64 indices")]:
-        ExpectTypeError(lambda: solver.SetupSym(system.A_TT, A_TF, A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), what)
+        ExpectTypeError(lambda: solver.SetupSym(system.A_TT, A_TF, A_FF, system.CellNearNullSpace, system.FaceNearNullSpace), what)
     assert not solver.IsSetUp()
     # Converted, or viewed
-    solver.SetupSym(system.A_TT, fhhos4.ToCSR(int64), fhhos4.ToCSR(csc), system.CellInterpOfOne, system.FaceInterpOfOne)
+    solver.SetupSym(system.A_TT, fhhos4.ToCSR(int64), fhhos4.ToCSR(csc), system.CellNearNullSpace, system.FaceNearNullSpace)
     reference = solver.Solve(system.b_T, system.b_F, x_T, x_F)
     y_T, y_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
-    solver.SetupSym(system.A_TT, system.A_TF, fhhos4.TransposedView(csc), system.CellInterpOfOne, system.FaceInterpOfOne)
+    solver.SetupSym(system.A_TT, system.A_TF, fhhos4.TransposedView(csc), system.CellNearNullSpace, system.FaceNearNullSpace)
     assert solver.Solve(system.b_T, system.b_F, y_T, y_F).Iterations == reference.Iterations
     assert RelativeError(y_F, x_F) < 1e-12
     # A CSRView of NumPy arrays
     A = system.A_TF
     view = fhhos4.CSRView(A.shape[0], A.shape[1], A.indptr, A.indices, A.data)
-    solver.SetupSym(system.A_TT, view, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    solver.SetupSym(system.A_TT, view, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
     y_T, y_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
     assert solver.Solve(system.b_T, system.b_F, y_T, y_F).Iterations == reference.Iterations
 
@@ -246,11 +248,11 @@ def test_blocks_of_the_global_matrix():
             assert abs(ToSciPy(blocks.A_TT) - sp.tril(system.A_TT)).max() == 0
             assert abs(ToSciPy(blocks.A_FF) - sp.tril(system.A_FF)).max() == 0
             assert blocks.A_FT.Rows == 0
-            solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            solver.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         else:
             blocks = fhhos4.ExtractBlocksNonSym(view, cells, faces)
             assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
-            solver.SetupNonSym(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            solver.SetupNonSym(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         assert abs(ToSciPy(blocks.A_TF) - system.A_TF).max() == 0
         # The global vectors: b (homogeneous Dirichlet conditions), and the solution x (the Dirichlet values unchanged)
         b = np.zeros(n)
@@ -288,9 +290,9 @@ def test_merge_off_diag():
             assert abs(ToSciPy(blocks.A_FT) - system.A_FT).max() == 0
         solver = ToySolver()
         if asymmetry == 0:
-            solver.SetupSym(system.A_TT, blocks.A_TF, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers)
+            solver.SetupSym(system.A_TT, blocks.A_TF, blocks.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace, blocks.FaceGhostGlobalNumbers)
         else:
-            solver.SetupNonSym(system.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne, blocks.FaceGhostGlobalNumbers, blocks.CellGhostGlobalNumbers)
+            solver.SetupNonSym(system.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace, blocks.FaceGhostGlobalNumbers, blocks.CellGhostGlobalNumbers)
         assert solver.IsSetUp()
     # 7 DoFs per face: not dividing the rows of A_FF (480); offdColumns of other index types in the blocks
     for wrong, error in (((columns, 7), fhhos4.Error), ((columns.astype(np.int64), 1), TypeError)):
@@ -334,14 +336,14 @@ def test_inferred_discretization():
     results = []
     for s in (reference, solver):
         s.PreSmoother = fhhos4.Smoother.BlockGaussSeidel
-        s.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        s.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
         results.append(s.Solve(system.b_T, system.b_F, x_T, x_F))
     assert results[0].Converged and results[1].Iterations == results[0].Iterations, results
     assert (solver.Dimension, solver.PolynomialSpace, solver.FaceDegree, solver.CellDegree) == (2, fhhos4.PolynomialSpace.P, 0, 0)
     assert (solver.CellBlockSize(), solver.FaceBlockSize()) == (1, 1)
     try:
-        fhhos4.Solver().SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        fhhos4.Solver().SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         assert False, "VectorComponents not set accepted"
     except fhhos4.Error as e:
         assert "set VectorComponents" in str(e)
@@ -357,7 +359,7 @@ def test_inferred_discretization():
     ambiguous = fhhos4.Solver()
     ambiguous.VectorComponents = 1
     try:
-        ambiguous.SetupSym(dense(small.A_TT, C_TT), dense(small.A_TF, C_TF), dense(small.A_FF, C_TF.T @ np.linalg.solve(C_TT, C_TF)), small.CellInterpOfOne, small.FaceInterpOfOne)
+        ambiguous.SetupSym(dense(small.A_TT, C_TT), dense(small.A_TF, C_TF), dense(small.A_FF, C_TF.T @ np.linalg.solve(C_TT, C_TF)), small.CellNearNullSpace, small.FaceNearNullSpace)
         assert False, "an ambiguity accepted"
     except fhhos4.Error as e:
         assert str(e).endswith("Set Dimension (2 or 3)."), str(e)
@@ -369,21 +371,21 @@ def test_errors():
     # The discretization inferred, but VectorComponents not set: it is not inferred
     solver = fhhos4.Solver()
     try:
-        solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         assert False, "VectorComponents not set accepted"
     except fhhos4.Error as e:
         assert "VectorComponents" in str(e)
     assert isinstance(fhhos4.Error("message"), RuntimeError)
     # Vectors: float64 only, not converted
     solver = ToySolver()
-    solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+    solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
     ExpectTypeError(lambda: solver.Solve(system.b_T, system.b_F, np.zeros(system.b_T.size, dtype=np.float32), np.zeros(system.b_F.size)), "a float32 output")
     ExpectTypeError(lambda: solver.Solve(system.b_T.astype(np.float32), system.b_F, np.zeros(system.b_T.size), np.zeros(system.b_F.size)), "a float32 input")
     # Not in the CSR format: unsorted columns
     A = system.A_TF.copy()
     A.indices[[0, 1]] = A.indices[[1, 0]]
     try:
-        solver.SetupSym(system.A_TT, A, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+        solver.SetupSym(system.A_TT, A, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
         assert False, "unsorted columns accepted"
     except fhhos4.Error as e:
         assert "CSR" in str(e)
@@ -392,7 +394,7 @@ def test_errors():
         solver = ToySolver()
         solver.CoarseSolver = fhhos4.CoarseSolver.MUMPS
         try:
-            solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne)
+            solver.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
             assert False, "MUMPS without MPI initialized accepted"
         except fhhos4.Error as e:
             assert "MPI_Init" in str(e)

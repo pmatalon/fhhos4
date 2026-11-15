@@ -140,48 +140,36 @@ namespace
 		}
 	};
 
-	// The interpolations of 1 (one coefficient per cell and per face), from the near null space of the operator: its
-	// first vector (or the constant one, has_cnst) is the interpolation of 1 on the DoFs, at any scale (PETSc's vectors
-	// are orthonormal), i.e. the coefficient of the first function of each cell and face (constant), the others 0
-	PetscErrorCode InterpolationsOfOne(Mat P, IS cells, IS faces, int cellBlockSize, int faceBlockSize, Eigen::VectorXd& cellInterpOfOne, Eigen::VectorXd& faceInterpOfOne)
+	// The near null space of the operator on the DoFs of the cells and of the faces of the process, one column per
+	// vector, as fhhos4::Solver takes it (which checks it): the vectors of MatSetNearNullSpace(), or the constant one
+	// (has_cnst, no vector: all the coefficients 1, the interpolation of 1 with one DoF per cell and face only)
+	PetscErrorCode NearNullSpace(Mat P, IS cells, IS faces, Eigen::MatrixXd& cellNearNullSpace, Eigen::MatrixXd& faceNearNullSpace)
 	{
 		MPI_Comm comm = PetscObjectComm((PetscObject)P);
 		MatNullSpace nearNullSpace;
 		PetscBool hasConstant;
 		PetscInt n;
 		const Vec* vectors;
-		bool ok = true;
 		PetscFunctionBegin;
 		PetscCall(MatGetNearNullSpace(P, &nearNullSpace));
-		PetscCheck(nearNullSpace, comm, PETSC_ERR_ARG_WRONGSTATE, "fhhos4: give the interpolation of 1 on the DoFs as the near null space of the operator, MatSetNearNullSpace() (no default: a wrong one slows the AMG down or makes it diverge)");
+		PetscCheck(nearNullSpace, comm, PETSC_ERR_ARG_WRONGSTATE, "fhhos4: give the near null space of the operator, MatSetNearNullSpace(): the interpolation of 1 on the DoFs (a vector-valued unknown: of the constant of each component; elasticity: the rigid body modes). No default: a wrong one slows the AMG down or makes it diverge");
 		PetscCall(MatNullSpaceGetVecs(nearNullSpace, &hasConstant, &n, &vectors));
-		for (auto [is, blockSize, interpOfOne] : { std::tuple{ cells, cellBlockSize, &cellInterpOfOne }, std::tuple{ faces, faceBlockSize, &faceInterpOfOne } })
+		for (auto [is, matrix] : { std::pair{ cells, &cellNearNullSpace }, std::pair{ faces, &faceNearNullSpace } })
 		{
-			Vec v = nullptr;
-			const PetscScalar* values = nullptr;
 			PetscInt size;
 			PetscCall(ISGetLocalSize(is, &size));
-			if (n > 0)
+			*matrix = Eigen::MatrixXd::Ones(size, n > 0 ? n : 1);
+			for (PetscInt j = 0; j < n; j++)
 			{
-				PetscCall(VecGetSubVector(vectors[0], is, &v));
+				Vec v;
+				const PetscScalar* values;
+				PetscCall(VecGetSubVector(vectors[j], is, &v));
 				PetscCall(VecGetArrayRead(v, &values));
-			}
-			interpOfOne->resize(size / blockSize);
-			for (PetscInt b = 0; b < size / blockSize; b++)
-			{
-				double first = values ? values[b * blockSize] : 1;
-				(*interpOfOne)[b] = first;
-				ok = ok && first != 0;
-				for (int k = 1; k < blockSize; k++)
-					ok = ok && std::abs(values ? values[b * blockSize + k] : 1) <= 1e-10 * std::abs(first);
-			}
-			if (v)
-			{
+				matrix->col(j) = Eigen::Map<const Eigen::VectorXd>(values, size);
 				PetscCall(VecRestoreArrayRead(v, &values));
-				PetscCall(VecRestoreSubVector(vectors[0], is, &v));
+				PetscCall(VecRestoreSubVector(vectors[j], is, &v));
 			}
 		}
-		PetscCall(CheckOnAll(comm, ok, "the near null space of the operator is not the interpolation of 1 on bases whose first function in each cell and face is constant (its coefficient non-zero, the others 0): hierarchical bases (e.g. Legendre's), the near null space the vector of these coefficients (a vector-valued unknown: that of the first component first)"));
 		PetscFunctionReturn(PETSC_SUCCESS);
 	}
 
@@ -283,7 +271,7 @@ namespace
 		IS rows[2];
 		int cbs = 0, fbs = 0;
 		Block tt, tf, ft, ff;
-		Eigen::VectorXd cellInterpOfOne, faceInterpOfOne;
+		Eigen::MatrixXd cellNearNullSpace, faceNearNullSpace;
 		std::string error;
 		bool allOk;
 		PetscFunctionBegin;
@@ -335,7 +323,7 @@ namespace
 		PetscCall(ISDestroy(&ctx->Faces));
 		ctx->Cells = rows[0];
 		ctx->Faces = rows[1];
-		PetscCall(InterpolationsOfOne(P, ctx->Cells, ctx->Faces, cbs, fbs, cellInterpOfOne, faceInterpOfOne));
+		PetscCall(NearNullSpace(P, ctx->Cells, ctx->Faces, cellNearNullSpace, faceNearNullSpace));
 
 		// The blocks, read in place: on one process, the blocks themselves; on several, A_TT's diagonal part (cells are
 		// not shared) and the others merged
@@ -367,15 +355,15 @@ namespace
 			{
 				LibraryMatrix a_TT(tt.Diag.Eigen());
 				if (size > 1 && symmetric)
-					solver.SetupSym(a_TT, ctx->Merged.A_TF, ctx->Merged.A_FF, cellInterpOfOne, faceInterpOfOne, ctx->Merged.FaceGhostGlobalNumbers);
+					solver.SetupSym(a_TT, ctx->Merged.A_TF, ctx->Merged.A_FF, cellNearNullSpace, faceNearNullSpace, ctx->Merged.FaceGhostGlobalNumbers);
 				else if (size > 1)
-					solver.SetupNonSym(a_TT, ctx->Merged.A_TF, ctx->Merged.A_FT, ctx->Merged.A_FF, cellInterpOfOne, faceInterpOfOne, ctx->Merged.FaceGhostGlobalNumbers, ctx->Merged.CellGhostGlobalNumbers);
+					solver.SetupNonSym(a_TT, ctx->Merged.A_TF, ctx->Merged.A_FT, ctx->Merged.A_FF, cellNearNullSpace, faceNearNullSpace, ctx->Merged.FaceGhostGlobalNumbers, ctx->Merged.CellGhostGlobalNumbers);
 				else if (symmetric)
-					solver.SetupSym(a_TT, LibraryMatrix(tf.Diag.Eigen()), LibraryMatrix(ff.Diag.Eigen()), cellInterpOfOne, faceInterpOfOne);
+					solver.SetupSym(a_TT, LibraryMatrix(tf.Diag.Eigen()), LibraryMatrix(ff.Diag.Eigen()), cellNearNullSpace, faceNearNullSpace);
 				else
 				{
 					ctx->A_FT = ft.Diag.Eigen();
-					solver.SetupNonSym(a_TT, LibraryMatrix(tf.Diag.Eigen()), ctx->A_FT, LibraryMatrix(ff.Diag.Eigen()), cellInterpOfOne, faceInterpOfOne);
+					solver.SetupNonSym(a_TT, LibraryMatrix(tf.Diag.Eigen()), ctx->A_FT, LibraryMatrix(ff.Diag.Eigen()), cellNearNullSpace, faceNearNullSpace);
 				}
 				ctx->SetUpSymmetric = symmetric;
 			}

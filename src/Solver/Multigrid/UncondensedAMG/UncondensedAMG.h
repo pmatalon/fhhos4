@@ -48,6 +48,10 @@ public:
 	// sizes given to the constructor included. The first n DoFs of each block are the constants (see
 	// UncondensedLevel::VectorComponents).
 	int VectorComponents = 1;
+	// PROTOTYPE (elasticity, .scratch/uamg/issues/07): if > 0, the first ConstantsPerBlock DoFs of each block are the
+	// near-kernel modes (the rigid body modes, in a basis where each has the same coordinate on all the blocks), instead
+	// of the VectorComponents constants: the blocks of the level of degree 0 and of the h-levels have that size.
+	int ConstantsPerBlock = 0;
 
 
 	UncondensedAMG(int dim, int degree, bool polynomialSpaceQ, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -430,7 +434,7 @@ private:
 		level->CollapseBoundaryFaces = CollapseBoundaryFaces;
 		level->Symmetric = _symmetric;
 		level->DownwindOrdering = DownwindOrdering;
-		level->VectorComponents = VectorComponents;
+		level->VectorComponents = ConstantsPerBlock > 0 ? ConstantsPerBlock : VectorComponents;
 		return level;
 	}
 
@@ -450,8 +454,9 @@ protected:
 		UncondensedLevel* coarse;
 		if (coarseningType == CoarseningType::P)
 		{
-			int coarseCellBlockSize = VectorComponents * (int)PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
-			int coarseFaceBlockSize = VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
+			bool modes = ConstantsPerBlock > 0 && coarseDegree == 0;
+			int coarseCellBlockSize = modes ? ConstantsPerBlock : VectorComponents * (int)PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
+			int coarseFaceBlockSize = modes ? ConstantsPerBlock : VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
 			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
 		}
 		else

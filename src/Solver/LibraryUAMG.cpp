@@ -67,12 +67,22 @@ public:
 		SetupFromBlocks(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 	}
 
+	// The interpolation of 1 on all the DoFs, the library's input, from the program's, one coefficient per block (of the
+	// first function of each block, constant): the other coefficients are zero
+	static Vector OnAllDoFs(const Vector& interpOfOne, Eigen::Index nDoFs)
+	{
+		Vector onAllDoFs = Vector::Zero(nDoFs);
+		if (interpOfOne.rows() > 0)
+			Eigen::Map<Vector, 0, Eigen::InnerStride<>>(onAllDoFs.data(), interpOfOne.rows(), Eigen::InnerStride<>(nDoFs / interpOfOne.rows())) = interpOfOne;
+		return onAllDoFs;
+	}
+
 	void SetupFromBlocks(const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
 	{
 		if (A_F_T.rows() > 0)
-			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, OnAllDoFs(cellInterpOfOne, A_T_F.rows()), OnAllDoFs(faceInterpOfOne, A_T_F.cols()));
 		else
-			_solver.SetupSym(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne);
+			_solver.SetupSym(A_T_T, A_T_F, A_F_F, OnAllDoFs(cellInterpOfOne, A_T_F.rows()), OnAllDoFs(faceInterpOfOne, A_T_F.cols()));
 		fhhos4::SparseMatrixMap A = _solver.CondensedMatrix();
 		_condensedMatrix.Borrow(A.rows(), A.cols(), A.outerIndexPtr(), A.innerIndexPtr(), A.valuePtr());
 		IterativeSolver::Setup(_condensedMatrix);
@@ -84,9 +94,9 @@ public:
 		_solver.Comm = Communicator::Current().Comm();
 #endif
 		if (Communicator::Current().All(A_F_T.rows() == 0 && A_F_T.cols() == 0))
-			_solver.SetupSym(A_T_T, A_T_F, A_F_F, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers);
+			_solver.SetupSym(A_T_T, A_T_F, A_F_F, OnAllDoFs(cellInterpOfOne, A_T_F.rows()), OnAllDoFs(faceInterpOfOne, A_F_F.rows()), faceGhostGlobalNumbers);
 		else
-			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers, cellGhostGlobalNumbers);
+			_solver.SetupNonSym(A_T_T, A_T_F, A_F_T, A_F_F, OnAllDoFs(cellInterpOfOne, A_T_F.rows()), OnAllDoFs(faceInterpOfOne, A_F_F.rows()), faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override

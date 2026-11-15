@@ -22,7 +22,7 @@ For the library's users: `README_library.md`. This file is for changing the libr
   vector-valued unknown, interleaved: see `docs/uamg.md`; -1, the default: 1 when the three are set, refused
   otherwise); `CellBlockSize()`/`FaceBlockSize()` give these block sizes once set or inferred (`BlockSizes()`, the
   setup's computation). `Result`, `Error`.
-- `SetupSym()` from `A_TT`, `A_TF`, `A_FF` and the interpolations of 1, or `SetupNonSym()` with `A_FT` too,
+- `SetupSym()` from `A_TT`, `A_TF`, `A_FF` and the near null space (below), or `SetupNonSym()` with `A_FT` too,
   then `Solve(b_T, b_F, x_T, x_F)`: the library condenses the system by cells (`StaticCondensation.h`) and computes the
   cell unknowns. `CondensedMatrix()` (one process), and `Solve(b, x)` on it (right-hand sides condensed by the caller).
   `CondenseRHS()`, `ApplyCondensedMatrix()` (`y = A x`: `Impl::A`, or `DistributedA` on several processes) and
@@ -80,11 +80,33 @@ PETSc's options:
   below the finest); one solver resolves, several are an ambiguity, with the parameter to propose; `Message()`,
   `Description()`.
 
+## The near null space
+
+`cellNearNullSpace`, `faceNearNullSpace` (`detail::ConstMatrixView`: the columns of the caller's matrix, read in place),
+after the block sizes (`Impl::ReduceNearNullSpace()`, collective):
+- As many columns as `VectorComponents`: they must be the constants of the components on hierarchical bases
+  (`ConstantsOnly()`: the column c non-zero on the DoF c of each block only, to 1e-10 relative; proportional to the
+  first column), reduced to the interpolation of 1 of each block, the first column's: what `UncondensedAMG` takes.
+  Otherwise an error. The setups and the results are those of the former input, one coefficient per block.
+- More columns (the rigid body modes): `Impl::SetupInBasis()`, `SetupSym()` on one process, degrees >= 1, no
+  `SingularMatrix`, a Krylov method. `ChangeOfBasis()` builds the block-diagonal `Q` of the cells and of the faces, each
+  block `[B | C]` on its DoFs of degree <= 1 (`B`: the functions, their coefficients beyond the degree 1 zero to 1e-8
+  relative, of full rank; `C`: an orthonormal basis of the orthogonal of their span) and the identity on the others.
+  The multigrid is set up on copies, `Q^T A Q` of the condensed matrix (`Impl::AInBasis`) and of the blocks, with ones
+  as interpolations of 1 and `UncondensedAMG::ConstantsPerBlock` = the number of functions (`docs/uamg.md`). The
+  condensation, `Impl::A` and the Krylov method are those of the system as given: the multigrid preconditions it
+  through `SolverPreconditioner::Basis` (`Q M^-1 Q^T`), so the residuals, `CondensedMatrix()` and the solutions are in
+  the caller's bases. The levels are in double precision whatever `MixedPrecision`: in these bases a rotation is a
+  global function, whose energy is the small difference of large coefficients (those of its translation part, as
+  |x|^2 / h^2), lost in single precision (the cycle diverges on a fine mesh).
+
+## The inference in the setups
+
 `library/Solver.cpp`, `InferDiscretization()`, in both setups after the CSR checks of the inputs and before
-`CheckParameters()` (which needs the block sizes): the four parameters set, nothing; the three set, the space alone from
-the sizes of the interpolations of 1 (the largest of the processes; no reading: P, which the checks of the sizes then
-refuse, with the sizes they expect); otherwise the analysis of each process (`CollectiveCheck()`), gathered
-(`AllGatherV()`), combined, checked against the sizes of the interpolations of 1, and inferred. The values found are
+`CheckParameters()` (which needs the block sizes): the four parameters set, nothing; the three set, the space alone: P
+if P and Q have the same DoFs, otherwise the analysis of each process, Q if it shows the DoFs of Q, P if not or if it
+fails (the checks of the sizes and of the near null space then refuse a wrong one); otherwise the analysis of each
+process (`CollectiveCheck()`), gathered (`AllGatherV()`), combined, and inferred. The values found are
 written into the members (`DiscretizationParametersSet()` checks those set: `CellDegree` k - 1 to k + 1 on every path).
 
 ## In the program
@@ -112,8 +134,9 @@ on several processes too (see `docs/uamg.md`). `tests/UAMGLibraryTest.cpp` compa
 - No new parallel builders, adjacency lambdas or helper machinery in the client.
 - The client's macros only around what does not compile without fhhos4: the include and the solver calls (with
   `#else`: an error, exit). The solver option and the block assembly stay unguarded.
-- Check the client's bases: the interpolations of 1 (1/phi_0 for a hierarchical basis), and the order of the DoFs of
-  each cell and face by degree (the p-levels extract the first ones).
+- Check the client's bases: the near null space is the client's own interpolation of 1 (hierarchical bases: one
+  non-zero coefficient per block), and the order of the DoFs of each cell and face by degree (the p-levels extract the
+  first ones).
 
 ## The examples
 
@@ -142,8 +165,8 @@ compiled into it: moving into PETSc, `src/ksp/pc/impls`, means installing this h
   stored entries don't give it, as `Solver::Setup()`); the
   block sizes from `Solver::CellBlockSize()`/`FaceBlockSize()`; the checks collective (`CheckOnAll()`: PETSc's errors
   are raised on the process that detects them, the others would wait in the next collective call): the DoFs of whole
-  cells and faces on each process, the interpolations of 1 from the near null space (its first vector, or the constant
-  one: the first DoF of each block; the others 0, to 1e-10 relative). PETSc's arrays read in place (`MatGetRowIJ()`,
+  cells and faces on each process, the near null space, all its vectors on the DoFs of the process as the columns of the
+  library's (`NearNullSpace()`; none: the constant one), which checks them. PETSc's arrays read in place (`MatGetRowIJ()`,
   `MatSeqAIJGetArrayRead()`; `MatMPIAIJGetSeqAIJ()` on several processes), released after the setup. One process: the
   blocks as Eigen maps of PETSc's arrays (copies by Eigen if `PetscInt` is not `SparseIndex`), `A_FT` copied (the solves
   read it). Several: `A_TT`'s diagonal part, the others by `MergeOffDiag()` (its errors local: reduced before the

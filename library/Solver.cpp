@@ -257,11 +257,10 @@ namespace fhhos4
 
 		// The parameters of the discretization not set, inferred from the blocks (ADR-0023) and written into s (printed at
 		// Verbosity >= 1). Dimension or a degree not set: from the stored entries of A_TT and A_TF of all the processes
-		// (DiscretizationInference.h), VectorComponents then required. Otherwise PolynomialSpace alone, from the sizes the
-		// setup checks (DoFs of no space: P, which these checks then refuse, with the sizes it needs). nCells, nFaces: the
-		// coefficients of the interpolations of 1; nFaceDoFs: the face DoFs of the process (the columns of A_TF on one
-		// process, the rows of A_FF on several). Collective.
-		void InferDiscretization(Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, Eigen::Index nCells, Eigen::Index nFaces, Eigen::Index nFaceDoFs, const Communicator& comm)
+		// (DiscretizationInference.h), VectorComponents then required. Otherwise PolynomialSpace alone, from these stored
+		// entries too (those of Q, or P: which the checks of the setup then refuse if wrong, with the sizes it needs).
+		// Collective.
+		void InferDiscretization(Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const Communicator& comm)
 		{
 			using namespace DiscretizationInference;
 			Discretization set;
@@ -278,29 +277,40 @@ namespace fhhos4
 				s.VectorComponents = 1;
 			if (degreesSet && set.PolynomialSpace != fhhos4::PolynomialSpace::Inferred)
 				return;
-			int cellBlockSize, faceBlockSize;
-			if (degreesSet) // the largest of the processes: those without cells or faces have none
+			if (degreesSet)
 			{
-				cellBlockSize = (int)comm.Max(nCells > 0 && A_TT.rows() % nCells == 0 ? (int64_t)(A_TT.rows() / nCells) : (int64_t)0);
-				faceBlockSize = (int)comm.Max(nFaces > 0 && nFaceDoFs % nFaces == 0 ? (int64_t)(nFaceDoFs / nFaces) : (int64_t)0);
-			}
-			else
-			{
-				BlockAnalysis local;
-				CollectiveCheck(comm, [&]() { local = AnalyzeBlocks(A_TT, A_TF); });
-				tie(cellBlockSize, faceBlockSize) = CombineAnalyses(comm.AllGatherV(vector<BlockAnalysis>{ local }), MemberNames);
-				CollectiveCheck(comm, [&]()
-				{
-					if (nCells * cellBlockSize != A_TT.rows() || nFaces * faceBlockSize != nFaceDoFs)
-						Utils::FatalError("fhhos4::Solver: the blocks have " + to_string(cellBlockSize) + " DoFs per cell and " + to_string(faceBlockSize) + " per face (the stored entries of A_TT and A_TF), but the interpolations of 1 have " + to_string(nCells) + " cells for the " + to_string(A_TT.rows()) + " rows of A_TT, and " + to_string(nFaces) + " faces for " + to_string(nFaceDoFs) + " face DoFs: store the zeros inside the blocks of each cell, or set Dimension, FaceDegree and CellDegree.");
-				});
-			}
-			Inference inference = DiscretizationInference::InferDiscretization(cellBlockSize, faceBlockSize, s.VectorComponents, set, s.PCoarsening);
-			if (inference.Solvers != 1 && degreesSet)
-			{
+				// The space alone: Q if P and Q have different DoFs per cell or face and the stored entries show those of Q
+				// (the zeros inside the blocks of each cell stored), P otherwise
+				auto sizes = [&](bool q) { return pair<int, int>(s.VectorComponents * (int)PolynomialSpaceDimension(s.Dimension, s.CellDegree, q), s.VectorComponents * (int)PolynomialSpaceDimension(s.Dimension - 1, s.FaceDegree, q)); };
 				s.PolynomialSpace = fhhos4::PolynomialSpace::P;
+				if (sizes(false) == sizes(true))
+					return;
+				BlockAnalysis local;
+				bool failed = false;
+				try
+				{
+					local = AnalyzeBlocks(A_TT, A_TF);
+				}
+				catch (const Error&)
+				{
+					failed = true;
+				}
+				if (comm.Any(failed))
+					return;
+				try // the same on all the processes
+				{
+					if (CombineAnalyses(comm.AllGatherV(vector<BlockAnalysis>{ local }), MemberNames) == sizes(true))
+						s.PolynomialSpace = fhhos4::PolynomialSpace::Q;
+				}
+				catch (const Error&)
+				{}
 				return;
 			}
+			int cellBlockSize, faceBlockSize;
+			BlockAnalysis local;
+			CollectiveCheck(comm, [&]() { local = AnalyzeBlocks(A_TT, A_TF); });
+			tie(cellBlockSize, faceBlockSize) = CombineAnalyses(comm.AllGatherV(vector<BlockAnalysis>{ local }), MemberNames);
+			Inference inference = DiscretizationInference::InferDiscretization(cellBlockSize, faceBlockSize, s.VectorComponents, set, s.PCoarsening);
 			if (inference.Solvers != 1)
 				Utils::FatalError(Message(inference, MemberNames));
 			s.Dimension = inference.Result.Dimension;
@@ -309,6 +319,101 @@ namespace fhhos4
 			s.CellDegree = inference.Result.CellDegree;
 			if (s.Verbosity >= 1 && comm.IsRoot())
 				cout << Description(inference, MemberNames) << endl;
+		}
+	}
+
+	namespace
+	{
+		// The near null space vectors of the calling code, read in place: one column per function, one row per DoF
+		using NearNullSpace = Eigen::Map<const Eigen::MatrixXd, 0, Eigen::OuterStride<>>;
+
+		NearNullSpace MapNearNullSpace(const detail::ConstMatrixView& view)
+		{
+			return NearNullSpace(view.Data, view.Rows, view.Cols, Eigen::OuterStride<>(view.OuterStride));
+		}
+
+		void CheckNearNullSpaceSizes(const NearNullSpace& cells, const NearNullSpace& faces, Eigen::Index nCellDoFs, Eigen::Index nFaceDoFs, int components)
+		{
+			if (cells.rows() != nCellDoFs || faces.rows() != nFaceDoFs)
+				Utils::FatalError("fhhos4::Solver: cellNearNullSpace and faceNearNullSpace have one row per DoF of the cells (" + to_string(nCellDoFs) + ") and of the faces (" + to_string(nFaceDoFs) + "), got " + to_string(cells.rows()) + " and " + to_string(faces.rows()) + " rows: they are the functions interpolated on the bases of all the cells and faces (a scalar unknown: the function 1), not one coefficient per cell and per face.");
+			if (cells.cols() != faces.cols() || cells.cols() < components)
+				Utils::FatalError("fhhos4::Solver: cellNearNullSpace and faceNearNullSpace have one column per function, the same functions in both, at least the constant of each of the " + to_string(components) + " components (VectorComponents), got " + to_string(cells.cols()) + " and " + to_string(faces.cols()) + " columns.");
+			if (!cells.allFinite() || !faces.allFinite())
+				Utils::FatalError("fhhos4::Solver: cellNearNullSpace or faceNearNullSpace has a coefficient that is not finite.");
+		}
+
+		// True if the columns of N are the constants of each component, in their order, on hierarchical bases whose first
+		// function is constant: the column c has one non-zero coefficient per block, that of the DoF c (the constant of
+		// the scalar basis times e_c), the same as in the first column up to the scale of the column. interpOfOne: then the
+		// interpolation of 1 on the scalar basis of each block, what the multigrid takes (the first column).
+		bool ConstantsOnly(const NearNullSpace& N, int blockSize, int components, Vector& interpOfOne)
+		{
+			if (N.cols() != components)
+				return false;
+			Eigen::Index nBlocks = N.rows() / blockSize;
+			interpOfOne.resize(nBlocks);
+			bool ok = true;
+			#pragma omp parallel for reduction(&& : ok)
+			for (Eigen::Index b = 0; b < nBlocks; ++b)
+			{
+				double first = N(b * blockSize, 0);
+				interpOfOne[b] = first;
+				for (int c = 0; c < components; ++c)
+				{
+					double constant = N(b * blockSize + c, c);
+					ok = ok && constant != 0 && abs(constant * N(0, 0) - first * N(c, c)) <= 1e-8 * abs(first * N(c, c));
+					for (int i = 0; i < blockSize; ++i)
+						ok = ok && (i == c || abs(N(b * blockSize + i, c)) <= 1e-10 * abs(constant));
+				}
+			}
+			return ok;
+		}
+
+		// The change of basis of the blocks (cells or faces) that makes the near null space functions the first DoFs of
+		// each block, with the coordinate 1 on all of them: the block-diagonal matrix Q, x = Q x', whose block is
+		// [B | C | 0; 0 | 0 | I]: B, the coefficients of the functions on the DoFs of degree <= 1 of the block (its first
+		// lowSize ones; those on its other DoFs must be zero: the functions are of degree <= 1, e.g. the rigid body
+		// modes); C, an orthonormal basis of the orthogonal of their span. In the new basis, a vector with the same first
+		// coefficients on all the blocks is one global function of the near null space, as a constant in the bases of a
+		// scalar unknown rescaled by its interpolation of 1: what the coarsening of the multigrid keeps.
+		SparseMatrix ChangeOfBasis(const NearNullSpace& N, int blockSize, int lowSize, const string& entity)
+		{
+			Eigen::Index nBlocks = N.rows() / blockSize;
+			int m = (int)N.cols();
+			if (lowSize > blockSize || m > lowSize)
+				Utils::FatalError("fhhos4::Solver: " + to_string(m) + " near null space functions (more than the constants of the components: e.g. the rotations): the " + entity + "s need at least the degree 1 to hold them (CellDegree and FaceDegree >= 1), and no more functions than their " + to_string(min(lowSize, blockSize)) + " DoFs of degree <= 1.");
+			vector<DenseMatrix> blocks(nBlocks);
+			Eigen::Index wrongBlock = -1;
+			#pragma omp parallel for
+			for (Eigen::Index b = 0; b < nBlocks; ++b)
+			{
+				DenseMatrix low = N.block(b * blockSize, 0, lowSize, m);
+				double scale = low.cwiseAbs().maxCoeff();
+				bool ok = scale > 0 && (blockSize == lowSize || N.block(b * blockSize + lowSize, 0, blockSize - lowSize, m).cwiseAbs().maxCoeff() <= 1e-8 * scale);
+				Eigen::ColPivHouseholderQR<DenseMatrix> qr(low);
+				if (!ok || qr.rank() != m)
+				{
+					#pragma omp critical
+					wrongBlock = b;
+					continue;
+				}
+				DenseMatrix Q = qr.householderQ();
+				blocks[b] = DenseMatrix::Identity(blockSize, blockSize);
+				blocks[b].block(0, 0, lowSize, m) = low;
+				blocks[b].block(0, m, lowSize, lowSize - m) = Q.rightCols(lowSize - m);
+			}
+			if (wrongBlock != -1)
+				Utils::FatalError("fhhos4::Solver: the near null space functions on the " + entity + " " + to_string(wrongBlock) + " are not " + to_string(m) + " independent functions of degree <= 1 on a hierarchical basis (their coefficients zero beyond its first " + to_string(lowSize) + " DoFs, those of degree <= 1): for a vector-valued unknown, give the constant of each component, in their order, or the rigid body modes (the translations and the rotations).");
+			vector<Eigen::Triplet<double, SparseMatrixIndex>> coefficients;
+			coefficients.reserve(nBlocks * (lowSize * lowSize + blockSize - lowSize));
+			for (Eigen::Index b = 0; b < nBlocks; ++b)
+				for (int i = 0; i < blockSize; ++i)
+					for (int j = 0; j < blockSize; ++j)
+						if ((i < lowSize && j < lowSize) || i == j)
+							coefficients.emplace_back(b * blockSize + i, b * blockSize + j, blocks[b](i, j));
+			SparseMatrix Q(N.rows(), N.rows());
+			Q.setFromTriplets(coefficients.begin(), coefficients.end());
+			return Q;
 		}
 	}
 
@@ -325,6 +430,11 @@ namespace fhhos4
 		SparseMatrix A; // the condensed matrix, computed by the setup (on one process): the solvers keep a pointer to it
 		bool Singular = false; // Solver::SingularMatrix, at the setup
 		vector<Vector> Kernel; // Singular: the interpolation of 1 on the faces (of the process), on each component, normalized (the kernel of A)
+		// More near null space functions than the constants (e.g. the rotations: SetupInBasis()): their number, 0
+		// otherwise; the change of basis of the faces that makes them the first DoFs of each block, x = Basis x', its
+		// transpose, and the condensed matrix in that basis, Basis^T A Basis, the multigrid's (which keeps a pointer to it)
+		int NearNullSpaceFunctions = 0;
+		SparseMatrix Basis, BasisTranspose, AInBasis;
 		unique_ptr<BorrowedSparseMatrix> GivenA_FT; // the caller's A_FT, read in place by Condensation (SetupNonSym())
 		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
@@ -409,7 +519,7 @@ namespace fhhos4
 
 		// The sizes and structure of the inputs, against the dimension and the degrees. A_FT: null if the matrix is
 		// symmetric.
-		void CheckInputs(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix& A_FF, const Eigen::Ref<const Eigen::VectorXd>& cellInterpOfOne, const Eigen::Ref<const Eigen::VectorXd>& faceInterpOfOne) const
+		void CheckInputs(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix* A_FT, const SparseMatrix& A_FF) const
 		{
 			string space = string(", PolynomialSpace ") + (PolynomialSpaceQ ? "Q" : "P") + (s.VectorComponents > 1 ? ", VectorComponents " + to_string(s.VectorComponents) : "");
 			string cellDoFs = to_string(CellBlockSize) + " DoFs per cell (CellDegree " + to_string(s.CellDegree) + ", Dimension " + to_string(s.Dimension) + space + ")";
@@ -427,24 +537,30 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: A_FT is " + size(*A_FT) + ", expected " + to_string(nFaceDoFs) + " x " + to_string(nCellDoFs) + " (the transpose of A_TF).");
 			if (A_FF.rows() != nFaceDoFs || A_FF.cols() != nFaceDoFs)
 				Utils::FatalError("fhhos4::Solver: A_FF is " + size(A_FF) + ", expected " + to_string(nFaceDoFs) + " x " + to_string(nFaceDoFs) + " (the columns of A_TF).");
-			if (cellInterpOfOne.rows() != nCellDoFs / CellBlockSize || faceInterpOfOne.rows() != nFaceDoFs / FaceBlockSize)
-				Utils::FatalError("fhhos4::Solver: the interpolations of 1 on the cells and faces must have one coefficient per cell (" + to_string(nCellDoFs / CellBlockSize) + ": the rows of A_TF, with " + cellDoFs + ") and per face (" + to_string(nFaceDoFs / FaceBlockSize) + ": the columns of A_TF, with " + faceDoFs + "), got " + to_string(cellInterpOfOne.rows()) + " and " + to_string(faceInterpOfOne.rows()) + ".");
 
 			CheckBlockDiagonal(A_TT, CellBlockSize, cellDoFs);
 			string reader = Symmetric ? "SetupSym()" : "SetupNonSym()";
 			CheckTriangles(A_TT, "A_TT", !Symmetric, reader);
 			CheckTriangles(A_FF, "A_FF", !Symmetric, reader);
-			CheckInterpOfOne(cellInterpOfOne, "cell");
-			CheckInterpOfOne(faceInterpOfOne, "face");
 		}
 
-		static void CheckInterpOfOne(const Eigen::Ref<const Eigen::VectorXd>& interpOfOne, const string& entity)
+		// The near null space as the multigrid takes it. The constants of the components: their interpolation of 1, one
+		// coefficient per cell and per face (false). More functions (e.g. the rotations): true, see SetupInBasis().
+		// Collective: the same answer on all the processes.
+		bool ReduceNearNullSpace(const Solver& s, const NearNullSpace& cells, const NearNullSpace& faces, Eigen::Index nCellDoFs, Eigen::Index nFaceDoFs, Vector& cellInterpOfOne, Vector& faceInterpOfOne) const
 		{
-			for (Eigen::Index i = 0; i < interpOfOne.rows(); i++)
+			bool constants = false;
+			CollectiveCheck(Comm, [&]()
 			{
-				if (!std::isfinite(interpOfOne[i]) || interpOfOne[i] == 0)
-					Utils::FatalError("fhhos4::Solver: the interpolation of 1 on the " + entity + " bases is not finite and non-zero on the " + entity + " " + to_string(i) + ".");
-			}
+				CheckNearNullSpaceSizes(cells, faces, nCellDoFs, nFaceDoFs, s.VectorComponents);
+				bool cellConstants = ConstantsOnly(cells, CellBlockSize, s.VectorComponents, cellInterpOfOne);
+				constants = ConstantsOnly(faces, FaceBlockSize, s.VectorComponents, faceInterpOfOne) && cellConstants;
+				if (!constants && cells.cols() == s.VectorComponents)
+					Utils::FatalError("fhhos4::Solver: cellNearNullSpace or faceNearNullSpace is not the interpolation of the constants on hierarchical bases whose first function is constant, with " + to_string(CellBlockSize) + " DoFs per cell and " + to_string(FaceBlockSize) + " per face: " + (s.VectorComponents == 1 ? "the interpolation of the function 1 has one non-zero coefficient per cell and per face, the first" : "the column c is the interpolation of the constant of the component c, which has one non-zero coefficient per cell and per face, that of its DoF c") + " (the others at most 1e-10 times it). Wrong bases (see PCoarsening, ReorderByDegree()), block sizes (Dimension, the degrees, PolynomialSpace, VectorComponents), or the former input, one coefficient per cell and per face?");
+				if (!constants && IsDistributed())
+					Utils::FatalError("fhhos4::Solver: more near null space functions than the constants of the components (e.g. the rotations): on one process only.");
+			});
+			return !constants;
 		}
 
 		// The pre-smoother when Solver::PreSmoother is empty, whatever the Krylov method (PERFORMANCE.md): for a symmetric
@@ -499,6 +615,56 @@ namespace fhhos4
 		}
 
 		// A_FT: null if the matrix is symmetric; kept until the next setup (the solves read it)
+		// More near null space functions than the constants of the components (the rigid body modes of elasticity:
+		// ReduceNearNullSpace()), symmetric matrix: the multigrid is set up on the system in the bases whose first DoFs
+		// are these functions (ChangeOfBasis(): copies of the blocks), with their number as the constants of each block
+		// (UncondensedAMG::ConstantsPerBlock), all of coordinate 1; it preconditions the Krylov method, which iterates
+		// on the system as given (SolverPreconditioner::Basis). The condensation is that of the system as given.
+		void SetupInBasis(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix& A_FF, const NearNullSpace& cells, const NearNullSpace& faces)
+		{
+			auto start = chrono::steady_clock::now();
+			if (!Symmetric || s.SingularMatrix || Krylov == fhhos4::Krylov::None)
+				Utils::FatalError("fhhos4::Solver: more near null space functions than the constants of the components (e.g. the rotations): SetupSym() only, without SingularMatrix, with a Krylov method (not Krylov::None).");
+			if (s.FaceDegree < 1 || s.CellDegree < 1)
+				Utils::FatalError("fhhos4::Solver: more near null space functions than the constants of the components (e.g. the rotations): FaceDegree and CellDegree must be >= 1, the degree of these functions.");
+			int components = s.VectorComponents;
+			SparseMatrix cellBasis = ChangeOfBasis(cells, CellBlockSize, components * (int)PolynomialSpaceDimension(s.Dimension, 1, PolynomialSpaceQ), "cell");
+			SparseMatrix faceBasis = ChangeOfBasis(faces, FaceBlockSize, components * (int)PolynomialSpaceDimension(s.Dimension - 1, 1, PolynomialSpaceQ), "face");
+
+			Reset();
+			NCellDoFs = A_TF.rows();
+			NFaceDoFs = A_TF.cols();
+			NearNullSpaceFunctions = (int)faces.cols();
+			Basis = std::move(faceBasis);
+			BasisTranspose = SparseMatrixOps::Transpose(Basis);
+
+			ProgramArguments args = Arguments(s);
+			CreateSolvers(args, s);
+
+			Condensation = make_unique<StaticCondensation>(A_TT, A_TF, nullptr, CellBlockSize);
+			A = Condensation->CondensedMatrix(A_FF, true);
+
+			// The blocks in the new bases (A_TT and A_FF are read from their lower triangular part), read by the setup only
+			using SparseMatrixOps::Multiply;
+			SparseMatrix cellBasisTranspose = SparseMatrixOps::Transpose(cellBasis);
+			AInBasis = Multiply(Multiply(BasisTranspose, A), Basis);
+			SparseMatrix a_TT = Multiply(Multiply(cellBasisTranspose, SparseMatrixOps::FullFromLower(A_TT)), cellBasis);
+			SparseMatrix a_TF = Multiply(Multiply(cellBasisTranspose, A_TF), Basis);
+			SparseMatrix a_FF = Multiply(Multiply(BasisTranspose, SparseMatrixOps::FullFromLower(A_FF)), Basis);
+			SparseMatrix symmetric; // empty A_FT: symmetric matrix
+			// The levels in double precision: in these bases a rotation is a global function, whose energy is the small
+			// difference of large coefficients (those of its translation part, as |x|^2 / h^2), lost in single precision
+			// (Disk++'s beam 8 x 1, triangles n = 64, k = 1: the cycle diverges; PERFORMANCE.md)
+			Multigrid->MixedPrecision = false;
+			Multigrid->Setup(AInBasis, a_TT, a_TF, symmetric, a_FF, Vector::Ones(NCellDoFs / CellBlockSize), Vector::Ones(NFaceDoFs / FaceBlockSize));
+			KrylovSolver->Setup(A);
+			IsSetUp = true;
+			PrintLevelsPrecision(s);
+
+			if (s.Verbosity == 1)
+				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
+		}
+
 		void Setup(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, unique_ptr<BorrowedSparseMatrix> A_FT, const SparseMatrix& A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 		{
 			auto start = chrono::steady_clock::now();
@@ -519,6 +685,7 @@ namespace fhhos4
 			SparseMatrix symmetric; // empty A_FT: symmetric matrix
 			ActiveSolver()->Setup(A, A_TT, A_TF, GivenA_FT ? *GivenA_FT : symmetric, A_FF, cellInterpOfOne, faceInterpOfOne);
 			IsSetUp = true;
+			PrintLevelsPrecision(s);
 
 			if (s.Verbosity == 1)
 				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
@@ -544,9 +711,26 @@ namespace fhhos4
 				SetKernel(faceInterpOfOne, s.VectorComponents);
 			ActiveSolver()->Setup(DistributedA, A_TT, A_TF, DistributedCondensation->A_FT(), faces, cellInterpOfOne, faceInterpOfOne);
 			IsSetUp = true;
+			PrintLevelsPrecision(s);
 
 			if (s.Verbosity == 1 && Comm.IsRoot())
 				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels on " << Comm.Size() << " processes in " << Seconds(start) << " s" << endl;
+		}
+
+		// Verbosity >= 2, after the setup of the multigrid: the precision of its levels, and why if it is not the one
+		// asked for (Solver::MixedPrecision)
+		void PrintLevelsPrecision(const Solver& s) const
+		{
+			if (s.Verbosity < 2 || !Comm.IsRoot())
+				return;
+			if (Multigrid->LevelsInSinglePrecision())
+				cout << "fhhos4: levels in single precision (MixedPrecision)" << endl;
+			else if (!s.MixedPrecision)
+				cout << "fhhos4: levels in double precision (MixedPrecision is false)" << endl;
+			else if (NearNullSpaceFunctions > 0)
+				cout << "fhhos4: levels in double precision (MixedPrecision ignored: more near null space functions than the constants of the components)" << endl;
+			else
+				cout << "fhhos4: levels in double precision (MixedPrecision does not apply to these parameters: see the setup above)" << endl;
 		}
 
 		// Solver::SingularMatrix: the kernel of A, the interpolation of 1 on the faces of each component (c on the DoF k of
@@ -574,6 +758,10 @@ namespace fhhos4
 			IsSetUp = false;
 			Singular = false;
 			Kernel.clear();
+			NearNullSpaceFunctions = 0;
+			Basis = SparseMatrix();
+			BasisTranspose = SparseMatrix();
+			AInBasis = SparseMatrix();
 			KrylovSolver.reset();
 			Multigrid.reset();
 			Condensation.reset();
@@ -592,11 +780,17 @@ namespace fhhos4
 			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, PolynomialSpaceQ, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 			Multigrid->SingularMatrix = s.SingularMatrix;
 			Multigrid->VectorComponents = s.VectorComponents;
+			Multigrid->ConstantsPerBlock = NearNullSpaceFunctions;
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(s.Restart > 0 ? s.Restart : 1);
 				fcg->ResidualRecomputation = 20;
 				fcg->Precond = SolverPreconditioner(Multigrid.get());
+				if (NearNullSpaceFunctions > 0)
+				{
+					fcg->Precond.Basis = &Basis;
+					fcg->Precond.BasisTranspose = &BasisTranspose;
+				}
 				KrylovSolver = std::move(fcg);
 			}
 			else if (Krylov == fhhos4::Krylov::GCR)
@@ -646,14 +840,14 @@ namespace fhhos4
 	Solver& Solver::operator=(Solver&&) noexcept = default;
 
 	void Solver::Setup(bool symmetric, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF,
-	                   detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+	                   detail::ConstMatrixView cellNearNullSpace, detail::ConstMatrixView faceNearNullSpace, const GhostGlobalNumbers& faceGhostGlobalNumbers,
 	                   const GhostGlobalNumbers& cellGhostGlobalNumbers)
 	{
 		_impl->SetCommunicator(*this);
 		CallScope scope(*this, _impl->Comm, _impl->SharingProcesses);
 		if (_impl->IsDistributed())
 		{
-			SetupDistributed(symmetric, A_TT, A_TF, A_FT, A_FF, cellInterpOfOne, faceInterpOfOne, faceGhostGlobalNumbers, cellGhostGlobalNumbers);
+			SetupDistributed(symmetric, A_TT, A_TF, A_FT, A_FF, cellNearNullSpace, faceNearNullSpace, faceGhostGlobalNumbers, cellGhostGlobalNumbers);
 			return;
 		}
 		if (faceGhostGlobalNumbers.Count != 0 || cellGhostGlobalNumbers.Count != 0)
@@ -664,16 +858,21 @@ namespace fhhos4
 		unique_ptr<BorrowedSparseMatrix> a_FF = Borrow(A_FF, "A_FF");
 		if (a_FF->cols() > a_FF->rows()) // the columns of ghost faces: the rows of a process of a distributed system
 			Utils::FatalError("fhhos4::Solver: A_FF (" + to_string(a_FF->rows()) + " x " + to_string(a_FF->cols()) + ") has more columns than rows: on one process (Comm), it is square." + ForgottenComm(*this));
-		InferDiscretization(*this, *a_TT, *a_TF, cellInterpOfOne.Size, faceInterpOfOne.Size, a_TF->cols(), _impl->Comm);
+		InferDiscretization(*this, *a_TT, *a_TF, _impl->Comm);
 		_impl->CheckParameters(*this, symmetric);
-		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
-		_impl->CheckInputs(*this, *a_TT, *a_TF, a_FT.get(), *a_FF, cellOne, faceOne);
-		_impl->Setup(*this, *a_TT, *a_TF, std::move(a_FT), *a_FF, cellOne, faceOne);
+		_impl->CheckInputs(*this, *a_TT, *a_TF, a_FT.get(), *a_FF);
+		NearNullSpace cells = MapNearNullSpace(cellNearNullSpace);
+		NearNullSpace faces = MapNearNullSpace(faceNearNullSpace);
+		Vector cellOne, faceOne;
+		if (_impl->ReduceNearNullSpace(*this, cells, faces, a_TF->rows(), a_TF->cols(), cellOne, faceOne))
+			_impl->SetupInBasis(*this, *a_TT, *a_TF, *a_FF, cells, faces);
+		else
+			_impl->Setup(*this, *a_TT, *a_TF, std::move(a_FT), *a_FF, cellOne, faceOne);
 	}
 
 	// On several processes, the parameters are those of the process of rank 0 (the same on all of them)
 	void Solver::SetupDistributed(bool symmetric, const CSRView& A_TT, const CSRView& A_TF, const CSRView* A_FT, const CSRView& A_FF,
-	                              detail::ConstVectorView cellInterpOfOne, detail::ConstVectorView faceInterpOfOne, const GhostGlobalNumbers& faceGhostGlobalNumbers,
+	                              detail::ConstMatrixView cellNearNullSpace, detail::ConstMatrixView faceNearNullSpace, const GhostGlobalNumbers& faceGhostGlobalNumbers,
 	                              const GhostGlobalNumbers& cellGhostGlobalNumbers)
 	{
 		const Communicator& comm = _impl->Comm;
@@ -692,7 +891,7 @@ namespace fhhos4
 				a_FT = Borrow(*A_FT, "A_FT");
 			a_FF = Borrow(A_FF, "A_FF");
 		});
-		InferDiscretization(*this, *a_TT, *a_TF, cellInterpOfOne.Size, faceInterpOfOne.Size, a_FF->rows(), comm);
+		InferDiscretization(*this, *a_TT, *a_TF, comm);
 		CollectiveCheck(comm, [&]() { _impl->CheckParameters(*this, symmetric); });
 		int cbs = _impl->CellBlockSize, fbs = _impl->FaceBlockSize;
 		CollectiveCheck(comm, [&]()
@@ -704,14 +903,12 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: on several processes, A_FF (" + size(*a_FF) + ") has the rows of the faces of the process (" + to_string(fbs) + " DoFs per face), and A_FF and A_TF (" + size(*a_TF) + ") the columns of the faces of the process then of its " + to_string(faceGhostGlobalNumbers.Count) + " ghosts (faceGhostGlobalNumbers).");
 			if (a_FT && (a_FT->rows() != a_FF->rows() || a_FT->cols() != a_TF->rows() + cellGhostGlobalNumbers.Count * cbs))
 				Utils::FatalError("fhhos4::Solver: on several processes, A_FT (" + size(*a_FT) + ") has the rows of the faces of the process (those of A_FF, " + size(*a_FF) + "), and the columns of the cells of the process (the rows of A_TF, " + size(*a_TF) + ") then of its " + to_string(cellGhostGlobalNumbers.Count) + " ghost cells (cellGhostGlobalNumbers).");
-			if (cellInterpOfOne.Size != a_TF->rows() / cbs || faceInterpOfOne.Size != a_FF->rows() / fbs)
-				Utils::FatalError("fhhos4::Solver: on several processes, the interpolations of 1 have the cells (" + to_string(a_TF->rows() / cbs) + ") and faces (" + to_string(a_FF->rows() / fbs) + ") of the process, got " + to_string(cellInterpOfOne.Size) + " and " + to_string(faceInterpOfOne.Size) + ".");
 			CheckBlockDiagonal(*a_TT, cbs, to_string(cbs) + " DoFs per cell");
 			CheckTriangles(*a_TT, "A_TT", !symmetric, symmetric ? "SetupSym()" : "SetupNonSym()");
 			CheckTriangles(*a_FF, "A_FF", true, "on several processes, the setup");
-			Impl::CheckInterpOfOne(Eigen::Map<const Vector>(cellInterpOfOne.Data, cellInterpOfOne.Size), "cell");
-			Impl::CheckInterpOfOne(Eigen::Map<const Vector>(faceInterpOfOne.Data, faceInterpOfOne.Size), "face");
 		});
+		Vector cellOne, faceOne;
+		_impl->ReduceNearNullSpace(*this, MapNearNullSpace(cellNearNullSpace), MapNearNullSpace(faceNearNullSpace), a_TF->rows(), a_FF->rows(), cellOne, faceOne);
 		// The faces of the process and its ghosts (collective, checks the ghosts on all the processes)
 		IndexMap owners(comm, a_FF->rows() / fbs);
 		faces = make_shared<const IndexMap>(IndexMap::InOrder(owners, vector<GlobalNumber>(faceGhostGlobalNumbers.Numbers, faceGhostGlobalNumbers.Numbers + faceGhostGlobalNumbers.Count)));
@@ -725,7 +922,6 @@ namespace fhhos4
 			auto cells = make_shared<const IndexMap>(IndexMap::InOrder(cellOwners, vector<GlobalNumber>(cellGhostGlobalNumbers.Numbers, cellGhostGlobalNumbers.Numbers + cellGhostGlobalNumbers.Count)));
 			localA_FT = DistributedMatrix::FromLocalColumns(make_shared<const IndexMap>(owners), cells, *a_FT, fbs, cbs).RowsWithGhosts(*faces, cellOwners);
 		}
-		Eigen::Map<const Vector> cellOne(cellInterpOfOne.Data, cellInterpOfOne.Size), faceOne(faceInterpOfOne.Data, faceInterpOfOne.Size);
 		_impl->SetupDistributed(*this, *a_TT, *a_TF, std::move(localA_FT), *a_FF, faces, cellOne, faceOne);
 	}
 
