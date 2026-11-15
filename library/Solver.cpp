@@ -369,51 +369,34 @@ namespace fhhos4
 			return ok;
 		}
 
-		// The change of basis of the blocks (cells or faces) that makes the near null space functions the first DoFs of
-		// each block, with the coordinate 1 on all of them: the block-diagonal matrix Q, x = Q x', whose block is
-		// [B | C | 0; 0 | 0 | I]: B, the coefficients of the functions on the DoFs of degree <= 1 of the block (its first
-		// lowSize ones; those on its other DoFs must be zero: the functions are of degree <= 1, e.g. the rigid body
-		// modes); C, an orthonormal basis of the orthogonal of their span. In the new basis, a vector with the same first
-		// coefficients on all the blocks is one global function of the near null space, as a constant in the bases of a
-		// scalar unknown rescaled by its interpolation of 1: what the coarsening of the multigrid keeps.
-		SparseMatrix ChangeOfBasis(const NearNullSpace& N, int blockSize, int lowSize, const string& entity)
+		// The near null space functions (more than the constants of the components, e.g. the rigid body modes) on the
+		// DoFs of degree <= 1 of each block (cells or faces), its first lowSize ones: what the multigrid takes
+		// (UncondensedAMG::CellNearNullSpace), lowSize rows per block. Checked: on each block, independent functions of
+		// degree <= 1 (their coefficients on its other DoFs zero, to 1e-8 relative).
+		DenseMatrix LowDegreeFunctions(const NearNullSpace& N, int blockSize, int lowSize, const string& entity)
 		{
 			Eigen::Index nBlocks = N.rows() / blockSize;
 			int m = (int)N.cols();
 			if (lowSize > blockSize || m > lowSize)
 				Utils::FatalError("fhhos4::Solver: " + to_string(m) + " near null space functions (more than the constants of the components: e.g. the rotations): the " + entity + "s need at least the degree 1 to hold them (CellDegree and FaceDegree >= 1), and no more functions than their " + to_string(min(lowSize, blockSize)) + " DoFs of degree <= 1.");
-			vector<DenseMatrix> blocks(nBlocks);
+			DenseMatrix functions(nBlocks * lowSize, m);
 			Eigen::Index wrongBlock = -1;
 			#pragma omp parallel for
 			for (Eigen::Index b = 0; b < nBlocks; ++b)
 			{
-				DenseMatrix low = N.block(b * blockSize, 0, lowSize, m);
+				auto low = functions.middleRows(b * lowSize, lowSize);
+				low = N.block(b * blockSize, 0, lowSize, m);
 				double scale = low.cwiseAbs().maxCoeff();
 				bool ok = scale > 0 && (blockSize == lowSize || N.block(b * blockSize + lowSize, 0, blockSize - lowSize, m).cwiseAbs().maxCoeff() <= 1e-8 * scale);
-				Eigen::ColPivHouseholderQR<DenseMatrix> qr(low);
-				if (!ok || qr.rank() != m)
+				if (!ok || Eigen::ColPivHouseholderQR<DenseMatrix>(low).rank() != m)
 				{
 					#pragma omp critical
 					wrongBlock = b;
-					continue;
 				}
-				DenseMatrix Q = qr.householderQ();
-				blocks[b] = DenseMatrix::Identity(blockSize, blockSize);
-				blocks[b].block(0, 0, lowSize, m) = low;
-				blocks[b].block(0, m, lowSize, lowSize - m) = Q.rightCols(lowSize - m);
 			}
 			if (wrongBlock != -1)
 				Utils::FatalError("fhhos4::Solver: the near null space functions on the " + entity + " " + to_string(wrongBlock) + " are not " + to_string(m) + " independent functions of degree <= 1 on a hierarchical basis (their coefficients zero beyond its first " + to_string(lowSize) + " DoFs, those of degree <= 1): for a vector-valued unknown, give the constant of each component, in their order, or the rigid body modes (the translations and the rotations).");
-			vector<Eigen::Triplet<double, SparseMatrixIndex>> coefficients;
-			coefficients.reserve(nBlocks * (lowSize * lowSize + blockSize - lowSize));
-			for (Eigen::Index b = 0; b < nBlocks; ++b)
-				for (int i = 0; i < blockSize; ++i)
-					for (int j = 0; j < blockSize; ++j)
-						if ((i < lowSize && j < lowSize) || i == j)
-							coefficients.emplace_back(b * blockSize + i, b * blockSize + j, blocks[b](i, j));
-			SparseMatrix Q(N.rows(), N.rows());
-			Q.setFromTriplets(coefficients.begin(), coefficients.end());
-			return Q;
+			return functions;
 		}
 	}
 
@@ -430,11 +413,7 @@ namespace fhhos4
 		SparseMatrix A; // the condensed matrix, computed by the setup (on one process): the solvers keep a pointer to it
 		bool Singular = false; // Solver::SingularMatrix, at the setup
 		vector<Vector> Kernel; // Singular: the interpolation of 1 on the faces (of the process), on each component, normalized (the kernel of A)
-		// More near null space functions than the constants (e.g. the rotations: SetupInBasis()): their number, 0
-		// otherwise; the change of basis of the faces that makes them the first DoFs of each block, x = Basis x', its
-		// transpose, and the condensed matrix in that basis, Basis^T A Basis, the multigrid's (which keeps a pointer to it)
-		int NearNullSpaceFunctions = 0;
-		SparseMatrix Basis, BasisTranspose, AInBasis;
+		int NearNullSpaceFunctions = 0; // more near null space functions than the constants (e.g. the rotations): their number, 0 otherwise
 		unique_ptr<BorrowedSparseMatrix> GivenA_FT; // the caller's A_FT, read in place by Condensation (SetupNonSym())
 		unique_ptr<StaticCondensation> Condensation; // after a setup from the blocks: for Solve(b_T, b_F, x_T, x_F)
 		unique_ptr<UncondensedAMG> Multigrid;
@@ -545,7 +524,7 @@ namespace fhhos4
 		}
 
 		// The near null space as the multigrid takes it. The constants of the components: their interpolation of 1, one
-		// coefficient per cell and per face (false). More functions (e.g. the rotations): true, see SetupInBasis().
+		// coefficient per cell and per face (false). More functions (e.g. the rotations): true, see NearNullSpaceBeyondConstants().
 		// Collective: the same answer on all the processes.
 		bool ReduceNearNullSpace(const Solver& s, const NearNullSpace& cells, const NearNullSpace& faces, Eigen::Index nCellDoFs, Eigen::Index nFaceDoFs, Vector& cellInterpOfOne, Vector& faceInterpOfOne) const
 		{
@@ -614,67 +593,45 @@ namespace fhhos4
 			return args;
 		}
 
-		// A_FT: null if the matrix is symmetric; kept until the next setup (the solves read it)
 		// More near null space functions than the constants of the components (the rigid body modes of elasticity:
-		// ReduceNearNullSpace()), symmetric matrix: the multigrid is set up on the system in the bases whose first DoFs
-		// are these functions (ChangeOfBasis(): copies of the blocks), with their number as the constants of each block
-		// (UncondensedAMG::ConstantsPerBlock), all of coordinate 1; it preconditions the Krylov method, which iterates
-		// on the system as given (SolverPreconditioner::Basis). The condensation is that of the system as given.
-		void SetupInBasis(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, const SparseMatrix& A_FF, const NearNullSpace& cells, const NearNullSpace& faces)
+		// ReduceNearNullSpace()), checked, on the DoFs of degree <= 1 of the cells and faces: what Setup() gives to the
+		// multigrid, whose last p-level and h-levels hold them instead of the constants (UncondensedAMG::CellNearNullSpace)
+		pair<DenseMatrix, DenseMatrix> NearNullSpaceBeyondConstants(const Solver& s, const NearNullSpace& cells, const NearNullSpace& faces) const
 		{
-			auto start = chrono::steady_clock::now();
-			if (!Symmetric || s.SingularMatrix || Krylov == fhhos4::Krylov::None)
-				Utils::FatalError("fhhos4::Solver: more near null space functions than the constants of the components (e.g. the rotations): SetupSym() only, without SingularMatrix, with a Krylov method (not Krylov::None).");
+			if (!Symmetric || s.SingularMatrix)
+				Utils::FatalError("fhhos4::Solver: more near null space functions than the constants of the components (e.g. the rotations): SetupSym() only, without SingularMatrix.");
 			if (s.FaceDegree < 1 || s.CellDegree < 1)
 				Utils::FatalError("fhhos4::Solver: more near null space functions than the constants of the components (e.g. the rotations): FaceDegree and CellDegree must be >= 1, the degree of these functions.");
 			int components = s.VectorComponents;
-			SparseMatrix cellBasis = ChangeOfBasis(cells, CellBlockSize, components * (int)PolynomialSpaceDimension(s.Dimension, 1, PolynomialSpaceQ), "cell");
-			SparseMatrix faceBasis = ChangeOfBasis(faces, FaceBlockSize, components * (int)PolynomialSpaceDimension(s.Dimension - 1, 1, PolynomialSpaceQ), "face");
-
-			Reset();
-			NCellDoFs = A_TF.rows();
-			NFaceDoFs = A_TF.cols();
-			NearNullSpaceFunctions = (int)faces.cols();
-			Basis = std::move(faceBasis);
-			BasisTranspose = SparseMatrixOps::Transpose(Basis);
-
-			ProgramArguments args = Arguments(s);
-			CreateSolvers(args, s);
-
-			Condensation = make_unique<StaticCondensation>(A_TT, A_TF, nullptr, CellBlockSize);
-			A = Condensation->CondensedMatrix(A_FF, true);
-
-			// The blocks in the new bases (A_TT and A_FF are read from their lower triangular part), read by the setup only
-			using SparseMatrixOps::Multiply;
-			SparseMatrix cellBasisTranspose = SparseMatrixOps::Transpose(cellBasis);
-			AInBasis = Multiply(Multiply(BasisTranspose, A), Basis);
-			SparseMatrix a_TT = Multiply(Multiply(cellBasisTranspose, SparseMatrixOps::FullFromLower(A_TT)), cellBasis);
-			SparseMatrix a_TF = Multiply(Multiply(cellBasisTranspose, A_TF), Basis);
-			SparseMatrix a_FF = Multiply(Multiply(BasisTranspose, SparseMatrixOps::FullFromLower(A_FF)), Basis);
-			SparseMatrix symmetric; // empty A_FT: symmetric matrix
-			// The levels in double precision: in these bases a rotation is a global function, whose energy is the small
-			// difference of large coefficients (those of its translation part, as |x|^2 / h^2), lost in single precision
-			// (Disk++'s beam 8 x 1, triangles n = 64, k = 1: the cycle diverges; PERFORMANCE.md)
-			Multigrid->MixedPrecision = false;
-			Multigrid->Setup(AInBasis, a_TT, a_TF, symmetric, a_FF, Vector::Ones(NCellDoFs / CellBlockSize), Vector::Ones(NFaceDoFs / FaceBlockSize));
-			KrylovSolver->Setup(A);
-			IsSetUp = true;
-			PrintLevelsPrecision(s);
-
-			if (s.Verbosity == 1)
-				cout << "fhhos4: setup of " << Multigrid->NumberOfLevels() << " levels in " << Seconds(start) << " s" << endl;
+			DenseMatrix cellFunctions = LowDegreeFunctions(cells, CellBlockSize, components * (int)PolynomialSpaceDimension(s.Dimension, 1, PolynomialSpaceQ), "cell");
+			DenseMatrix faceFunctions = LowDegreeFunctions(faces, FaceBlockSize, components * (int)PolynomialSpaceDimension(s.Dimension - 1, 1, PolynomialSpaceQ), "face");
+			return { std::move(cellFunctions), std::move(faceFunctions) };
 		}
 
-		void Setup(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, unique_ptr<BorrowedSparseMatrix> A_FT, const SparseMatrix& A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+		// A_FT: null if the matrix is symmetric; kept until the next setup (the solves read it).
+		// cellFunctions, faceFunctions: empty, or NearNullSpaceBeyondConstants() (then the interpolations of 1 are ones).
+		void Setup(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, unique_ptr<BorrowedSparseMatrix> A_FT, const SparseMatrix& A_FF, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne,
+		           DenseMatrix cellFunctions = DenseMatrix(), DenseMatrix faceFunctions = DenseMatrix())
 		{
 			auto start = chrono::steady_clock::now();
 			Reset();
 			GivenA_FT = std::move(A_FT);
 			NCellDoFs = A_TF.rows();
 			NFaceDoFs = A_TF.cols();
+			NearNullSpaceFunctions = (int)faceFunctions.cols();
 
 			ProgramArguments args = Arguments(s);
 			CreateSolvers(args, s);
+			if (NearNullSpaceFunctions > 0)
+			{
+				Multigrid->CellNearNullSpace = std::move(cellFunctions);
+				Multigrid->FaceNearNullSpace = std::move(faceFunctions);
+				// The levels in double precision: on the levels of these functions, a rotation is a global function, whose
+				// energy is the small difference of large coefficients (those of its translation part, as |x|^2 / h^2),
+				// lost in single precision (Disk++'s beam 8 x 1, triangles n = 64, k = 1: the cycle diverges;
+				// PERFORMANCE.md)
+				Multigrid->MixedPrecision = false;
+			}
 
 			Condensation = make_unique<StaticCondensation>(A_TT, A_TF, GivenA_FT.get(), CellBlockSize);
 			A = Condensation->CondensedMatrix(A_FF, Symmetric);
@@ -759,9 +716,6 @@ namespace fhhos4
 			Singular = false;
 			Kernel.clear();
 			NearNullSpaceFunctions = 0;
-			Basis = SparseMatrix();
-			BasisTranspose = SparseMatrix();
-			AInBasis = SparseMatrix();
 			KrylovSolver.reset();
 			Multigrid.reset();
 			Condensation.reset();
@@ -780,17 +734,11 @@ namespace fhhos4
 			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, PolynomialSpaceQ, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 			Multigrid->SingularMatrix = s.SingularMatrix;
 			Multigrid->VectorComponents = s.VectorComponents;
-			Multigrid->ConstantsPerBlock = NearNullSpaceFunctions;
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(s.Restart > 0 ? s.Restart : 1);
 				fcg->ResidualRecomputation = 20;
 				fcg->Precond = SolverPreconditioner(Multigrid.get());
-				if (NearNullSpaceFunctions > 0)
-				{
-					fcg->Precond.Basis = &Basis;
-					fcg->Precond.BasisTranspose = &BasisTranspose;
-				}
 				KrylovSolver = std::move(fcg);
 			}
 			else if (Krylov == fhhos4::Krylov::GCR)
@@ -865,7 +813,10 @@ namespace fhhos4
 		NearNullSpace faces = MapNearNullSpace(faceNearNullSpace);
 		Vector cellOne, faceOne;
 		if (_impl->ReduceNearNullSpace(*this, cells, faces, a_TF->rows(), a_TF->cols(), cellOne, faceOne))
-			_impl->SetupInBasis(*this, *a_TT, *a_TF, *a_FF, cells, faces);
+		{
+			auto [cellFunctions, faceFunctions] = _impl->NearNullSpaceBeyondConstants(*this, cells, faces);
+			_impl->Setup(*this, *a_TT, *a_TF, nullptr, *a_FF, Vector::Ones(a_TF->rows() / _impl->CellBlockSize), Vector::Ones(a_TF->cols() / _impl->FaceBlockSize), std::move(cellFunctions), std::move(faceFunctions));
+		}
 		else
 			_impl->Setup(*this, *a_TT, *a_TF, std::move(a_FT), *a_FF, cellOne, faceOne);
 	}

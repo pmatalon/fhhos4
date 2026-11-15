@@ -6,11 +6,6 @@ conversion is a separate helper documented as a copy (`ExtractBlocksSym()`, `Spl
 caller sees the cost and can change its assembly to avoid it: "keep all copies out of the library". The matrices the
 library computes (condensed matrix, levels) are not copies.
 
-Exception (the user, 2026-11-14, "for now"): with more near null space functions than the constants of the components
-(the rigid body modes of elasticity), the setup works on copies of the blocks and of the condensed matrix in other
-bases (`Q^T A Q`, `docs/library.md`, "The near null space"); the inputs themselves are still read in place. The
-alternative, the change of basis applied inside the levels, is more code.
-
 ## Consequences
 
 The caller's matrices must outlive the solver where it keeps them (`A_FT` for a non-symmetric setup): deleted

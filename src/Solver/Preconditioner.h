@@ -102,12 +102,6 @@ class SolverPreconditioner : public Preconditioner
 protected:
 	Solver* _solver = nullptr;
 public:
-	// If set: the solver works in another basis, x = Basis x', on the matrix Basis^T A Basis, and is set up apart by
-	// the owner (the Setup() functions do nothing): Apply(r) = Basis solver(Basis^T r). E.g. the multigrid of the
-	// library with the rigid body modes as the first DoFs of each block (fhhos4::Solver).
-	const SparseMatrix* Basis = nullptr;
-	const SparseMatrix* BasisTranspose = nullptr;
-
 	SolverPreconditioner() {}
 
 	SolverPreconditioner(Solver* solver)
@@ -135,7 +129,7 @@ public:
 
 	bool CanOptimizeResidualComputation()
 	{
-		if (!_solver || Basis) return false;
+		if (!_solver) return false;
 		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
 		if (iterSolver)
 			return iterSolver->CanOptimizeResidualComputation();
@@ -152,13 +146,13 @@ public:
 
 	void Setup(const SparseMatrix& A) override
 	{
-		if (_solver && !Basis)
+		if (_solver)
 			_solver->Setup(A);
 	}
 
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
 	{
-		if (!_solver || Basis)
+		if (!_solver)
 			return;
 		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
 		if (iterSolver)
@@ -186,8 +180,6 @@ public:
 
 	Vector Apply(const Vector& r) override
 	{
-		if (_solver && Basis)
-			return *Basis * _solver->Solve(*BasisTranspose * r);
 		if (_solver)
 			return _solver->Solve(r);
 		return r;

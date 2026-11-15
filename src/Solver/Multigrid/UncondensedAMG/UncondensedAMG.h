@@ -48,10 +48,15 @@ public:
 	// sizes given to the constructor included. The first n DoFs of each block are the constants (see
 	// UncondensedLevel::VectorComponents).
 	int VectorComponents = 1;
-	// PROTOTYPE (elasticity, .scratch/uamg/issues/07): if > 0, the first ConstantsPerBlock DoFs of each block are the
-	// near-kernel modes (the rigid body modes, in a basis where each has the same coordinate on all the blocks), instead
-	// of the VectorComponents constants: the blocks of the level of degree 0 and of the h-levels have that size.
-	int ConstantsPerBlock = 0;
+	// Near null space functions beyond the VectorComponents constants (m columns, e.g. the rigid body modes of
+	// elasticity; fhhos4::Solver; one process, p-levels before the h-levels), if not empty: their coefficients on the
+	// first DoFs of each cell and face (the same number of rows per block, at most the DoFs of degree 1: the functions
+	// are of degree <= 1). The finest level and the p-levels of degree >= 1 stay in the given bases; the last p-level
+	// (degree 0 in the code) has their m coefficients as the DoFs of each block, instead of the constants: its
+	// prolongation has these blocks instead of the injection (UncondensedLevel::CellNearNullSpace), and each function
+	// has the coordinate 1 on all its blocks, as the constants on the h-levels, which have blocks of m DoFs.
+	DenseMatrix CellNearNullSpace;
+	DenseMatrix FaceNearNullSpace;
 
 
 	UncondensedAMG(int dim, int degree, bool polynomialSpaceQ, int cellBlockSize, int faceBlockSize, double strongCouplingThreshold, UAMGFaceProlongation faceProlong, UAMGProlongation coarseningProlong, UAMGProlongation mgProlong, int nLevels = 0)
@@ -434,7 +439,7 @@ private:
 		level->CollapseBoundaryFaces = CollapseBoundaryFaces;
 		level->Symmetric = _symmetric;
 		level->DownwindOrdering = DownwindOrdering;
-		level->VectorComponents = ConstantsPerBlock > 0 ? ConstantsPerBlock : VectorComponents;
+		level->VectorComponents = FaceNearNullSpace.cols() > 0 ? (int)FaceNearNullSpace.cols() : VectorComponents;
 		return level;
 	}
 
@@ -454,10 +459,15 @@ protected:
 		UncondensedLevel* coarse;
 		if (coarseningType == CoarseningType::P)
 		{
-			bool modes = ConstantsPerBlock > 0 && coarseDegree == 0;
-			int coarseCellBlockSize = modes ? ConstantsPerBlock : VectorComponents * (int)PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
-			int coarseFaceBlockSize = modes ? ConstantsPerBlock : VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
+			bool nearNullSpaceFunctions = FaceNearNullSpace.cols() > 0 && coarseDegree == 0;
+			int coarseCellBlockSize = nearNullSpaceFunctions ? (int)CellNearNullSpace.cols() : VectorComponents * (int)PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
+			int coarseFaceBlockSize = nearNullSpaceFunctions ? (int)FaceNearNullSpace.cols() : VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
 			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
+			if (nearNullSpaceFunctions)
+			{
+				coarse->CellNearNullSpace = &CellNearNullSpace;
+				coarse->FaceNearNullSpace = &FaceNearNullSpace;
+			}
 		}
 		else
 			coarse = CreateLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize());

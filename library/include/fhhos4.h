@@ -459,9 +459,8 @@ namespace fhhos4
 		//     order (the translations); or, for linear elasticity, the rigid body modes, the translations and the
 		//     rotations (3 columns in 2D, 6 in 3D), in any order or any basis of the space they span: required for the
 		//     solver to converge unless the displacement is imposed on the whole boundary. With the rotations:
-		//     SetupSym() on one process only, FaceDegree and CellDegree >= 1, no SingularMatrix, a Krylov method (not
-		//     Krylov::None); the setup works on a copy of the blocks, and the levels are in double precision
-		//     (MixedPrecision is ignored).
+		//     SetupSym() on one process only, FaceDegree and CellDegree >= 1, no SingularMatrix; the levels are in
+		//     double precision (MixedPrecision is ignored).
 		//   The bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose
 		//   degree is the largest partial degree; with PCoarsening::ToZero, only the degree 0 first, or the degrees 0
 		//   and 1 with the rotations) with a constant first function phi_0, of any scale, which may differ from one

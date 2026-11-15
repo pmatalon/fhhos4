@@ -88,17 +88,15 @@ after the block sizes (`Impl::ReduceNearNullSpace()`, collective):
   (`ConstantsOnly()`: the column c non-zero on the DoF c of each block only, to 1e-10 relative; proportional to the
   first column), reduced to the interpolation of 1 of each block, the first column's: what `UncondensedAMG` takes.
   Otherwise an error. The setups and the results are those of the former input, one coefficient per block.
-- More columns (the rigid body modes): `Impl::SetupInBasis()`, `SetupSym()` on one process, degrees >= 1, no
-  `SingularMatrix`, a Krylov method. `ChangeOfBasis()` builds the block-diagonal `Q` of the cells and of the faces, each
-  block `[B | C]` on its DoFs of degree <= 1 (`B`: the functions, their coefficients beyond the degree 1 zero to 1e-8
-  relative, of full rank; `C`: an orthonormal basis of the orthogonal of their span) and the identity on the others.
-  The multigrid is set up on copies, `Q^T A Q` of the condensed matrix (`Impl::AInBasis`) and of the blocks, with ones
-  as interpolations of 1 and `UncondensedAMG::ConstantsPerBlock` = the number of functions (`docs/uamg.md`). The
-  condensation, `Impl::A` and the Krylov method are those of the system as given: the multigrid preconditions it
-  through `SolverPreconditioner::Basis` (`Q M^-1 Q^T`), so the residuals, `CondensedMatrix()` and the solutions are in
-  the caller's bases. The levels are in double precision whatever `MixedPrecision`: in these bases a rotation is a
-  global function, whose energy is the small difference of large coefficients (those of its translation part, as
-  |x|^2 / h^2), lost in single precision (the cycle diverges on a fine mesh).
+- More columns (the rigid body modes): `Impl::NearNullSpaceBeyondConstants()`, `SetupSym()` on one process, degrees
+  >= 1, no `SingularMatrix`. `LowDegreeFunctions()` keeps the rows of the DoFs of degree <= 1 of each cell and face
+  (checked: the coefficients beyond the degree 1 zero to 1e-8 relative, the functions independent on each block), given
+  to the multigrid (`UncondensedAMG::CellNearNullSpace`, `FaceNearNullSpace`, `docs/uamg.md`) with ones as
+  interpolations of 1. The blocks are read in place as in the other setups, and the whole solver works on the system
+  as given: no change of basis outside the last p-level. The levels are in double precision whatever
+  `MixedPrecision`: on the levels of these functions a rotation is a global function, whose energy is the small
+  difference of large coefficients (those of its translation part, as |x|^2 / h^2), lost in single precision (the
+  cycle diverges on a fine mesh).
 
 ## The inference in the setups
 

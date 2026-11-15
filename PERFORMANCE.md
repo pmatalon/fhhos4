@@ -2239,6 +2239,22 @@ Kept as they were written there; some repeat entries of "Done" in another form.
       of setup for 9.75 s of solve; 3.8 s of setup with the translations only) and the memory is 1.5 to 1.8 times
       that of the translations only: the copies of the blocks in the other bases (ADR-0003's exception) are the
       first thing to remove.
+  - Without the copies (2026-11-15: the blocks read in place, the levels of degree >= 1 in the given bases, the
+    functions as the prolongation of the last p-level; the same runs, with the rotations only,
+    `logs_elast/large_nocopy/summary.txt`). Disk++'s solver time, peak RSS (iterations), with the copies -> without
+    (x: the time ratio, below 1 = faster without the copies).
+    - Beam, triangles, to 1e-6: n=64 k1 4.41 s, 1.5 GB (23) -> 3.13 s, 1.1 GB (24), x0.71; n=64 k2 6.80 s, 3.5 GB
+      (18) -> 4.11 s, 2.3 GB (18), x0.60; n=128 k1 19.6 s, 5.8 GB (25) -> 13.5 s, 4.3 GB (25), x0.69.
+    - Beam, tetrahedra, to 1e-8: n=8 k1 7.83 s, 2.1 GB (34) -> 5.56 s, 1.5 GB (34), x0.71; n=8 k2 killed -> 11.0 s,
+      4.7 GB (33); n=12 k1 killed -> 20.5 s, 4.8 GB (35).
+    - Dirichlet everywhere, to 1e-8: triangles n=128 k1 2.35 s, 0.77 GB (21) -> 1.52 s, 0.57 GB (21), x0.65; k2
+      3.57 s, 1.8 GB (16) -> 2.11 s, 1.2 GB (16), x0.59; tetrahedra n=12 k1 5.35 s, 1.7 GB (23) -> 3.06 s, 1.2 GB
+      (23), x0.57; n=12 k2 killed -> 6.04 s, 3.8 GB (20); n=16 k1 11.6 s, 3.9 GB (23) -> 7.53 s, 2.8 GB (23), x0.65.
+    - The library's setup (`Verbosity` 1): triangles n=128 k1 beam 2.65 s (9.9 s with the copies), n=64 k1 0.60 s,
+      k2 1.01 s; tetrahedra n=8 k1 0.83 s, n=12 k1 3.49 s. The iterations are those of the copies (within 1). The
+      memory is that of the translations only plus 5 to 30% (the levels in double precision, 3 or 6 DoFs per face
+      on the h-levels). Against MUMPS (time ratio, above 1 = slower than MUMPS): the beam of tetrahedra
+      n=8 k1 x1.1 (5.01 s), the two others run where MUMPS is killed; the 2D beams still lose (n=128 k1: x1.7).
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

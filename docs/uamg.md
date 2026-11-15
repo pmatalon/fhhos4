@@ -96,14 +96,17 @@ n: it counts rows); `CoupledComponents`, the blocks ⊗ C: the direct solution; 
 
 ## Near null space beyond the constants (elasticity)
 
-`UncondensedAMG::ConstantsPerBlock` = m > 0 (the library only, `fhhos4::Solver` with more near null space functions
-than components: the rigid body modes, m = 3 in 2D, 6 in 3D): the first m DoFs of each block are these functions, in
-bases where each has the coordinate 1 on every cell and face (the change of basis is the library's:
-`docs/library.md`, "The near null space"), as the constant of a scalar unknown after the rescaling by its
-interpolation of 1. They take the place of the n constants:
-- the last p-level (degree 0 in the code) keeps the first m DoFs of each block (`CreateCoarseLevel()`), instead of
-  the n constants: the functions are of degree <= 1, within the first DoFs of the blocks of degree 1, so the p-levels
-  above extract as usual (k, k - 2, ..., then the functions; k = 1 and 2: the functions directly);
+`UncondensedAMG::CellNearNullSpace`, `FaceNearNullSpace` with m columns (the library only, `fhhos4::Solver` with more
+near null space functions than components: the rigid body modes, m = 3 in 2D, 6 in 3D; one process): the coefficients
+of these functions on the DoFs of degree <= 1 of each cell and face, B_T and B_F. They take the place of the n
+constants:
+- the finest level and the p-levels of degree >= 1 are in the given bases, extracted as usual (k, k - 2, ...; the
+  functions are of degree <= 1, within the first DoFs of their blocks);
+- the last p-level (degree 0 in the code, `CreateCoarseLevel()`) has m DoFs per block, the coefficients of the
+  functions: its prolongation is block-diagonal, B_F on the first DoFs of each face instead of the injection
+  (`ProlongIn()`, `RestrictIn()`), and its blocks are the Galerkin ones, B_i^T A_ij B_j
+  (`ExtractCoarseMatrix()` with the functions; for `A_TF`, B_T^T A_TF B_F). There each function has the coordinate 1
+  on every cell and face, as the constant of a scalar unknown after the rescaling by its interpolation of 1;
 - the h-levels have m DoFs per face, and the passes treat them as constants (`UncondensedLevel::VectorComponents` and
   `CoarseningPass::VectorComponents` = m): the injection of the kept faces copies the same m coordinates, i.e. the
   same global function, to all the fine faces of a coarse face.

@@ -646,6 +646,36 @@ TEST(UAMGLibrary, CondensedMatrix)
 	}
 }
 
+// A flexible conjugate gradient (Polak-Ribiere) of the calling code on the condensed system A y = b, preconditioned by
+// one cycle of the solver per iteration (Krylov::None, MaxIterations 1, zero initial guess), its products by
+// ApplyCondensedMatrix(). Returns y; iterations: their number, at most maxIterations.
+static Eigen::VectorXd ExternalFlexibleConjugateGradient(fhhos4::Solver& preconditioner, const Eigen::VectorXd& b, int maxIterations, int& iterations)
+{
+	Eigen::Index nF = b.size();
+	auto precondition = [&](const Eigen::VectorXd& r)
+	{
+		Eigen::VectorXd z = Eigen::VectorXd::Zero(nF);
+		EXPECT_EQ(preconditioner.Solve(r, z).Iterations, 1);
+		return z;
+	};
+	Eigen::VectorXd y_F = Eigen::VectorXd::Zero(nF), r = b, z = precondition(r), p = z;
+	double rz = r.dot(z);
+	iterations = 0;
+	for (; r.norm() > 1e-10 * b.norm() && iterations < maxIterations; iterations++)
+	{
+		Eigen::VectorXd Ap(nF), previousR = r;
+		preconditioner.ApplyCondensedMatrix(p, Ap);
+		double alpha = rz / p.dot(Ap);
+		y_F += alpha * p;
+		r -= alpha * Ap;
+		z = precondition(r);
+		double beta = z.dot(r - previousR) / rz;
+		rz = r.dot(z);
+		p = z + beta * p;
+	}
+	return y_F;
+}
+
 // The AMG as the preconditioner of a Krylov method of the calling code on the condensed system: CondenseRHS(), one
 // K-cycle per iteration (Krylov::None, MaxIterations 1, zero initial guess) in a flexible conjugate gradient
 // (Polak-Ribiere) whose products are ApplyCondensedMatrix(), then SolveCellUnknowns(): the solution of Solve(b_T, b_F,
@@ -667,27 +697,8 @@ TEST(UAMGLibrary, PreconditionerOfAnExternalKrylovMethod)
 	preconditioner.CondenseRHS(b_T, b_F, b);
 	EXPECT_LT((b - (b_F - system.A_FT * system.A_TT.diagonal().cwiseInverse().cwiseProduct(b_T))).norm(), 1e-14 * b.norm());
 
-	auto precondition = [&](const Eigen::VectorXd& r)
-	{
-		Eigen::VectorXd z = Eigen::VectorXd::Zero(nF);
-		EXPECT_EQ(preconditioner.Solve(r, z).Iterations, 1);
-		return z;
-	};
-	Eigen::VectorXd y_F = Eigen::VectorXd::Zero(nF), r = b, z = precondition(r), p = z;
-	double rz = r.dot(z);
-	int iterations = 0;
-	for (; r.norm() > 1e-10 * b.norm() && iterations < 30; iterations++)
-	{
-		Eigen::VectorXd Ap(nF), previousR = r;
-		preconditioner.ApplyCondensedMatrix(p, Ap);
-		double alpha = rz / p.dot(Ap);
-		y_F += alpha * p;
-		r -= alpha * Ap;
-		z = precondition(r);
-		double beta = z.dot(r - previousR) / rz;
-		rz = r.dot(z);
-		p = z + beta * p;
-	}
+	int iterations;
+	Eigen::VectorXd y_F = ExternalFlexibleConjugateGradient(preconditioner, b, 30, iterations);
 	EXPECT_LT(iterations, 30);
 	EXPECT_LT((y_F - x_F).norm() / x_F.norm(), 1e-8);
 
@@ -1842,10 +1853,11 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 }
 
 // More near null space functions than the constants of the components (the rigid body modes of elasticity): the
-// multigrid set up in the bases whose first DoFs are these functions, the Krylov method on the system as given. On the
-// toy system ⊗ dense blocks, 2 components at degree 1 (6 DoFs per cell, 4 per face), with a third function of degree
-// <= 1: the solution of the system, as with the constants alone, and the levels with 3 DoFs per face. Refused: a
-// function with a coefficient of degree 2, SingularMatrix, no Krylov method, the degree 0.
+// last p-level and the h-levels of the multigrid hold these functions. On the toy system ⊗ dense blocks, 2 components
+// at degree 1 (6 DoFs per cell, 4 per face), with a third function of degree <= 1: the solution of the system, as with
+// the constants alone, by the library's Krylov method and as the preconditioner of an external one (Krylov::None).
+// Refused: a function with a coefficient of degree
+// 2, SingularMatrix, two columns that are not the constants.
 TEST(UAMGLibrary, NearNullSpaceBeyondTheConstants)
 {
 	HybridSystem system(32);
@@ -1907,9 +1919,17 @@ TEST(UAMGLibrary, NearNullSpaceBeyondTheConstants)
 	fhhos4::Solver singular = solver();
 	singular.SingularMatrix = true;
 	EXPECT_THROW(singular.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions, faceFunctions), fhhos4::Error);
-	fhhos4::Solver noKrylov = solver();
-	noKrylov.Krylov = fhhos4::Krylov::None;
-	EXPECT_THROW(noKrylov.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions, faceFunctions), fhhos4::Error);
+	// The preconditioner of a Krylov method of the calling code (Krylov::None, one cycle): the same solution
+	fhhos4::Solver preconditioner = solver();
+	preconditioner.Krylov = fhhos4::Krylov::None;
+	preconditioner.MaxIterations = 1;
+	preconditioner.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions, faceFunctions);
+	Eigen::VectorXd b(nFaceDoFs);
+	preconditioner.CondenseRHS(b_T, b_F, b);
+	int iterations;
+	Eigen::VectorXd y_F = ExternalFlexibleConjugateGradient(preconditioner, b, 200, iterations);
+	EXPECT_LE(iterations, result.Iterations + 2); // those of the library's own Krylov method (another tolerance)
+	EXPECT_LT((y_F - referenceX_F).norm(), 1e-7 * referenceX_F.norm());
 	// Two columns that are not the constants of the components
 	EXPECT_THROW(solver().SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions.rightCols(2), faceFunctions.rightCols(2)), fhhos4::Error);
 }
