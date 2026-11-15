@@ -186,8 +186,8 @@ It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
   - **Linear elasticity**: the rigid body modes, i.e. the translations and the rotations (3 columns in 2D, 6 in 3D),
     in any order, or any basis of the space they span. Without the rotations, the solver only converges if the
     displacement is imposed on the whole boundary. With them: `SetupSym()` on one process, `FaceDegree` and
-    `CellDegree` at least 1, no `SingularMatrix`; the levels are in double precision (`MixedPrecision` is
-    ignored).
+    `CellDegree` at least 1, no `SingularMatrix`; with `MixedPrecision`, only the levels of degree >= 1 are in
+    single precision.
 
   The bases must be **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d
   whose degree is the largest partial degree; with `PCoarsening::ToZero`, only the degree 0 first, or the degrees 0 and

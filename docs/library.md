@@ -93,10 +93,8 @@ after the block sizes (`Impl::ReduceNearNullSpace()`, collective):
   (checked: the coefficients beyond the degree 1 zero to 1e-8 relative, the functions independent on each block), given
   to the multigrid (`UncondensedAMG::CellNearNullSpace`, `FaceNearNullSpace`, `docs/uamg.md`) with ones as
   interpolations of 1. The blocks are read in place as in the other setups, and the whole solver works on the system
-  as given: no change of basis outside the last p-level. The levels are in double precision whatever
-  `MixedPrecision`: on the levels of these functions a rotation is a global function, whose energy is the small
-  difference of large coefficients (those of its translation part, as |x|^2 / h^2), lost in single precision (the
-  cycle diverges on a fine mesh).
+  as given: no change of basis outside the last p-level. `MixedPrecision` applies to the levels of degree >= 1 only
+  (`docs/uamg.md`; `Verbosity` 2 prints it).
 
 ## The inference in the setups
 

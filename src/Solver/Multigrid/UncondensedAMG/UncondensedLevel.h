@@ -1402,19 +1402,23 @@ public:
 public:
 	void SetupOperatorByBlockExtraction()
 	{
-		UncondensedLevelOf* fine = dynamic_cast<UncondensedLevelOf*>(FinerLevel);
+		// The finer level may be in another precision (single, above the level of the near null space functions, in
+		// double): its blocks and its operator of the setup are in double
+		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(FinerLevel);
 		if (fine->IsDistributed())
 		{
-			SetupOperatorByBlockExtractionDistributed(*fine);
+			SetupOperatorByBlockExtractionDistributed(dynamic_cast<UncondensedLevelOf&>(*fine));
 			return;
 		}
 
-		auto nElems = fine->A_T_F->rows() / fine->_cellBlockSize;
-		auto nFaces = fine->A_T_F->cols() / fine->_faceBlockSize;
+		int fineCellBlockSize = fine->CellBlockSize();
+		int fineFaceBlockSize = fine->FaceBlockSize();
+		auto nElems = fine->A_T_F->rows() / fineCellBlockSize;
+		auto nFaces = fine->A_T_F->cols() / fineFaceBlockSize;
 
 		if (FaceNearNullSpace && ComputeCoarseA_F_F)
 			Utils::FatalError("UncondensedAMG: the options that need the block A_F_F are not available with near null space functions beyond the constants.");
-		_extractedA = ExtractCoarseMatrix(*fine->OperatorMatrix, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize, FaceNearNullSpace, FaceNearNullSpace);
+		_extractedA = ExtractCoarseMatrix(*fine->OperatorMatrix, nFaces, nFaces, fineFaceBlockSize, fineFaceBlockSize, this->_faceBlockSize, this->_faceBlockSize, FaceNearNullSpace, FaceNearNullSpace);
 		this->OperatorMatrix = &_extractedA;
 		if constexpr (std::is_same_v<T, float>)
 		{
@@ -1426,13 +1430,13 @@ public:
 		}
 		// HarmonicExtensionOrInject: no A_T_T (UsesCellBlocks())
 		if (UsesCellBlocks())
-			_extractedA_T_T = ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fine->_cellBlockSize, fine->_cellBlockSize, this->_cellBlockSize, this->_cellBlockSize, CellNearNullSpace, CellNearNullSpace, Symmetric);
+			_extractedA_T_T = ExtractCoarseMatrix(*fine->A_T_T, nElems, nElems, fineCellBlockSize, fineCellBlockSize, this->_cellBlockSize, this->_cellBlockSize, CellNearNullSpace, CellNearNullSpace, Symmetric);
 		this->A_T_T = UsesCellBlocks() ? &_extractedA_T_T : nullptr;
-		_extractedA_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fine->_cellBlockSize, fine->_faceBlockSize, this->_cellBlockSize, this->_faceBlockSize, CellNearNullSpace, FaceNearNullSpace);
+		_extractedA_T_F = ExtractCoarseMatrix(*fine->A_T_F, nElems, nFaces, fineCellBlockSize, fineFaceBlockSize, this->_cellBlockSize, this->_faceBlockSize, CellNearNullSpace, FaceNearNullSpace);
 		this->A_T_F = &_extractedA_T_F;
 		if (fine->A_F_T)
 		{
-			_extractedA_F_T = ExtractCoarseMatrix(*fine->A_F_T, nFaces, nElems, fine->_faceBlockSize, fine->_cellBlockSize, this->_faceBlockSize, this->_cellBlockSize, FaceNearNullSpace, CellNearNullSpace);
+			_extractedA_F_T = ExtractCoarseMatrix(*fine->A_F_T, nFaces, nElems, fineFaceBlockSize, fineCellBlockSize, this->_faceBlockSize, this->_cellBlockSize, FaceNearNullSpace, CellNearNullSpace);
 			this->A_F_T = &_extractedA_F_T;
 		}
 		// A_F_F: only for the options that use it (see UncondensedAMG::A_F_FNeeded())
@@ -1441,7 +1445,7 @@ public:
 		{
 			if (!fine->A_F_F)
 				Utils::FatalError("UncondensedAMG: the p-coarsening requires the block A_F_F, which has not been computed on the finer level (see UncondensedAMG::A_F_FNeeded()).");
-			_extractedA_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fine->_faceBlockSize, fine->_faceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
+			_extractedA_F_F = ExtractCoarseMatrix(*fine->A_F_F, nFaces, nFaces, fineFaceBlockSize, fineFaceBlockSize, this->_faceBlockSize, this->_faceBlockSize);
 			this->A_F_F = &_extractedA_F_F;
 		}
 	}
@@ -1998,9 +2002,9 @@ private:
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 		{
 			// This is possible only if the basis is hierarchical
-			UncondensedLevelOf* coarseLevel = dynamic_cast<UncondensedLevelOf*>(CoarserLevel);
+			UncondensedLevel* coarseLevel = dynamic_cast<UncondensedLevel*>(CoarserLevel); // possibly in another precision
 			auto nHigherDegreeUnknowns = this->_faceBlockSize;
-			auto nLowerDegreeUnknowns = coarseLevel->_faceBlockSize;
+			auto nLowerDegreeUnknowns = coarseLevel->FaceBlockSize();
 			auto nFaces = vectorOnTheCoarserLevel.rows() / nLowerDegreeUnknowns;
 			VectorOf<T> vectorOnThisLevel = VectorOf<T>::Zero(nFaces * nHigherDegreeUnknowns);
 			if (const DenseMatrix* functions = coarseLevel->FaceNearNullSpace)
@@ -2037,9 +2041,9 @@ private:
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 		{
 			// This makes sense only if the basis is hierarchical and orthogonal
-			UncondensedLevelOf* coarseLevel = dynamic_cast<UncondensedLevelOf*>(CoarserLevel);
+			UncondensedLevel* coarseLevel = dynamic_cast<UncondensedLevel*>(CoarserLevel); // possibly in another precision
 			auto nHigherDegreeUnknowns = this->_faceBlockSize;
-			auto nLowerDegreeUnknowns = coarseLevel->_faceBlockSize;
+			auto nLowerDegreeUnknowns = coarseLevel->FaceBlockSize();
 			auto nFaces = vectorOnThisLevel.rows() / nHigherDegreeUnknowns;
 			VectorOf<T> vectorOnTheCoarserLevel(nFaces * nLowerDegreeUnknowns);
 			if (const DenseMatrix* functions = coarseLevel->FaceNearNullSpace)
@@ -2107,10 +2111,15 @@ public:
 			UncondensedLevelOf* coarse = dynamic_cast<UncondensedLevelOf*>(this->CoarserLevel);
 			if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 			{
-				coarse->SetupOperatorByBlockExtraction();
+				// The p-level may be in another precision (that of the near null space functions, in double)
+				if (auto* inDouble = dynamic_cast<UncondensedLevelOf<double>*>(this->CoarserLevel))
+					inDouble->SetupOperatorByBlockExtraction();
+				else
+					dynamic_cast<UncondensedLevelOf<float>*>(this->CoarserLevel)->SetupOperatorByBlockExtraction();
 				// The lower-degree bases start with the same constant function
-				coarse->CellInterpOfOne = this->CellInterpOfOne;
-				coarse->FaceInterpOfOne = this->FaceInterpOfOne;
+				UncondensedLevel* pLevel = dynamic_cast<UncondensedLevel*>(this->CoarserLevel);
+				pLevel->CellInterpOfOne = this->CellInterpOfOne;
+				pLevel->FaceInterpOfOne = this->FaceInterpOfOne;
 			}
 			else if (this->IsDistributed())
 			{

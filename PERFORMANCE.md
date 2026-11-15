@@ -2255,6 +2255,23 @@ Kept as they were written there; some repeat entries of "Done" in another form.
       memory is that of the translations only plus 5 to 30% (the levels in double precision, 3 or 6 DoFs per face
       on the h-levels). Against MUMPS (time ratio, above 1 = slower than MUMPS): the beam of tetrahedra
       n=8 k1 x1.1 (5.01 s), the two others run where MUMPS is killed; the 2D beams still lose (n=128 k1: x1.7).
+    - Where the time of an iteration goes (2026-11-15, the two largest beams at k1, the solve time / the iterations;
+      translations only with the levels in single precision, the same in double (`MixedPrecision` false,
+      `logs_elast/precision_single|double`), with the rotations (double)): triangles n=128 0.145 s / 0.222 s /
+      0.352 s; tetrahedra n=12 0.110 s / 0.191 s / 0.418 s. Double precision costs x1.5 (2D) to x1.7 (3D) per
+      iteration at the same levels; the rest of the gap, 0.13 s (2D) and 0.23 s (3D), more than half of the
+      iteration in 3D, comes with the levels of the functions (3 or 6 DoFs per face instead of 2 or 3). Not
+      profiled by level. Single precision on the levels of degree >= 1 alone would save at most the first part,
+      about 0.08 s per iteration: x0.78 (2D), x0.81 (3D) on the solve.
+    - Done (2026-11-15, `logs_elast/large_mixed`, one run each at `Verbosity` 2): single precision on the levels of
+      degree >= 1, double on those of the functions. Less than that bound. Disk++'s solver time, all levels in
+      double -> mixed (x: the time ratio, below 1 = faster mixed), the iterations unchanged (within 1). Beams:
+      triangles n=64 k1 3.13 -> 2.86 s (x0.91), k2 4.11 -> 3.73 (x0.91), n=128 k1 13.5 -> 13.4 (x0.99); tetrahedra
+      n=8 k1 5.56 -> 5.01 (x0.90), k2 11.0 -> 9.30 (x0.85), n=12 k1 20.5 -> 18.7 (x0.91). Dirichlet: triangles n=128
+      k1 1.52 -> 1.39 (x0.92), k2 2.11 -> 1.91 (x0.90); tetrahedra n=12 k1 3.06 -> 2.79 (x0.91), k2 6.04 -> 5.66
+      (x0.94), n=16 k1 7.53 -> 6.73 (x0.89). Peak RSS 1 to 3% higher (the operator of the finest level in single
+      precision, beside the matrix in double). The beams that single precision on all the levels broke converge:
+      triangles n=64 k1 24 iterations (diverged), n=32 k1 21 (37).
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

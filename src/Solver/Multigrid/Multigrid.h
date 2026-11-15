@@ -629,34 +629,16 @@ private:
 				}
 			}
 
+			// In the precision of the coarser level: double under a level in single precision if the coarser level is
+			// set up in double (the coarsest level: its solve, in CycleIn())
 			VectorOf<T> ec;
-			if (this->Cycle == CycleType::V || this->Cycle == CycleType::W)
+			if (single && !level->CoarserLevel->IsCoarsestLevel() && !level->CoarserLevel->InSinglePrecision())
 			{
-				ec = VectorOf<T>::Zero(rc.rows());
-				bool ecEquals0 = true;
-				for (int i = 0; i < this->WLoops; ++i)
-				{
-					IterationResult coarseResult;
-					CycleIn<T>(level->CoarserLevel, rc, ec, ecEquals0, nullptr, nullptr, coarseResult);   result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
-					if (level->CoarserLevel->IsCoarsestLevel())
-						break;
-				}
+				Vector rcInDouble = rc.template cast<double>();
+				ec = CoarseCorrection<double>(level, rcInDouble, result).template cast<T>();
 			}
-			else if (this->Cycle == CycleType::K)
-			{
-				IterationResult coarseResult;
-				if (level->CoarserLevel->IsCoarsestLevel())
-				{
-					bool ecEquals0 = true;
-					CycleIn<T>(level->CoarserLevel, rc, ec, ecEquals0, nullptr, nullptr, coarseResult); // exact solution
-					                                                                               result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
-				}
-				else
-				{
-					//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddWorkInMFlops(level->CoarserLevel->FCG->SolvingComputationalWork);
-					ec = KrylovForKCycle<T>(level->CoarserLevel, rc, coarseResult);                result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
-				}
-			}
+			else
+				ec = CoarseCorrection<T>(level, rc, result);
 
 			//------------------------//
 			// Coarse-grid correction //
@@ -739,6 +721,42 @@ private:
 				}
 			}
 		}
+	}
+
+	// The correction of the coarser level for the restricted residual rc of level (V, W: cycles from zero; K: the
+	// Krylov iterations of KrylovForKCycle()), in precision T, that of the coarser level
+	template <typename T>
+	VectorOf<T> CoarseCorrection(Level* level, VectorOf<T>& rc, IterationResult& result)
+	{
+		VectorOf<T> ec;
+		if (this->Cycle == CycleType::V || this->Cycle == CycleType::W)
+		{
+			ec = VectorOf<T>::Zero(rc.rows());
+			bool ecEquals0 = true;
+			for (int i = 0; i < this->WLoops; ++i)
+			{
+				IterationResult coarseResult;
+				CycleIn<T>(level->CoarserLevel, rc, ec, ecEquals0, nullptr, nullptr, coarseResult);   result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
+				if (level->CoarserLevel->IsCoarsestLevel())
+					break;
+			}
+		}
+		else if (this->Cycle == CycleType::K)
+		{
+			IterationResult coarseResult;
+			if (level->CoarserLevel->IsCoarsestLevel())
+			{
+				bool ecEquals0 = true;
+				CycleIn<T>(level->CoarserLevel, rc, ec, ecEquals0, nullptr, nullptr, coarseResult); // exact solution
+				                                                                               result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
+			}
+			else
+			{
+				//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddWorkInMFlops(level->CoarserLevel->FCG->SolvingComputationalWork);
+				ec = KrylovForKCycle<T>(level->CoarserLevel, rc, coarseResult);                result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
+			}
+		}
+		return ec;
 	}
 
 	// 1 or 2 iterations of FCG or GCR (KCycleKrylov) preconditioned by the cycle on this level: Notay, "An

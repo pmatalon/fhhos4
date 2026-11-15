@@ -626,11 +626,6 @@ namespace fhhos4
 			{
 				Multigrid->CellNearNullSpace = std::move(cellFunctions);
 				Multigrid->FaceNearNullSpace = std::move(faceFunctions);
-				// The levels in double precision: on the levels of these functions, a rotation is a global function, whose
-				// energy is the small difference of large coefficients (those of its translation part, as |x|^2 / h^2),
-				// lost in single precision (Disk++'s beam 8 x 1, triangles n = 64, k = 1: the cycle diverges;
-				// PERFORMANCE.md)
-				Multigrid->MixedPrecision = false;
 			}
 
 			Condensation = make_unique<StaticCondensation>(A_TT, A_TF, GivenA_FT.get(), CellBlockSize);
@@ -680,12 +675,12 @@ namespace fhhos4
 		{
 			if (s.Verbosity < 2 || !Comm.IsRoot())
 				return;
-			if (Multigrid->LevelsInSinglePrecision())
+			if (Multigrid->LevelsInSinglePrecision() && NearNullSpaceFunctions > 0)
+				cout << "fhhos4: levels of degree >= 1 in single precision (MixedPrecision), the coarser ones in double precision (more near null space functions than the constants of the components)" << endl;
+			else if (Multigrid->LevelsInSinglePrecision())
 				cout << "fhhos4: levels in single precision (MixedPrecision)" << endl;
 			else if (!s.MixedPrecision)
 				cout << "fhhos4: levels in double precision (MixedPrecision is false)" << endl;
-			else if (NearNullSpaceFunctions > 0)
-				cout << "fhhos4: levels in double precision (MixedPrecision ignored: more near null space functions than the constants of the components)" << endl;
 			else
 				cout << "fhhos4: levels in double precision (MixedPrecision does not apply to these parameters: see the setup above)" << endl;
 		}

@@ -25,6 +25,7 @@ private:
 	FloatSparseMatrix _singleA;   // levels in single precision: the operator of the finest level (its smoothers, the cycle)
 	DistributedMatrixOf<float> _singleDistributedA; // the same on several processes
 	bool _blockCSR = false;       // the levels whose faces have several DoFs store their operator in block CSR
+	bool _blockCSRInDouble = false; // the same for the levels in double precision (BlockCSRStorage, if the smoothers support it)
 	bool _singular = false;       // SingularMatrix, at the setup
 	vector<Vector> _kernel;       // _singular: the interpolation of 1 on the faces of the finest level (of the process), on each component, normalized
 public:
@@ -171,7 +172,8 @@ public:
 			this->_fineLevel = NewFineLevel();
 		}
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
-		_blockCSR = this->_mixedPrecision || (BlockCSRStorage && BlockCSRApplies());
+		_blockCSRInDouble = (!this->_mixedPrecision || FaceNearNullSpace.cols() > 0) && BlockCSRStorage && BlockCSRApplies();
+		_blockCSR = this->_mixedPrecision || _blockCSRInDouble;
 		fine->BlockCSRStorage = _blockCSR;
 
 		// If the constant has coordinate 1 everywhere, as in the paper, no rescaling: the setup is unchanged
@@ -250,7 +252,8 @@ public:
 			this->_fineLevel = NewFineLevel();
 		}
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(this->_fineLevel);
-		_blockCSR = this->_mixedPrecision || (BlockCSRStorage && BlockCSRApplies());
+		_blockCSRInDouble = (!this->_mixedPrecision || FaceNearNullSpace.cols() > 0) && BlockCSRStorage && BlockCSRApplies();
+		_blockCSR = this->_mixedPrecision || _blockCSRInDouble;
 		fine->BlockCSRStorage = _blockCSR;
 		fine->A_T_T = &A_T_T;
 		fine->A_T_F = &A_T_F;
@@ -413,7 +416,10 @@ private:
 		if (!this->_mixedPrecision)
 			return;
 		for (Level* level = this->_fineLevel->CoarserLevel; level; level = level->CoarserLevel)
-			dynamic_cast<UncondensedLevelOf<float>*>(level)->ReleaseOperatorInDouble();
+		{
+			if (auto* inSingle = dynamic_cast<UncondensedLevelOf<float>*>(level)) // not the levels of the near null space functions
+				inSingle->ReleaseOperatorInDouble();
+		}
 	}
 
 	// The finest level, in the precision of the levels, with the local matrices of the operators
@@ -424,16 +430,17 @@ private:
 		return fine;
 	}
 
-	// A level in the precision of the levels (_mixedPrecision)
-	UncondensedLevel* CreateLevel(int number, int degree, int cellBlockSize, int faceBlockSize) const
+	// A level in single precision (with _mixedPrecision, but the levels of the near null space functions: see
+	// CreateCoarseLevel()) or in double
+	UncondensedLevel* CreateLevel(int number, int degree, int cellBlockSize, int faceBlockSize, bool inSinglePrecision) const
 	{
 		UncondensedLevel* level;
-		if (this->_mixedPrecision)
+		if (inSinglePrecision)
 			level = new UncondensedLevelOf<float>(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 		else
 			level = new UncondensedLevelOf<double>(number, degree, cellBlockSize, faceBlockSize, _strongCouplingThreshold, _faceProlong, _coarseningProlong, _multigridProlong);
 		level->ComputeCoarseA_F_F = A_F_FNeeded();
-		level->BlockCSRStorage = _blockCSR;
+		level->BlockCSRStorage = inSinglePrecision ? _blockCSR : _blockCSRInDouble;
 		level->ComputeQ_F = ChainedQ_FNeeded();
 		level->ManageAnisotropy = ManageAnisotropy;
 		level->CollapseBoundaryFaces = CollapseBoundaryFaces;
@@ -446,7 +453,7 @@ private:
 protected:
 	Level* CreateFineLevel() const override
 	{
-		return CreateLevel(0, _degree, _cellBlockSize, _faceBlockSize);
+		return CreateLevel(0, _degree, _cellBlockSize, _faceBlockSize, this->_mixedPrecision);
 	}
 
 	Level* CreateCoarseLevel(Level* fineLevel, CoarseningType coarseningType, int coarseDegree) override
@@ -462,7 +469,10 @@ protected:
 			bool nearNullSpaceFunctions = FaceNearNullSpace.cols() > 0 && coarseDegree == 0;
 			int coarseCellBlockSize = nearNullSpaceFunctions ? (int)CellNearNullSpace.cols() : VectorComponents * (int)PolynomialSpaceDimension(_dim    , coarseDegree, _polynomialSpaceQ);
 			int coarseFaceBlockSize = nearNullSpaceFunctions ? (int)FaceNearNullSpace.cols() : VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, coarseDegree, _polynomialSpaceQ);
-			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize);
+			// The level of the near null space functions and the h-levels under it in double precision: there a
+			// rotation is a global function, whose energy is the small difference of large coefficients (those of its
+			// translation part, as |x|^2 / h^2), lost in single precision (the cycle diverges: PERFORMANCE.md)
+			coarse = CreateLevel(fine->Number + 1, coarseDegree, coarseCellBlockSize, coarseFaceBlockSize, this->_mixedPrecision && !nearNullSpaceFunctions);
 			if (nearNullSpaceFunctions)
 			{
 				coarse->CellNearNullSpace = &CellNearNullSpace;
@@ -470,7 +480,7 @@ protected:
 			}
 		}
 		else
-			coarse = CreateLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize());
+			coarse = CreateLevel(fine->Number + 1, fine->PolynomialDegree(), fine->CellBlockSize(), fine->FaceBlockSize(), dynamic_cast<UncondensedLevelOf<float>*>(fine) != nullptr);
 		coarse->LocalOp = fine->LocalOp;
 		return coarse;
 	}

@@ -111,6 +111,14 @@ constants:
   `CoarseningPass::VectorComponents` = m): the injection of the kept faces copies the same m coordinates, i.e. the
   same global function, to all the fine faces of a coarse face.
 
+Precision: with the mixed precision, the finest level and the p-levels of degree >= 1 are in single precision, the
+level of the functions and the h-levels under it in double (`CreateCoarseLevel()`): there a rotation is a global
+function, whose energy is the small difference of large coefficients (those of its translation part, as |x|^2 / h^2),
+lost in single precision (the cycle diverges on a fine mesh). The cycle changes precision at that step
+(`Multigrid::CycleIn()`: the restricted residual cast to double, `CoarseCorrection<double>()`, its result cast back),
+as it does for the coarsest solve; the level in double extracts its blocks from the operators in double of the finer
+level (`SetupOperatorByBlockExtraction()`).
+
 Keeping the degree 1 on the h-levels without them (`-hp-cs h`) does not carry the rotations: the injection gives all
 the fine faces of a coarse face the same coefficients, and the constant part of a rotation differs from one face to
 another. Checked by `UAMGLibrary.NearNullSpaceBeyondTheConstants` (algebraic: a third function on 2 components);
