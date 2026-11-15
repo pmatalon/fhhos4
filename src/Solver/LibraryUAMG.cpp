@@ -37,6 +37,7 @@ public:
 		_solver.PostSmoothingIterations = mg.PostSmoothingIterations;
 		_solver.PreSmoother = LibraryParameters::LibrarySmoother(mg.PreSmoother);
 		_solver.PostSmoother = LibraryParameters::LibrarySmoother(mg.PostSmoother);
+		_solver.KCycleMinimumOperatorReduction = mg.KCycleMinimumOperatorReduction; // the program's default: 0 (the papers)
 		_solver.CoarseningFactor = mg.CoarseningFactor;
 		_solver.CoarseMatrixMaxRows = mg.MatrixMaxSizeForCoarsestLevel;
 #if FHHOS4_MPI

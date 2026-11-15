@@ -27,6 +27,7 @@ public:
 	// Null otherwise.
 	const BlockSparseMatrix<double>* BlockOperator = nullptr;
 	const BlockSparseMatrix<float>* SingleBlockOperator = nullptr;
+	bool OneKCycleIteration = false; // K-cycle: never a second Krylov iteration on this level (Multigrid::KCycleMinimumOperatorReduction)
 	bool UseGalerkinOperator = false;
 private:
 	SparseMatrix _galerkinOperator;
@@ -192,6 +193,13 @@ public:
 		if (this->SingleOperatorMatrix)
 			return this->SingleOperatorMatrix->nonZeros();
 		return this->SingleBlockOperator->NonZeros();
+	}
+
+	// The bytes of the values of the operator (of all the processes), in the precision of the level. Not the indices:
+	// they depend on the storage (CSR or by blocks), and a system of n components must weigh n^2 times the scalar one.
+	double OperatorBytes() const
+	{
+		return (double)this->OperatorNonZeros() * (this->InSinglePrecision() ? sizeof(float) : sizeof(double));
 	}
 
 	string OperatorInfo() const

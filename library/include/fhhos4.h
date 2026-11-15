@@ -387,6 +387,13 @@ namespace fhhos4
 		double L1Theta = 0.5;
 		// The prolongation of the h-coarsening: from the faces of the boundary of each aggregate to its interior faces
 		fhhos4::Prolongation Prolongation = fhhos4::Prolongation::HarmonicExtension;
+		// K-cycle (Cycle::K): on each coarse level, one iteration of a Krylov method preconditioned by the cycle, and a
+		// second one if the first does not reduce the residual by 4. With this parameter, never a second one on a level
+		// whose operator is less than this many times smaller, in bytes, than the finer level's: two visits of a level
+		// less than twice smaller cost more than the finer level. It matters where the coarsening reduces the operators
+		// slowly (tetrahedra, a near null space beyond the constants): faster cycles, a few more iterations. 0: no such
+		// rule. Not negative.
+		double KCycleMinimumOperatorReduction = 2;
 		double CoarseningFactor = 3.8;     // target ratio of the numbers of cells of two successive h-levels
 		int CoarseMatrixMaxRows = 1000;    // the coarsening stops when the matrix has at most this many rows (on several
 		                                   // processes, in total)

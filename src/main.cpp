@@ -515,6 +515,11 @@ void print_usage() {
 	cout << "      aggregates. Default (and the library's): removed by the coarsening, as the faces interior to an aggregate" << endl;
 	cout << "      (their coarse values given by the prolongation)." << endl;
 	cout << endl;
+	cout << "-kcycle-min-reduction NUM" << endl;
+	cout << "      K-cycle: never a second Krylov iteration on a level whose operator is less than NUM times smaller, in bytes," << endl;
+	cout << "      than the finer level's (two visits of a level less than twice smaller cost more than the finer level)." << endl;
+	cout << "      Default: 0 (no such rule: the papers); the library's default is 2." << endl;
+	cout << endl;
 	cout << "-coarsening-factor NUM" << endl;
 	cout << "      Requested coarsening factor for the coarsening strategies compatible." << endl;
 	cout << "              Independent remeshing         (-cs m  ): coarsening factor H/h, default 2" << endl;
@@ -831,6 +836,7 @@ int Run(int argc, char* argv[])
 		OPT_BoundaryFaceCollapsing,
 		OPT_ReEntrantCornerManagement,
 		OPT_CoarseningFactor,
+		OPT_KCycleMinimumOperatorReduction,
 		OPT_UAMGNonsymmetric,
 		OPT_UAMGMixedPrecision,
 		OPT_UAMGBlockCSRStorage,
@@ -939,6 +945,7 @@ int Run(int argc, char* argv[])
 		 { "coarse-solver", required_argument, NULL, OPT_CoarseSolver },
 		 { "rcm", required_argument, NULL, OPT_ReEntrantCornerManagement },
 		 { "coarsening-factor", required_argument, NULL, OPT_CoarseningFactor },
+		 { "kcycle-min-reduction", required_argument, NULL, OPT_KCycleMinimumOperatorReduction },
 		 { "uamg-nonsym", no_argument, NULL, OPT_UAMGNonsymmetric },
 		 { "uamg-mixed", no_argument, NULL, OPT_UAMGMixedPrecision },
 		 { "uamg-bcsr", no_argument, NULL, OPT_UAMGBlockCSRStorage },
@@ -1597,6 +1604,9 @@ int Run(int argc, char* argv[])
 			}
 			case OPT_CoarseningFactor:
 				args.Solver.MG.CoarseningFactor = atof(optarg);
+				break;
+			case OPT_KCycleMinimumOperatorReduction:
+				args.Solver.MG.KCycleMinimumOperatorReduction = atof(optarg);
 				break;
 			case OPT_UAMGNonsymmetric:
 				args.Solver.MG.UAMGNonsymmetric = true;

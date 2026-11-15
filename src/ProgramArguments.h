@@ -64,6 +64,7 @@ struct MultigridArguments
 	CycleType Cycle = CycleType::V;
 	int WLoops = 1;
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // GCR under -s gcr (ApplyProgramArgumentDefaults)
+	double KCycleMinimumOperatorReduction = 0; // -kcycle-min-reduction (Multigrid::KCycleMinimumOperatorReduction); 0: the papers
 	bool UAMGNonsymmetric = false; // -uamg-nonsym: U-AMG for a non-symmetric matrix (A_FT given), on the symmetric matrix
 	bool UAMGMixedPrecision = false; // -uamg-mixed: the levels of U-AMG in single precision (Multigrid::MixedPrecision)
 	bool UAMGBlockCSRStorage = false; // -uamg-bcsr: U-AMG's operators in block CSR in double (UncondensedAMG::BlockCSRStorage)

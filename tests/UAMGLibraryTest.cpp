@@ -828,6 +828,9 @@ TEST(UAMGLibrary, VectorComponents)
 				uamg.Prolongation = prolongation;
 				uamg.VectorComponents = components;
 				uamg.CoarseMatrixMaxRows *= components; // the coarsening stops on the rows: the same levels
+				// The same K-cycle: the non-zeros stored by blocks (the vector systems) include the zeros of the face
+				// functions not coupled here, so the reductions of the operators differ from the scalar system's
+				uamg.KCycleMinimumOperatorReduction = 0;
 				if (system.Symmetric)
 					uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, Constants(system.CellInterpOfOne, blocks.A_TT.rows(), components), Constants(system.FaceInterpOfOne, blocks.A_TF.cols(), components));
 				else
@@ -1562,6 +1565,42 @@ TEST(UAMGLibrary, MultigridAlone)
 	Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
 	EXPECT_TRUE(uamg.Solve(system.b, x).Converged);
 	EXPECT_LT(RelativeError(system, x), 1e-8);
+}
+
+// KCycleMinimumOperatorReduction: 0 (the second Krylov iteration of the K-cycle decided by the residual alone), a
+// value under the reduction of all the levels (the same iterations), and a value above the reduction of all the levels (one iteration on each): the same solution. One iteration
+// on all the levels takes more iterations than the residual's rule; a negative value is refused.
+TEST(UAMGLibrary, KCycleMinimumOperatorReduction)
+{
+	// Faces of degree 1 (the system of VectorComponents, whose two face functions are not coupled): the level of degree
+	// 0 has 1.14 times fewer non-zeros than the finest
+	HybridSystem system(64);
+	Eigen::MatrixXd one = Eigen::MatrixXd::Identity(1, 1), firstFaceFunction(1, 2), faceFunctions(2, 2);
+	firstFaceFunction << 1, 0;
+	faceFunctions << 1, 0, 0, 2;
+	Blocks blocks = Kron(Blocks{ system.A_TT, system.A_TF, system.A_FT, system.A_FF }, one, firstFaceFunction, faceFunctions);
+	Eigen::VectorXd b_T = Eigen::VectorXd::Random(blocks.A_TT.rows()), b_F = Eigen::VectorXd::Random(blocks.A_FF.rows());
+	std::map<double, int> iterations;
+	std::map<double, Eigen::VectorXd> solutions;
+	for (double minimumReduction : { 0.0, 1.1, 1e9 })
+	{
+		fhhos4::Solver uamg = ToySolver();
+		uamg.FaceDegree = 1;
+		uamg.KCycleMinimumOperatorReduction = minimumReduction;
+		uamg.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, Constants(system.CellInterpOfOne, blocks.A_TT.rows(), 1), Constants(system.FaceInterpOfOne, blocks.A_TF.cols(), 1));
+		Eigen::VectorXd x_T(blocks.A_TT.rows());
+		solutions[minimumReduction] = Eigen::VectorXd::Zero(blocks.A_FF.rows());
+		fhhos4::Result result = uamg.Solve(b_T, b_F, x_T, solutions[minimumReduction]);
+		EXPECT_TRUE(result.Converged) << minimumReduction;
+		EXPECT_LT((solutions[minimumReduction] - solutions[0.0]).norm() / solutions[0.0].norm(), 1e-8) << minimumReduction;
+		iterations[minimumReduction] = result.Iterations;
+	}
+	EXPECT_EQ(iterations[1.1], iterations[0.0]); // no level less than 1.1 times smaller
+	EXPECT_GT(iterations[1e9], iterations[0.0]);
+
+	fhhos4::Solver negative = ToySolver();
+	negative.KCycleMinimumOperatorReduction = -1;
+	EXPECT_THROW(negative.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 }
 
 // Mixed precision (MixedPrecision, the default: the levels in single precision), with the Chebyshev smoothers (the

@@ -21,6 +21,10 @@ public:
 	CycleType Cycle = CycleType::V;
 	int WLoops = 1; // 1 --> V-cycle, >= 2 --> W-cycle 
 	KrylovMethod KCycleKrylov = KrylovMethod::FCG; // the iterations of the K-cycle on the coarse levels
+	// K-cycle: a level gets a second Krylov iteration only if its operator is at least this many times smaller, in
+	// bytes (Level::OperatorBytes()), than the finer level's. Two visits of a level less than twice smaller cost more
+	// than the finer level: the work of the cycle is not bounded. 0: no such rule (the papers).
+	double KCycleMinimumOperatorReduction = 0;
 	// Mixed precision (U-AMG only; otherwise ignored): the matrices of the levels stored and the cycles run in single
 	// precision. The operators, transfers and smoothers of the levels in float (the setup in double, its results rounded
 	// when stored), the vectors of the cycle in float, its sums and dot products in double, the coarsest solve in double
@@ -327,6 +331,17 @@ private:
 
 		this->InitializeCoarseSolver();
 		this->SetupCoarseSolver();
+
+		if (this->Cycle == CycleType::K && this->KCycleMinimumOperatorReduction > 0)
+		{
+			for (Level* level = this->_fineLevel->CoarserLevel; level && !level->IsCoarsestLevel(); level = level->CoarserLevel)
+			{
+				double operatorReduction = level->FinerLevel->OperatorBytes() / level->OperatorBytes();
+				level->OneKCycleIteration = operatorReduction < this->KCycleMinimumOperatorReduction;
+				if (level->OneKCycleIteration)
+					Utils::Log() << "\tLevel " << level->Number << ": one iteration of the K-cycle (operator " << operatorReduction << " times smaller in bytes than the level " << level->FinerLevel->Number << "'s, less than " << this->KCycleMinimumOperatorReduction << ")" << endl;
+			}
+		}
 
 		/*if (this->Cycle == CycleType::K)
 		{
@@ -760,7 +775,9 @@ private:
 	}
 
 	// 1 or 2 iterations of FCG or GCR (KCycleKrylov) preconditioned by the cycle on this level: Notay, "An
-	// aggregation-based algebraic multigrid method", ETNA 37 (2010), Algorithm 3.2, step 4. The two methods differ by
+	// aggregation-based algebraic multigrid method", ETNA 37 (2010), Algorithm 3.2, step 4. The second one if the
+	// first does not reduce the residual by 4, and never on a level whose operator is not small enough beside the
+	// finer level's (Level::OneKCycleIteration). The two methods differ by
 	// their inner products only: FCG minimizes the A-norm of the error, GCR the residual norm. In precision T (the dot
 	// products in double).
 	template <typename T>
@@ -782,6 +799,13 @@ private:
 		//Vector v = A * c;                                                         result.AddWorkInFlops(Cost::MatVec(A));
 		double rho1 = gcr ? Parallel::SquaredNorm(v) : Parallel::Dot(c, v);       result.AddWorkInFlops(Cost::Dot(c));
 		double alpha1 = gcr ? Parallel::Dot(v, r) : Parallel::Dot(c, r);          result.AddWorkInFlops(Cost::Dot(c));
+
+		// One iteration decided at the setup (KCycleMinimumOperatorReduction): no residual to compare
+		if (level->OneKCycleIteration)
+		{
+			x = T(alpha1 / rho1) * c;                                             result.AddWorkInFlops(Cost::ConstantVec(x));
+			return x;
+		}
 
 		double r_norm_old = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
 		r -= T(alpha1 / rho1) * v;                                                result.AddWorkInFlops(Cost::VectorDAXPY(r));
@@ -850,6 +874,8 @@ public:
 		os << ")";
 		if (this->Cycle == CycleType::K)
 			os << ", " << (this->KCycleKrylov == KrylovMethod::GCR ? "GCR" : "FCG") << " on the coarse levels";
+		if (this->Cycle == CycleType::K && this->KCycleMinimumOperatorReduction > 0)
+			os << ", one iteration on the levels less than " << this->KCycleMinimumOperatorReduction << " times smaller in bytes [-kcycle-min-reduction]";
 		os << endl;
 
 		if (this->HP_CS != HP_CoarsStgy::P_only)

@@ -208,6 +208,7 @@ public:
 		mg->Cycle = args.Solver.MG.Cycle;
 		mg->WLoops = args.Solver.MG.WLoops;
 		mg->KCycleKrylov = args.Solver.MG.KCycleKrylov;
+		mg->KCycleMinimumOperatorReduction = args.Solver.MG.KCycleMinimumOperatorReduction;
 		mg->UseGalerkinOperator = args.Solver.MG.UseGalerkinOperator;
 		// Default: the arguments of the internal solvers (the coarse solver's...), not set by ApplyProgramArgumentDefaults()
 		mg->PreSmoother = args.Solver.MG.PreSmoother != SmootherType::Default ? args.Solver.MG.PreSmoother : SmootherType::BlockGaussSeidel;

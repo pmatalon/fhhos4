@@ -189,6 +189,15 @@ program `-uamg-bcsr`.
 - GCR: restarted every 10 iterations, Notay's economical version (ETNA 37, 2010, Algorithm 3.1); the K-cycle then
   iterates with GCR. FCG keeps 1 direction (FCG(1), truncated). The library's `Restart` sets both (the outer method
   only, not the K-cycle's).
+- K-cycle (`Multigrid::KrylovForKCycle()`): on each coarse level, one iteration of FCG or GCR preconditioned by the
+  cycle, and a second one if the first does not reduce the residual by 4 (Notay). `KCycleMinimumOperatorReduction` R
+  (library, default 2; program `-kcycle-min-reduction`, default 0: the papers) adds a criterion known at the setup
+  (`Level::OneKCycleIteration`, listed in the setup log): never a second iteration on a level whose operator is less
+  than R times smaller than the finer level's, in bytes (`Level::OperatorBytes()`: the values in the level's
+  precision, not the indices, which depend on the storage), since the cycle is bound by the memory. Such a level skips the
+  residual update and its two norms. One rule for all the systems: it applies where the operators decrease slowly,
+  i.e. at the first aggregation in 3D on simplices, and on the level of the near null space functions (in double
+  under levels in single precision).
 - FCG replaces its recurrence residual by the true `b - A x` every 20 iterations (library; 0 in the program) and when it
   meets the tolerance (GCR: at each restart and at the tolerance), then continues if the true one does not: the
   tolerance applies to the true residual. Near the attainable accuracy the recurrence drifts; a tolerance below it runs

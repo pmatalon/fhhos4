@@ -2272,6 +2272,60 @@ Kept as they were written there; some repeat entries of "Done" in another form.
       (x0.94), n=16 k1 7.53 -> 6.73 (x0.89). Peak RSS 1 to 3% higher (the operator of the finest level in single
       precision, beside the matrix in double). The beams that single precision on all the levels broke converge:
       triangles n=64 k1 24 iterations (diverged), n=32 k1 21 (37).
+    - By level (2026-11-15, the setup logs at `Verbosity` 2, `logs_elast/large_mixed` and `levels_constants`).
+      Non-zeros of the levels in millions, finest first. Beam of tetrahedra n=12 k1: translations only 47.1, 5.2,
+      3.2, 0.92, 0.19, 0.02; with the rotations 47.1, 20.9, 13.0, 3.6, 0.78, 0.09. Beam of triangles n=128 k1:
+      31.5, 7.9, 2.0, 0.32, 0.06 and 31.5, 17.7, 4.2, 0.83, 0.13. The first aggregation divides the faces by 3.9
+      (3D) but the non-zeros by 1.6 only (the stencil densifies), on both paths; the K-cycle visits a level up to
+      twice per visit of the finer one: its work is bounded only if the non-zeros decrease by more than 2. The
+      model non-zeros x visits x bytes gives the rotations 4.0 (3D) and 2.6 (2D) times the cost of the translations
+      per iteration; measured 3.8 and 2.4. In 3D with the rotations: the finest level about 15% of the bytes moved,
+      the level of the functions 26%, the first h-level 32%, the second 18%.
+    - Prototype (2026-11-15, temporary switch `FHHOS4_PROTOTYPE_KCYCLE`, `Multigrid::KrylovForKCycle()`, not a
+      parameter; `logs_elast/kcycle/summary.txt`, one run each): one inner iteration of the K-cycle instead of up
+      to two on the levels with less than R times fewer non-zeros than the finer level (R = 2 or 3), or on the
+      level under the finest ("first"). The library's solve time and (iterations): today / first / R=2 / R=3.
+      - With the rotations: beam of triangles n=128 k1 8.37 s (24) / 5.71 (25) / 5.51 (25) / 5.65 (25); beam of
+        tetrahedra n=12 k1 12.8 (35) / 8.06 (36) / 9.74 (35) / 6.95 (39); Dirichlet tetrahedra n=16 k1 4.03 (23) /
+        2.52 (25) / 3.32 (23) / 2.50 (27). R=2: x0.66, x0.76, x0.82; R=3: x0.68, x0.54, x0.62.
+      - Constants only (Dirichlet elasticity): tetrahedra n=16 k1 1.64 s (30) / 1.61 (36) / 1.56 (31) / 1.54 (31);
+        triangles n=128 k1 0.55 (30) / 0.57 (39) / 0.62 (30) / 0.59 (30): "first" costs iterations, R within the
+        noise of sub-second runs.
+      - Diffusion, the program (`-s fcguamg -smoothers bgs`, `build/kcycle`): iterations today / R=2 / R=3: Cube-tet
+        n=16 k0 26/26/26, k1 33/33/33, n=8 k2 32/32/32; Square-tri n=256 k0 23/23/27, n=128 k1 16/16/17; the work
+        (MFlops) and the times within 2%, but Square-tri k0 at R=3 (-8% of work, 4 more iterations, no time gain).
+        There the second inner iteration is seldom run (the first one reduces the residual by 4).
+    - Implemented (2026-11-15): `KCycleMinimumOperatorReduction` (library default 2; program
+      `-kcycle-min-reduction`, default 0), on the bytes of the values only (no indices: independent of the storage),
+      the levels decided at the setup, which skip the residual update and its norms (not measurable). The
+      elasticity runs below again (`logs_elast/kcycle_final`): the same iterations and times (5.62, 5.69 s (25);
+      6.83, 6.74 (39); 2.63, 2.47 (27); constants 1.56, 1.54 (31); 0.61, 0.61 (30)). The reductions that trigger it:
+      1.13 (level of the functions) and 1.61 on the beam of tetrahedra, 1.93 with the constants on tetrahedra, 1.75
+      and 1.73 on the program's Cube-tet n=32 k0 and k1 (24 -> 25, 26 -> 27 iterations). A level just under the
+      threshold can cost more: the toy system of `UAMGLibrary.VectorComponents` (two face functions not coupled,
+      the level of degree 0 1.14 times smaller than the finest) takes 13-14 iterations instead of 8-9.
+    - The measurements before it, with the prototype of the same rule on the bytes of the operators (the values, and
+      one index per non-zero in CSR), R = 2 (`FHHOS4_PROTOTYPE_KCYCLE=b2`, removed; 2026-11-15, plugged in, 8 threads, today / rule interleaved, twice;
+      a counter per level tells where the rule stops the inner iterations). Solve times, (iterations); ratios
+      rule / today, below 1 = faster.
+      - Elasticity with the rotations (`logs_elast/kcycle_bytes`): beam of triangles n=128 k1 9.11, 8.51 s (24) ->
+        5.61, 5.75 (25): x0.64; beam of tetrahedra n=12 k1 13.2, 12.9 (35) -> 6.82, 6.74 (39): x0.52; Dirichlet
+        tetrahedra n=16 k1 3.97, 3.87 (23) -> 2.58, 2.49 (27): x0.65. The rule stops the level of the functions
+        (in double under the finest in single precision) and, in 3D, the first aggregated level: what R = 3 did on
+        the non-zeros.
+      - Constants only: tetrahedra n=16 k1 1.63, 1.74 (30) -> 1.66, 1.54 (31) (the first aggregated level);
+        triangles n=128 k1 0.59, 0.61 -> 0.59, 0.68 (30): the rule never applies.
+      - HArDCore3D (`build/kcycle2`, `run.sh hardcore3d`): diffusion `-c 1 2` (gcube 32^3 k1, k2, 48^3 k1,
+        tetrahedra cube.6 k1, Voronoi voro-16 k1) and convection-diffusion `1 2 3 0`, `1 1 5 0` (gcube 32^3 and
+        48^3 k0, k1, cube.6 k1, voro-16 k1): the rule never applies (every level more than twice smaller in bytes),
+        the same iterations, the times within the spread of the two runs (48^3 k1: diffusion 1.58, 1.60 -> 1.66,
+        1.59 s; `1 2 3 0` 2.39, 2.43 -> 2.31, 2.39 s; `1 1 5 0` 0.81, 0.85 -> 0.80, 0.91 s).
+      - The program, diffusion (`-s fcguamg`, default smoothers, `run.sh program`): Square-tri n=256 k1 0.79, 0.74
+        -> 0.80, 0.77 s (14); n=128 k3 0.32, 0.32 -> 0.30, 0.31 (8); n=512 k0 1.40, 1.39 -> 1.39, 1.40 (22);
+        Square-cart n=256 k1 0.29, 0.30 -> 0.30, 0.31 (10); Cube-tet n=32 k0 0.52, 0.53 (24) -> 0.50, 0.51 (25);
+        n=16 k2 0.98, 0.96 -> 0.97, 0.92 (32); n=32 k1 2.91, 2.69 (26) -> 2.94, 2.82 (27); Cube-cart n=32 k1 0.27,
+        0.26 -> 0.26, 0.25 (9); n=64 k0 0.91, 0.91 -> 0.93, 0.89 (15). One more iteration on the two largest
+        Cube-tet cases, no time gained or lost beyond the spread.
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

@@ -492,6 +492,8 @@ namespace fhhos4
 				if (!symmetric && SmootherFactory::IsChebyshev(LibraryParameters::ProgramSmoother(smoother)))
 					Utils::FatalError("fhhos4::Solver: the Chebyshev smoothers require a symmetric positive definite matrix: leave PreSmoother and PostSmoother Default for a non-symmetric one.");
 			}
+			if (!(s.KCycleMinimumOperatorReduction >= 0))
+				Utils::FatalError("fhhos4::Solver: KCycleMinimumOperatorReduction must be >= 0, got " + to_string(s.KCycleMinimumOperatorReduction) + ".");
 			if (!(s.L1Theta >= 0))
 				Utils::FatalError("fhhos4::Solver: L1Theta must be >= 0, got " + to_string(s.L1Theta) + ".");
 		}
@@ -580,6 +582,7 @@ namespace fhhos4
 			// PostSmoother Default: of the type of the pre-smoother
 			mg.PostSmoothingIterations = s.PostSmoothingIterations >= 0 ? s.PostSmoothingIterations : DefaultSmoothingIterations(mg.PostSmoother != SmootherType::Default ? mg.PostSmoother : mg.PreSmoother);
 			mg.L1Theta = s.L1Theta;
+			mg.KCycleMinimumOperatorReduction = s.KCycleMinimumOperatorReduction;
 			mg.CoarseningFactor = s.CoarseningFactor;
 			mg.MatrixMaxSizeForCoarsestLevel = s.CoarseMatrixMaxRows;
 #if FHHOS4_MPI

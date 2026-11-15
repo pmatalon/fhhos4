@@ -530,6 +530,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("PostSmoother", &fhhos4::Solver::PostSmoother)
 		.def_rw("L1Theta", &fhhos4::Solver::L1Theta)
 		.def_rw("Prolongation", &fhhos4::Solver::Prolongation)
+		.def_rw("KCycleMinimumOperatorReduction", &fhhos4::Solver::KCycleMinimumOperatorReduction)
 		.def_rw("CoarseningFactor", &fhhos4::Solver::CoarseningFactor)
 		.def_rw("CoarseMatrixMaxRows", &fhhos4::Solver::CoarseMatrixMaxRows)
 #if FHHOS4_MPI
