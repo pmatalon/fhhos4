@@ -27,7 +27,7 @@ private:
 	bool _blockCSR = false;       // the levels whose faces have several DoFs store their operator in block CSR
 	bool _blockCSRInDouble = false; // the same for the levels in double precision (BlockCSRStorage, if the smoothers support it)
 	bool _singular = false;       // SingularMatrix, at the setup
-	vector<Vector> _kernel;       // _singular: the interpolation of 1 on the faces of the finest level (of the process), on each component, normalized
+	vector<Vector> _kernel;       // _singular: the kernel on the faces of the finest level (of the process), orthonormal vectors (see Kernel())
 public:
 	bool ManageAnisotropy = true; // see UncondensedLevel::ManageAnisotropy
 	bool CollapseBoundaryFaces = false; // see UncondensedLevel::CollapseBoundaryFaces (-uamg-bfc)
@@ -38,8 +38,10 @@ public:
 	// Chebyshev smoothers, on one process; otherwise in CSR (the reason printed).
 	bool BlockCSRStorage = false;
 	// The matrix is singular, its kernel spanned by the interpolation of 1 (the constants: a pure Neumann problem; with
-	// VectorComponents n, the constant of each component), symmetric: the coarsest level, whose kernel is its own
-	// interpolation of 1 (P z_c = z_f, see UncondensedLevel::CoarsenMesh()), is solved by SingularSolver. The residuals of
+	// VectorComponents n, the constant of each component), or by the near null space functions if they are given
+	// (FaceNearNullSpace: e.g. the rigid body modes, pure traction elasticity), symmetric: the coarsest level, whose
+	// kernel is its own interpolation of 1 (P z_c = z_f, see UncondensedLevel::CoarsenMesh()), or the functions (the
+	// constants of their m coordinates under their p-level), is solved by SingularSolver. The residuals of
 	// the other levels stay in the image of their matrices (z^T A = 0) up to the rounding errors, which the coarsest
 	// solve removes: no projection on them (the levels in single precision are kept). The output of each cycle is projected orthogonally to the kernel (see
 	// ExecuteOneIteration()). The right-hand side must be in the image of the matrix.
@@ -198,7 +200,7 @@ public:
 			fine->SingleOperatorMatrix = &_singleA;
 		}
 		_singular = SingularMatrix;
-		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.rows(), VectorComponents) : vector<Vector>();
+		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.rows(), VectorComponents, Functions(), FaceNearNullSpaceDoFs()) : vector<Vector>();
 
 		Multigrid::Setup(A);
 
@@ -286,7 +288,7 @@ public:
 				fine->SingleOperatorMatrix = &_singleDistributedA.Diag;
 		}
 		_singular = SingularMatrix;
-		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.LocalRows(), VectorComponents) : vector<Vector>();
+		_kernel = _singular ? SingularSolver::Kernel(faceInterpOfOne, _faceBlockSize, A.LocalRows(), VectorComponents, Functions(), FaceNearNullSpaceDoFs()) : vector<Vector>();
 
 		Multigrid::Setup(A);
 
@@ -300,7 +302,16 @@ public:
 		fine->A_F_T = nullptr;
 	}
 
-	// SingularMatrix: the coarse solver wrapped by SingularSolver, with the interpolation of 1 of the coarsest level
+	// SingularMatrix, after the setup: the kernel of the matrix on the faces (of the process), orthonormal vectors: the
+	// interpolation of 1 of each component (SingularSolver::Kernel()), or the near null space functions orthonormalized
+	const vector<Vector>& Kernel() const
+	{
+		return _kernel;
+	}
+
+	// SingularMatrix: the coarse solver wrapped by SingularSolver, with the kernel of the coarsest level: its interpolation
+	// of 1 of each of its components (the m functions on their p-level and the h-levels under it), or the functions on a
+	// level in the given bases (the coarsening stopped before their p-level)
 	void InitializeCoarseSolver() override
 	{
 		Multigrid::InitializeCoarseSolver();
@@ -316,7 +327,8 @@ public:
 			this->CoarseSolver = singular;
 		}
 		UncondensedLevel& coarsest = dynamic_cast<UncondensedLevel&>(*level);
-		singular->SetKernel(coarsest.FaceInterpOfOne, coarsest.FaceBlockSize(), VectorComponents);
+		bool inGivenBases = coarsest.PolynomialDegree() > 0;
+		singular->SetKernel(coarsest.FaceInterpOfOne, coarsest.FaceBlockSize(), coarsest.VectorComponents, inGivenBases ? Functions() : nullptr, FaceNearNullSpaceDoFs());
 	}
 
 	// SingularMatrix: the output of the cycle projected orthogonally to the kernel. The kernel component added by the
@@ -431,6 +443,16 @@ private:
 		return fine;
 	}
 
+	// The near null space functions on the faces, if given (null otherwise), and their rows per face (the DoFs of degree <= 1)
+	const DenseMatrix* Functions() const
+	{
+		return FaceNearNullSpace.cols() > 0 ? &FaceNearNullSpace : nullptr;
+	}
+	int FaceNearNullSpaceDoFs() const
+	{
+		return VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, 1, _polynomialSpaceQ);
+	}
+
 	// A level in single precision (with _mixedPrecision, but the levels of the near null space functions: see
 	// CreateCoarseLevel()) or in double
 	UncondensedLevel* CreateLevel(int number, int degree, int cellBlockSize, int faceBlockSize, bool inSinglePrecision) const
@@ -478,7 +500,7 @@ protected:
 			{
 				coarse->CellNearNullSpace = &CellNearNullSpace;
 				coarse->FaceNearNullSpace = &FaceNearNullSpace;
-				coarse->FaceNearNullSpaceDoFs = VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, 1, _polynomialSpaceQ);
+				coarse->FaceNearNullSpaceDoFs = FaceNearNullSpaceDoFs();
 			}
 		}
 		else

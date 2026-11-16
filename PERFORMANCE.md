@@ -2326,6 +2326,30 @@ Kept as they were written there; some repeat entries of "Done" in another form.
         n=16 k2 0.98, 0.96 -> 0.97, 0.92 (32); n=32 k1 2.91, 2.69 (26) -> 2.94, 2.82 (27); Cube-cart n=32 k1 0.27,
         0.26 -> 0.26, 0.25 (9); n=64 k0 0.91, 0.91 -> 0.93, 0.89 (15). One more iteration on the two largest
         Cube-tet cases, no time gained or lost beyond the spread.
+- **Disk++ linear elasticity, pure traction** (`linear_elasticity -s fhhos4 -t`: the traction of the manufactured
+  solution on the whole boundary, no Dirichlet face, `SingularMatrix` with the rigid body modes; against `-r`, the
+  same solution imposed on the whole boundary, the same modes in the near null space; 2026-11-16, the library's
+  defaults, 1e-10, one run each, the default threads; `~/code/diskpp/build/bench_vector/logs_elast/traction_summary.txt`;
+  lambda = mu = 1). Iterations Dirichlet / pure traction (Disk++'s solver time: setup and solve), L2 errors (pure
+  traction: after the removal of the rigid motion, its L2 projection on the modes):
+  - Triangles n=16/32/64/128: k1 24/26, 26/27, 27/27, 27/29 (n=128: 1.13 s / 1.30 s, x1.15); k2 18/21, 18/21, 19/21,
+    19/not converged (below). L2 errors within 10% of Dirichlet's, the same rates (k1 n=128 3.62e-6 / 3.67e-6, k2
+    1.320e-8 / 1.324e-8).
+  - Tetrahedra n=4/8/12/16: k1 23/35, 29/38, 32/39, 34/40 (n=16: 5.85 s / 7.91 s, x1.35; 3.0 GB of RSS); k2 n=4/8/12
+    25/36, 27/35, 26/35 (n=12: 6.34 s / 8.27 s, x1.30; 4.2 GB). L2 errors 3 to 30% above Dirichlet's (the most on the
+    coarsest mesh: k1 n=16 1.06e-3 / 1.14e-3, k2 n=12 1.22e-4 / 1.27e-4).
+  - The iterations are flat in h, 2-3 above Dirichlet in 2D, 6-12 in 3D. The right-hand side's component along the
+    modes removed by the library (quadrature of the traction): at most 8e-7 relative (tetrahedra n=12 k1).
+  - Triangles n=128 k2 stalls: the true residual 2.3e-10 from iteration 21 on, 200 iterations (10.4 s), the L2 error
+    that of Dirichlet. The K-cycle: with a V-cycle (`FHHOS4_TEST_VCYCLE`, a PROTOTYPE switch of the app) 43 iterations
+    to 8.7e-11 (Dirichlet: 44); one level (`FHHOS4_TEST_COARSE`, the Cholesky of the condensed matrix pinned on the
+    modes: 10.5 s of setup, 2.0 GB) 4.5e-12, the attainable accuracy (eps |A| |x| / |b| = 2.5e-12). Not the cause: the
+    single precision (2.29e-10 with all the levels in double), the cycle's A e of the unprojected e (FCG computing
+    A d itself: 2.55e-10), the kernel (|A q| / |A| = 1.6e-15 on the orthonormalized modes; the residual has no
+    component along them). Below a residual of 1e-9, the kernel component of the cycle's output (removed by the
+    projection on the finest level) grows from about its size to 1e3-7e3 times the rest, of constant absolute size:
+    the residual converges to a direction that the cycle sends into the kernel. Not fixed (open: projections in the
+    K-cycle's inner iterations on the singular coarse levels?).
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

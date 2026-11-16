@@ -27,25 +27,36 @@ Singular systems (`UncondensedAMG::SingularMatrix`, the library's `Solver::Singu
 `-tc fullneumann`; symmetric): the kernel is the interpolation of 1, z = c on the first DoF of each face
 block, 0 on the others (`SingularSolver::Kernel()`); with n components, n vectors z_k, c on the DoF k of each block (see
 Vector-valued unknowns). No new input: the hierarchical bases with a constant phi_0 make the
-higher-order coefficients of 1 zero. On each level, the kernel is the level's own interpolation of 1 (1 on the
-h-levels, where the constant has coordinate 1: P z_c = z_f).
-- The coarsest level: `SingularSolver` wraps the coarse solver, its matrix pinned on the DoF of largest |z_i| of each
-  vector of the kernel (row and column of the identity) before the factorization; each solve projects its right-hand
+higher-order coefficients of 1 zero. With near null space functions beyond the constants (`FaceNearNullSpace`, the
+rigid body modes: pure traction elasticity), the kernel is these functions, on the DoFs of degree <= 1 of each face and
+0 beyond, orthonormalized (modified Gram-Schmidt, twice: a rotation is not orthogonal to the translations). The kernel
+of the finest level is computed once by `UncondensedAMG`'s setup (`Kernel()`), which the library reads for its check
+and its projections. On each level, the kernel is the level's own interpolation of 1 (1 on the h-levels, where the
+constant has coordinate 1: P z_c = z_f); with the functions, the m constants of their coordinates on their p-level and
+the h-levels under it (each function has the coordinate 1 on every block), the functions themselves on the levels in
+the given bases.
+- The coarsest level: `SingularSolver` wraps the coarse solver, its matrix pinned on one DoF per vector of the kernel
+  (row and column of the identity) before the factorization: for each vector in turn, minus its multiples of the
+  previous ones that make it zero on their pinned DoFs, the DoF of its largest |coefficient|, so that the kernel
+  restricted to the pinned DoFs is triangular with a non-zero diagonal (the pinned matrix is regular); on vectors of
+  disjoint supports (the constants), the DoF of largest |z_i| of each. Each solve projects its right-hand
   side onto Im(A), zeroes the pinned DoFs and projects the solution. Without it, the factorization meets a pivot of the order of the rounding errors,
   and the kernel component of the coarse corrections ruins FCG. The kernel is known: no threshold to detect a null
   pivot (MUMPS's `ICNTL(24)`/`CNTL(3)` would need one; Eigen's `SimplicialLDLT` and `SparseLU` only stop on an exactly
-  zero pivot), and the same code for all the coarse solvers. On several processes: the DoF of largest |z_i| on the
-  smallest rank that has it; its owner pins its row and its column of `Diag`, the processes that have it as a ghost
-  zero its column of `Offd`; the dot products are `Parallel::Dot`.
+  zero pivot), and the same code for all the coarse solvers. On several processes: the DoF of largest |coefficient| on
+  the smallest rank that has it, whose coefficients the eliminations take from its owner; its owner pins its row and
+  its column of `Diag`, the processes that have it as a ghost zero its column of `Offd`; the dot products are
+  `Parallel::Dot`.
 - The finest level: the output of each cycle projected orthogonally to z (`UncondensedAMG::ExecuteOneIteration()`): the
   smoothers' kernel components would accumulate in the iterates until the rounding errors of A x stall the true
   residual at small tolerances.
 - No projection on the intermediate levels: their residuals stay in Im(A) up to rounding (z^T A = 0, R = P^T), so the
   levels in single precision are kept. (The geometric multigrid's per-level hooks `ApplyZeroMeanCondition`/
   `EnforceCompatibilityCondition` are in double only.)
-- The library checks |A z| / (|A| |z|) < 1e-8 at the setup (an error otherwise), and projects the condensed right-hand
-  side of each solve onto Im(A). The solution is returned up to a multiple of z: the client shifts it (the library has
-  no integrals of the basis functions to compute a mean).
+- The library checks |A z| / (|A| |z|) < 1e-8 for each vector of the kernel after the setup of the multigrid (an error
+  otherwise: a Dirichlet face in the system, e.g. a clamped one), and projects the condensed right-hand side of each
+  solve onto Im(A). The solution is returned up to an element of the kernel: the client shifts it (the library has no
+  integrals of the basis functions to compute a mean).
 - Pinning a DoF in the client instead does not work through the uncondensed interface: it zeroes a column of `A_TF`,
   whose face then has no cell once the p-level extraction drops the zeros.
 
@@ -86,8 +97,8 @@ block, that of the scalar basis) applies to them (`UncondensedLevel::VectorCompo
 `ScaleConstantRows()`). The couplings of the aggregation are the traces of the blocks of `A_TF`, summed over the
 components; the h-levels have n DoFs per face (the block smoothers, block CSR). The coarse levels hold the n constants
 (the translations), not the rotations, unless they are given (next section). `SingularMatrix`: the kernel of the
-n constants, a pinned DoF for each on the coarsest level (`SingularSolver`): the pure Neumann vector Laplacian, not
-elasticity (its kernel has the rotations). `Prolongation::Reconstruction`: the n rows of the constants of the
+n constants, a pinned DoF for each on the coarsest level (`SingularSolver`): the pure Neumann vector Laplacian; with
+the rotations given, pure traction elasticity (next section). `Prolongation::Reconstruction`: the n rows of the constants of the
 reconstruction of the coarse cell go to the n constants of each removed face (`CoarseningPass::ComputeProlongation()`;
 coupled components: coupled rows). Checked by `UAMGLibrary.VectorComponents` and `SingularVectorComponents`: the blocks
 ⊗ I_n give the scalar iterations and solution on each component, with both prolongations (`CoarseMatrixMaxRows` times
@@ -122,11 +133,19 @@ lost in single precision (the cycle diverges on a fine mesh). The cycle changes 
 as it does for the coarsest solve; the level in double extracts its blocks from the operators in double of the finer
 level (`SetupOperatorByBlockExtraction()`).
 
+`SingularMatrix` with the functions (pure traction): the kernel is the functions (see Singular systems, under
+Boundary faces); on the level of the functions and the h-levels under it, the m constants, which the passes preserve
+(P z_c = z_f, as for the constants of the components), so that the coarsest level, pinned on m DoFs, has the kernel
+of the m constants. The cells of the functions must be those of the kernel (-A_TT^{-1} A_TF on their faces, what the
+interpolation of a rigid motion gives in HHO): otherwise the Galerkin blocks of the level of the functions lose the
+kernel.
+
 Keeping the degree 1 on the h-levels without them (`-hp-cs h`) does not carry the rotations: the injection gives all
 the fine faces of a coarse face the same coefficients, and the constant part of a rotation differs from one face to
-another. Checked by `UAMGLibrary.NearNullSpaceBeyondTheConstants` (algebraic: a third function on 2 components),
-on several processes by `DistributedLibrary.NearNullSpaceBeyondTheConstants`; elasticity itself only on Disk++'s
-`linear_elasticity` (`docs/clients.md`, one process).
+another. Checked by `UAMGLibrary.NearNullSpaceBeyondTheConstants` (algebraic: a third function on 2 components) and
+`SingularNearNullSpace` (a kernel of 3 functions, not orthogonal), on several processes by
+`DistributedLibrary.NearNullSpaceBeyondTheConstants` (also singular); elasticity itself only on Disk++'s
+`linear_elasticity` (`docs/clients.md`, one process: Dirichlet, a clamped beam, pure traction).
 
 ## Non-symmetric matrices
 

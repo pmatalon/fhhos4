@@ -89,14 +89,17 @@ so that they take the same path):
   (`ConstantsOnly()`: the column c non-zero on the DoF c of each block only, to 1e-10 relative; proportional to the
   first column), reduced to the interpolation of 1 of each block, the first column's: what `UncondensedAMG` takes.
   Otherwise an error. The setups and the results are those of the former input, one coefficient per block.
-- More columns (the rigid body modes): `Impl::NearNullSpaceBeyondConstants()`, `SetupSym()`, degrees >= 1, no
-  `SingularMatrix`. `LowDegreeFunctions()` keeps the rows of the DoFs of degree <= 1 of each cell and face (checked:
+- More columns (the rigid body modes): `Impl::NearNullSpaceBeyondConstants()`, `SetupSym()`, degrees >= 1.
+  `LowDegreeFunctions()` keeps the rows of the DoFs of degree <= 1 of each cell and face (checked:
   the coefficients beyond the degree 1 zero to 1e-8 relative, the functions independent on each block; on several
   processes, those of the process, by `CollectiveCheck()`), given
   to the multigrid (`UncondensedAMG::CellNearNullSpace`, `FaceNearNullSpace`, `docs/uamg.md`) with ones as
   interpolations of 1. The blocks are read in place as in the other setups, and the whole solver works on the system
   as given: no change of basis outside the last p-level. `MixedPrecision` applies to the levels of degree >= 1 only
   (`docs/uamg.md`; `Verbosity` 2 prints it).
+- `SingularMatrix`: the kernel is the functions given, those of the multigrid (`UncondensedAMG::Kernel()`, computed
+  by its setup), which `Impl::CheckKernel()` checks after the setup of the multigrid and `SolveCondensed()` projects
+  the right-hand side on.
 
 ## The inference in the setups
 

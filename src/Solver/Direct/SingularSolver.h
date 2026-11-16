@@ -4,13 +4,15 @@
 // The solver of a singular symmetric matrix whose kernel is spanned by the interpolation of 1 (the coarsest level of
 // U-AMG for a pure Neumann problem, see UncondensedAMG::SingularMatrix): the kernel z is c on the first DoF of each
 // block and 0 on the others (1 = c phi_0); with n components (UncondensedAMG::VectorComponents), n vectors z_k, c on the
-// DoF k of each block (the constant of the component k), orthogonal (disjoint supports). The matrix is pinned on the DoF
-// of largest |z_i| of each (its row and column replaced by those of the identity): regular (the kernel vectors restricted
-// to the pinned DoFs are independent), factorized by the solver given. Each solve projects the right-hand side onto the
-// image of the matrix (orthogonal to the kernel), zeroes the pinned DoFs, solves, and returns the solution orthogonal to
-// the kernel. Without the pins, the factorization meets pivots of the order of the rounding errors, and the solutions
-// have a kernel component that ruins the Krylov method. The kernel is known: no threshold to detect the null pivots (as
-// MUMPS's ICNTL(24) would need), and the same for all the factorizations, on one process or several.
+// DoF k of each block (the constant of the component k), orthogonal (disjoint supports). Or given functions (e.g. the
+// rigid body modes) on the first DoFs of each block, orthonormalized (see Kernel()). The matrix is pinned on one DoF per
+// vector of the kernel (its row and column replaced by those of the identity), chosen so that the kernel restricted to
+// the pinned DoFs is regular (see Setup()): the pinned matrix is regular, factorized by the solver given. Each solve
+// projects the right-hand side onto the image of the matrix (orthogonal to the kernel), zeroes the pinned DoFs, solves,
+// and returns the solution orthogonal to the kernel. Without the pins, the factorization meets pivots of the order of
+// the rounding errors, and the solutions have a kernel component that ruins the Krylov method. The kernel is known: no
+// threshold to detect the null pivots (as MUMPS's ICNTL(24) would need), and the same for all the factorizations, on
+// one process or several.
 class SingularSolver : public Solver
 {
 private:
@@ -18,7 +20,9 @@ private:
 	Vector _interpOfOne; // one coefficient per block; empty: 1
 	int _blockSize = 1;
 	int _components = 1;
-	vector<Vector> _z;            // the kernel, normalized vectors
+	const DenseMatrix* _functions = nullptr; // see Kernel()
+	int _functionDoFs = 0;
+	vector<Vector> _z;            // the kernel, orthonormal vectors
 	vector<Eigen::Index> _pins;   // the pinned DoFs (one per vector of the kernel), local: those of the process
 	SparseMatrix _pinnedA;
 	DistributedMatrix _pinnedDistributedA;
@@ -28,12 +32,34 @@ public:
 		: _pinnedSolver(pinnedSolver)
 	{}
 
-	// The kernel on the n DoFs of the process, normalized vectors (on all the processes of Communicator::Current()): for
+	// The kernel on the n DoFs of the process, orthonormal vectors (on all the processes of Communicator::Current()): for
 	// each of the components k, the interpolation of 1 c on the DoF k of each block of blockSize DoFs (1 if interpOfOne
-	// is empty; its first n / blockSize coefficients: those of the owned blocks), 0 on the others
-	static vector<Vector> Kernel(const Vector& interpOfOne, int blockSize, Eigen::Index n, int components)
+	// is empty; its first n / blockSize coefficients: those of the owned blocks), 0 on the others. functions (if not
+	// null): instead, its columns on the first functionDoFs DoFs of each block (functionDoFs rows per block), 0 on the
+	// others, orthonormalized (modified Gram-Schmidt, twice)
+	static vector<Vector> Kernel(const Vector& interpOfOne, int blockSize, Eigen::Index n, int components, const DenseMatrix* functions = nullptr, int functionDoFs = 0)
 	{
 		vector<Vector> kernel;
+		if (functions)
+		{
+			for (Eigen::Index j = 0; j < functions->cols(); ++j)
+			{
+				Vector z = Vector::Zero(n);
+				for (Eigen::Index b = 0; b < n / blockSize; ++b)
+					z.segment(b * blockSize, functionDoFs) = functions->col(j).segment(b * functionDoFs, functionDoFs);
+				kernel.push_back(z);
+			}
+			for (int pass = 0; pass < 2; ++pass)
+			{
+				for (size_t j = 0; j < kernel.size(); ++j)
+				{
+					for (size_t i = 0; i < j; ++i)
+						kernel[j] -= Parallel::Dot(kernel[i], kernel[j]) * kernel[i];
+					kernel[j] /= Parallel::Norm(kernel[j]);
+				}
+			}
+			return kernel;
+		}
 		for (int k = 0; k < components; ++k)
 		{
 			Vector z = Vector::Zero(n);
@@ -44,7 +70,7 @@ public:
 		return kernel;
 	}
 
-	// x projected orthogonally to the kernel (its vectors orthogonal: one after the other); returns the norm of the
+	// x projected orthogonally to the kernel (its vectors orthonormal: one after the other); returns the norm of the
 	// component removed
 	static double Project(Vector& x, const vector<Vector>& kernel)
 	{
@@ -58,30 +84,42 @@ public:
 		return removed;
 	}
 
-	// The interpolation of 1 on the blocks of blockSize DoFs of the matrix of the next setup (empty: 1 everywhere), and
-	// the number of components, whose constants are the first DoFs of each block
-	void SetKernel(const Vector& interpOfOne, int blockSize, int components)
+	// The kernel of the matrix of the next setup, see Kernel(): the interpolation of 1 on the blocks of blockSize DoFs
+	// (empty: 1 everywhere) and the number of components, whose constants are the first DoFs of each block; or the
+	// functions (not copied: kept until the setup)
+	void SetKernel(const Vector& interpOfOne, int blockSize, int components, const DenseMatrix* functions = nullptr, int functionDoFs = 0)
 	{
 		_interpOfOne = interpOfOne;
 		_blockSize = blockSize;
 		_components = components;
+		_functions = functions;
+		_functionDoFs = functionDoFs;
 	}
 
 	void Serialize(ostream& os) const override
 	{
-		os << *_pinnedSolver << " (singular matrix: " << (_components == 1 ? "one DoF" : to_string(_components) + " DoFs") << " pinned, projections onto the image)";
+		size_t pins = _functions ? (size_t)_functions->cols() : (size_t)_components;
+		os << *_pinnedSolver << " (singular matrix: " << (pins == 1 ? "one DoF" : to_string(pins) + " DoFs") << " pinned, projections onto the image)";
 	}
 
+	// The pinned DoFs: for each vector of the kernel in turn, minus its multiples of the previous ones that make it zero on
+	// their pinned DoFs, the DoF of its largest |coefficient|. The kernel restricted to the pinned DoFs is then triangular
+	// with a non-zero diagonal: regular. On vectors of disjoint supports (the constants of the components), the DoF of
+	// largest |z_i| of each.
 	void Setup(const SparseMatrix& A) override
 	{
 		Solver::Setup(A);
-		_z = Kernel(_interpOfOne, _blockSize, A.rows(), _components);
+		_z = Kernel(_interpOfOne, _blockSize, A.rows(), _components, _functions, _functionDoFs);
 		_pinnedA = A;
 		_pins.clear();
-		for (const Vector& z : _z)
+		vector<Vector> eliminated = _z;
+		for (size_t j = 0; j < _z.size(); ++j)
 		{
+			Vector& w = eliminated[j];
+			for (size_t i = 0; i < j; ++i)
+				w -= w[_pins[i]] / eliminated[i][_pins[i]] * eliminated[i];
 			Eigen::Index pin;
-			z.cwiseAbs().maxCoeff(&pin);
+			w.cwiseAbs().maxCoeff(&pin);
 			_pins.push_back(pin);
 			Pin(_pinnedA, pin, pin);
 		}
@@ -89,23 +127,31 @@ public:
 		this->SetupComputationalWork = _pinnedSolver->SetupComputationalWork;
 	}
 
-	// On several processes: the pinned DoF of each vector of the kernel is that of largest |z_i| on the smallest rank that
-	// has it. Its owner pins its row and its column of Diag; the processes that have it as a ghost zero its column of
-	// Offd. Collective.
+	// On several processes: the pinned DoFs as on one process, the DoF of largest |coefficient| on the smallest rank that
+	// has it, whose coefficients the eliminations take from its owner. Its owner pins its row and its column of Diag; the
+	// processes that have it as a ghost zero its column of Offd. Collective.
 	void Setup(const DistributedMatrix& A) override
 	{
 		this->Matrix = nullptr;
 		this->Distributed = &A;
 		const Communicator& comm = A.Comm();
-		_z = Kernel(_interpOfOne, _blockSize, A.LocalRows(), _components);
+		_z = Kernel(_interpOfOne, _blockSize, A.LocalRows(), _components, _functions, _functionDoFs);
 		_pinnedDistributedA = A;
 		_pins.clear();
-		for (const Vector& z : _z)
+		vector<Vector> eliminated = _z;
+		vector<Eigen::Index> pins;  // of each vector: the local pinned DoF on its owner, -1 on the other processes
+		vector<double> pivots;      // of each vector: its eliminated coefficient on its pinned DoF
+		for (size_t j = 0; j < _z.size(); ++j)
 		{
+			Vector& w = eliminated[j];
+			for (size_t i = 0; i < j; ++i)
+				w -= comm.Sum(pins[i] >= 0 ? w[pins[i]] : 0.0) / pivots[i] * eliminated[i];
 			Eigen::Index localPin = -1;
-			double localMax = z.rows() > 0 ? z.cwiseAbs().maxCoeff(&localPin) : -1;
+			double localMax = w.rows() > 0 ? w.cwiseAbs().maxCoeff(&localPin) : -1;
 			int owner = comm.Min(localMax == comm.Max(localMax) ? comm.Rank() : comm.Size());
 			Eigen::Index pin = comm.Rank() == owner ? localPin : -1;
+			pins.push_back(pin);
+			pivots.push_back(comm.Sum(pin >= 0 ? w[pin] : 0.0));
 			if (pin >= 0)
 				_pins.push_back(pin);
 			GlobalNumber pinGlobal = comm.Sum<GlobalNumber>(pin >= 0 ? A.RowMap->Begin * A.RowBlockSize + pin : 0);

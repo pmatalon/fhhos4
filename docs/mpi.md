@@ -79,8 +79,8 @@ program too: `-DENABLE_PROGRAM=ON`).
   not around the setup, whose collective calls a process that throws would leave the others waiting in: its own checks
   reduce their condition before raising, e.g. `BlockChebyshev::SetupBlocks()`). A process may own nothing (NGSolve
   6.2.2608's rank 0; its block CSR matrices empty, of the block size of the faces). `SingularMatrix`: the kernel on
-  the own faces, the dot products global, the pinned DoF of the coarsest level (one per component) on one process
-  (`docs/uamg.md`).
+  the own faces, the dot products global, each pinned DoF of the coarsest level (one per vector of the kernel) on one
+  process (`docs/uamg.md`).
   `ApplyCondensedMatrix()`: `DistributedA * x`. Not yet: `CondensedMatrix()` (its columns may reach beyond
   `faceGhostGlobalNumbers`: those of the received rows). `MergeOffDiag()`: the blocks of a process in
   two parts (PETSc's MPIAIJ, hypre's ParCSR) merged into the local columns of the setups, the ghosts by increasing
@@ -123,7 +123,8 @@ program too: `-DENABLE_PROGRAM=ON`).
 `EmptyProcess`: the library with an empty first process, NGSolve's, in block CSR; `InferredDiscretization`: the
 discretization inferred from the blocks of the processes, with an empty first process too, in the iterations of all
 set; `NearNullSpaceBeyondTheConstants`: a third function on 2 components, the iterations of one process within 1 when
-the level of the functions is the coarsest, an empty first process);
+the level of the functions is the coarsest, an empty first process; singular, the kernel of the 3 functions mixed,
+also with the finest level as the coarsest);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; 3D k=0
 `-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses

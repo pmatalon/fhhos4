@@ -31,7 +31,9 @@ apart (moved to the right-hand sides). L2-orthonormal bases: the interpolations 
 `linear_elasticity`). Hierarchical monomials, phi_0 = 1. Its condensed matrix is symmetric only to rounding.
 `linear_elasticity` (Di Pietro-Ern, k >= 1) gives the near null space by its own projection (`project_function()`) of
 the translations and, with `-r`, of the rotations about the origin, on each cell and each face in the system; its
-vectors pass the library's checks. The only elasticity the library is run on.
+vectors pass the library's checks. `-t`: pure traction (the traction of the manufactured solution on the whole
+boundary of the unit square or cube, no Dirichlet face): `SingularMatrix` with the rigid body modes, the L2 error after
+the removal of the rigid motion (its L2 projection on the modes). The only elasticity the library is run on.
 
 **NGSolve.** HDG is one bilinear form on a product space: a monolithic matrix (uint64 row pointers, int32 columns, read
 in place), its DoFs sorted by degree by the adapter (Dubiner order). On several processes `local_mat` holds partial

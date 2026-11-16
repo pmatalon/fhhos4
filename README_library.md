@@ -186,7 +186,8 @@ It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
   - **Linear elasticity**: the rigid body modes, i.e. the translations and the rotations (3 columns in 2D, 6 in 3D),
     in any order, or any basis of the space they span. Without the rotations, the solver only converges if the
     displacement is imposed on the whole boundary. With them: `SetupSym()`, `FaceDegree` and `CellDegree` at least
-    1, no `SingularMatrix`; with `MixedPrecision`, only the levels of degree >= 1 are in single precision.
+    1; with `MixedPrecision`, only the levels of degree >= 1 are in single precision. The pure traction problem (no
+    Dirichlet face): `SingularMatrix`, whose kernel is then the rigid body modes given.
 
   The bases must be **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d
   whose degree is the largest partial degree; with `PCoarsening::ToZero`, only the degree 0 first, or the degrees 0 and
@@ -508,7 +509,7 @@ library's defaults (`library/include/fhhos4.h`, which details each one):
 | `VectorComponents` | `-1`: required if `Dimension` or a degree is inferred, `1` otherwise | `>= 1`: components of the unknown, interleaved in each block (see [Inputs](#inputs)) |
 | `Dimension`, `FaceDegree`, `CellDegree` | `-1`: inferred from the blocks (see [Inputs](#inputs)) | `2` or `3`; k `>= 0`; l = k - 1, k or k + 1 |
 | `PolynomialSpace` | `PolynomialSpace::Inferred`: from the blocks | Space of the cell and face bases: <ul><li>`P`: degree at most k</li><li>`Q`: degree at most k in each variable (quadrilaterals, hexahedra)</li></ul> |
-| `SingularMatrix` | `false` | `true`: the kernel is the constant of each component (pure Neumann; translations, not rotations). `SetupSym()` only. The solution is defined up to that kernel |
+| `SingularMatrix` | `false` | `true`: the kernel is the near null space given: the constant of each component (pure Neumann), or all the functions given beyond them (the rigid body modes: pure traction). `SetupSym()` only; checked at the setup. The solution is defined up to that kernel |
 | `Krylov` | `FCG` if symmetric, `GCR` if non-symmetric | <ul><li>`FCG`: flexible conjugate gradient</li><li>`GCR`: restarted GCR, any matrix</li><li>`None`: multigrid cycles alone (e.g. [as a preconditioner](#use-as-a-preconditioner))</li></ul> |
 | `Restart` | `1` for FCG, `10` for GCR | `>= 1`: search directions stored (two face vectors each). Fewer save memory; GCR may then need more iterations |
 | `Tolerance` | `1e-8` | Relative residual of the condensed system at which `Solve()` stops |

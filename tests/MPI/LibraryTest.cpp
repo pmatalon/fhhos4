@@ -1,6 +1,7 @@
 #include <random>
 #include <gtest/gtest.h>
 #include <Eigen/Cholesky>
+#include <Eigen/SparseCholesky>
 #include <fhhos4>
 #include "support/CartesianHybridSystem.h"
 #include "support/Kronecker.h"
@@ -362,12 +363,15 @@ TEST(DistributedLibrary, InferredDiscretization)
 // faces of each process, on blocks of processes and with a process that owns nothing. With the level of the functions
 // as the coarsest one (CoarseMatrixMaxRows), the multigrid has no aggregation: that of one process, and its iterations
 // within 1 (the operator of that level reads the functions of the ghost faces, received from their owners: wrong ones
-// cost 83 iterations instead of 5); with the h-levels under it, each process aggregates its cells. Refused on all the
-// processes: dependent functions on a cell of one process, another number of functions on one process.
+// cost 83 iterations instead of 5); with the h-levels under it, each process aggregates its cells. Singular
+// (SingularMatrix: the boundary faces in the system, whose kernel the 3 functions then are, with their exact cells
+// -A_TT^-1 A_TF, mixed so that they are not orthogonal): the same, and the finest level as the coarsest, pinned on the
+// mixed functions. Refused on all the processes: dependent functions on a cell of one process, another number of
+// functions on one process.
 TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
 {
 	int n = 40;
-	CartesianHybridSystem global(n, 0);
+	CartesianHybridSystem global(n, 0), neumann(n, 0, true);
 	// The dense blocks of DenseBlocks() (UAMGLibraryTest.cpp): C_TT symmetric positive definite, G = C_TF^T C_TT^-1 C_TF
 	std::mt19937 generator(6);
 	std::uniform_real_distribution<double> coefficient(0.5, 1);
@@ -395,9 +399,10 @@ TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
 		Vector X_T, X_F;
 	};
 	auto solve = [](MPI_Comm comm, int coarseMatrixMaxRows, const fhhos4::SparseMatrix& A_TT, const fhhos4::SparseMatrix& A_TF, const fhhos4::SparseMatrix& A_FF,
-	                const Eigen::MatrixXd& cellFunctions, const Eigen::MatrixXd& faceFunctions, const vector<int64_t>& ghosts, const Vector& b_T, const Vector& b_F)
+	                const Eigen::MatrixXd& cellFunctions, const Eigen::MatrixXd& faceFunctions, const vector<int64_t>& ghosts, const Vector& b_T, const Vector& b_F, bool singular = false)
 	{
 		fhhos4::Solver solver = CartesianSolver(comm);
+		solver.SingularMatrix = singular;
 		solver.FaceDegree = 1;
 		solver.CellDegree = 1;
 		solver.VectorComponents = 2;
@@ -411,11 +416,12 @@ TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
 		return solution;
 	};
 
+	for (bool singular : { false, true })
 	for (PartitionShape shape : { PartitionShape::Blocks, PartitionShape::StripsWithFirstProcessEmpty })
 	{
 		if (shape == PartitionShape::StripsWithFirstProcessEmpty && World().Size() == 1)
 			continue;
-		PartitionedSystem system(global, n, shape, World());
+		PartitionedSystem system(singular ? neumann : global, n, shape, World());
 		const IndexMap& faces = *system.Faces;
 		const IndexMap& cells = *system.Cells;
 		Vector d = Vector::LinSpaced(faces.GlobalSize, 0, faces.GlobalSize - 1).unaryExpr([](double f) { return 1 + fmod(f, 5) / 4; });
@@ -428,6 +434,13 @@ TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
 		SparseMatrix scaledA_FF = d.asDiagonal() * system.Global.A_FF * d.asDiagonal();
 		SparseMatrix identity(faces.GlobalSize, faces.GlobalSize);
 		identity.setIdentity();
+		if (singular)
+		{
+			Eigen::Matrix3d mix;
+			mix << 1, 0, 0.5, 0.3, 1, -0.2, 0.7, 0.4, 1;
+			faceFunctions *= mix;
+			cellFunctions = -Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>>(Eigen::SparseMatrix<double>(Kron(system.Global.A_TT, C_TT))).solve(Eigen::MatrixXd(Kron(scaledA_TF, C_TF) * faceFunctions));
+		}
 
 		SparseMatrix ownA_TF = scaledA_TF.middleRows(cells.Begin, cells.NOwned);
 		SparseMatrix ownA_FF = scaledA_FF.middleRows(faces.Begin, faces.NOwned);
@@ -442,11 +455,14 @@ TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
 		Vector ownB_T = b_T.segment(6 * cells.Begin, 6 * cells.NOwned);
 		Vector ownB_F = b_F.segment(4 * faces.Begin, 4 * faces.NOwned);
 
-		for (int coarseMatrixMaxRows : { functionsLevelRows, 0 })
+		vector<int> coarseMatrixMaxRowsCases = { functionsLevelRows, 0 };
+		if (singular)
+			coarseMatrixMaxRowsCases.push_back(4 * (int)faces.GlobalSize); // the coarsest: the finest
+		for (int coarseMatrixMaxRows : coarseMatrixMaxRowsCases)
 		{
-			Solution expected = solve(MPI_COMM_SELF, coarseMatrixMaxRows, Kron(system.Global.A_TT, C_TT), Kron(scaledA_TF, C_TF), Kron(scaledA_FF, G) + Kron(identity, H), cellFunctions, faceFunctions, {}, b_T, b_F);
-			Solution distributed = solve(World().Comm(), coarseMatrixMaxRows, A_TT, A_TF, A_FF, ownCellFunctions, ownFaceFunctions, ghosts, ownB_T, ownB_F);
-			string where = to_string(World().Size()) + " processes, shape " + to_string((int)shape) + ", CoarseMatrixMaxRows " + to_string(coarseMatrixMaxRows);
+			Solution expected = solve(MPI_COMM_SELF, coarseMatrixMaxRows, Kron(system.Global.A_TT, C_TT), Kron(scaledA_TF, C_TF), Kron(scaledA_FF, G) + Kron(identity, H), cellFunctions, faceFunctions, {}, b_T, b_F, singular);
+			Solution distributed = solve(World().Comm(), coarseMatrixMaxRows, A_TT, A_TF, A_FF, ownCellFunctions, ownFaceFunctions, ghosts, ownB_T, ownB_F, singular);
+			string where = to_string(World().Size()) + " processes, shape " + to_string((int)shape) + ", CoarseMatrixMaxRows " + to_string(coarseMatrixMaxRows) + (singular ? ", singular" : "");
 			Vector allX_T = Gathered(distributed.X_T);
 			Vector allX_F = Gathered(distributed.X_F);
 			EXPECT_LE((allX_F - expected.X_F).norm(), 1e-8 * expected.X_F.norm()) << where;
@@ -459,7 +475,7 @@ TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
 				cout << "\t" << where << ": " << distributed.Iterations << " iterations (" << expected.Iterations << " on one)" << endl;
 		}
 
-		if (shape != PartitionShape::Blocks || World().Size() == 1)
+		if (singular || shape != PartitionShape::Blocks || World().Size() == 1)
 			continue;
 		bool last = World().Rank() == World().Size() - 1;
 		Eigen::MatrixXd dependent = ownCellFunctions;

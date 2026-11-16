@@ -1895,8 +1895,7 @@ TEST(UAMGLibrary, LeavesTheCallerUnchanged)
 // last p-level and the h-levels of the multigrid hold these functions. On the toy system ⊗ dense blocks, 2 components
 // at degree 1 (6 DoFs per cell, 4 per face), with a third function of degree <= 1: the solution of the system, as with
 // the constants alone, by the library's Krylov method and as the preconditioner of an external one (Krylov::None).
-// Refused: a function with a coefficient of degree
-// 2, SingularMatrix, two columns that are not the constants.
+// Refused: a function with a coefficient of degree 2, two columns that are not the constants.
 TEST(UAMGLibrary, NearNullSpaceBeyondTheConstants)
 {
 	HybridSystem system(32);
@@ -1955,9 +1954,6 @@ TEST(UAMGLibrary, NearNullSpaceBeyondTheConstants)
 	cellFunctions2(6, 2) = 1;
 	EXPECT_THROW(cellDegree2.SetupSym(blocks2.A_TT, blocks2.A_TF, blocks2.A_FF, cellFunctions2, faceFunctions), fhhos4::Error);
 
-	fhhos4::Solver singular = solver();
-	singular.SingularMatrix = true;
-	EXPECT_THROW(singular.SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions, faceFunctions), fhhos4::Error);
 	// The preconditioner of a Krylov method of the calling code (Krylov::None, one cycle): the same solution
 	fhhos4::Solver preconditioner = solver();
 	preconditioner.Krylov = fhhos4::Krylov::None;
@@ -1971,4 +1967,97 @@ TEST(UAMGLibrary, NearNullSpaceBeyondTheConstants)
 	EXPECT_LT((y_F - referenceX_F).norm(), 1e-7 * referenceX_F.norm());
 	// Two columns that are not the constants of the components
 	EXPECT_THROW(solver().SetupSym(blocks.A_TT, blocks.A_TF, blocks.A_FF, cellFunctions.rightCols(2), faceFunctions.rightCols(2)), fhhos4::Error);
+}
+
+// SingularMatrix with more near null space functions than the components (pure traction elasticity: the kernel is the
+// rigid body modes). The pure Neumann toy system ⊗ dense blocks (DenseBlocks(): 2 components at degree 1, 6 DoFs per
+// cell and 4 per face) has the kernel of the vectors v on every face (C_TT^{-1} C_TF v on every cell), v in R^4; a term
+// w w^T on each face block of A_FF (w orthogonal to 3 of them) cuts it to 3 functions, not orthogonal: the 2
+// constants and a random one. Converged, the solution of the system up to the kernel (also with a right-hand side
+// incompatible along a function), in about the iterations of the same system with Dirichlet faces, with both
+// prolongations; the coarsest level in the given bases (the finest: one direct solve, pinned on these vectors).
+// Refused: functions not in the kernel (the system with Dirichlet faces).
+TEST(UAMGLibrary, SingularNearNullSpace)
+{
+	HybridSystem neumann(32, Eigen::VectorXd(), Eigen::VectorXd(), 0, true), dirichlet(32);
+	std::srand(11);
+	Eigen::MatrixXd V(4, 3);
+	V << Eigen::MatrixXd::Identity(4, 2), Eigen::VectorXd::Random(4);
+	Eigen::VectorXd w = Eigen::HouseholderQR<Eigen::MatrixXd>(V).householderQ() * Eigen::VectorXd::Unit(4, 3); // orthogonal to V
+	auto withFaceTerm = [&w](const HybridSystem& scalar)
+	{
+		Blocks blocks = DenseBlocks(scalar, 6, 4);
+		blocks.A_FF = HybridSystem::Matrix(blocks.A_FF + Kron(scalar.A_FF, w * w.transpose()));
+		return blocks;
+	};
+	Blocks singular = withFaceTerm(neumann), regular = withFaceTerm(dirichlet);
+	Eigen::Index nCellDoFs = singular.A_TT.rows(), nFaceDoFs = singular.A_FF.rows();
+	// The cells of the kernel: -A_TT^{-1} A_TF on the faces, the same on all the cells (bases not scaled)
+	Eigen::MatrixXd faceFunctions = V.replicate(nFaceDoFs / 4, 1);
+	Eigen::MatrixXd cellFunctions = (-Eigen::SimplicialLDLT<ColMajorMatrix>(ColMajorMatrix(singular.A_TT)).solve(Eigen::MatrixXd(singular.A_TF * faceFunctions))).topRows(6).replicate(nCellDoFs / 6, 1);
+	Eigen::MatrixXd Z(nCellDoFs + nFaceDoFs, 3);
+	Z << cellFunctions, faceFunctions;
+	ASSERT_LT((singular.A_TT * cellFunctions + singular.A_TF * faceFunctions).norm() + (singular.A_FT * cellFunctions + singular.A_FF * faceFunctions).norm(), 1e-10 * Z.norm());
+	Eigen::MatrixXd Q = Eigen::HouseholderQR<Eigen::MatrixXd>(Z).householderQ() * Eigen::MatrixXd::Identity(Z.rows(), 3);
+	auto withoutKernel = [&Q](const Eigen::VectorXd& v) { return Eigen::VectorXd(v - Q * (Q.transpose() * v)); };
+
+	Eigen::VectorXd exact = withoutKernel(Eigen::VectorXd::Random(nCellDoFs + nFaceDoFs));
+	Eigen::VectorXd b_T = singular.A_TT * exact.head(nCellDoFs) + singular.A_TF * exact.tail(nFaceDoFs);
+	Eigen::VectorXd b_F = singular.A_FT * exact.head(nCellDoFs) + singular.A_FF * exact.tail(nFaceDoFs);
+	auto solver = [](fhhos4::Prolongation prolongation)
+	{
+		fhhos4::Solver uamg = ToySolver();
+		uamg.FaceDegree = 1;
+		uamg.CellDegree = 1;
+		uamg.VectorComponents = 2;
+		uamg.Prolongation = prolongation;
+		return uamg;
+	};
+	auto solveSingular = [&](fhhos4::Solver& uamg, double incompatibility, const std::string& label)
+	{
+		uamg.SingularMatrix = true;
+		uamg.SetupSym(singular.A_TT, singular.A_TF, singular.A_FF, cellFunctions, faceFunctions);
+		Eigen::VectorXd rhs_F = b_F + incompatibility * b_F.norm() / faceFunctions.col(2).norm() * faceFunctions.col(2);
+		Eigen::VectorXd x_T(nCellDoFs), x_F = Eigen::VectorXd::Zero(nFaceDoFs);
+		fhhos4::Result result = uamg.Solve(b_T, rhs_F, x_T, x_F);
+		EXPECT_TRUE(result.Converged) << label;
+		Eigen::VectorXd x(nCellDoFs + nFaceDoFs);
+		x << x_T, x_F;
+		EXPECT_LT(withoutKernel(x - exact).norm() / exact.norm(), 1e-8) << label;
+		return result.Iterations;
+	};
+	for (fhhos4::Prolongation prolongation : { fhhos4::Prolongation::HarmonicExtension, fhhos4::Prolongation::Reconstruction })
+	{
+		std::string label = prolongation == fhhos4::Prolongation::Reconstruction ? "Reconstruction" : "HarmonicExtension";
+		fhhos4::Solver reference = solver(prolongation);
+		reference.SetupSym(regular.A_TT, regular.A_TF, regular.A_FF, cellFunctions, V.replicate(regular.A_FF.rows() / 4, 1));
+		Eigen::VectorXd y_T(nCellDoFs), y_F = Eigen::VectorXd::Zero(regular.A_FF.rows());
+		fhhos4::Result regularResult = reference.Solve(Eigen::VectorXd::Random(nCellDoFs), Eigen::VectorXd::Random(regular.A_FF.rows()), y_T, y_F);
+		EXPECT_TRUE(regularResult.Converged) << label;
+		for (double incompatibility : { 0.0, 1e-3 })
+		{
+			fhhos4::Solver uamg = solver(prolongation);
+			int iterations = solveSingular(uamg, incompatibility, label + ", incompatibility " + std::to_string(incompatibility));
+			EXPECT_LE(iterations, regularResult.Iterations + 3) << label;
+		}
+	}
+
+	// The coarsest level in the given bases, here the finest: one direct solve, the pinned DoFs chosen on the functions
+	fhhos4::Solver direct = solver(fhhos4::Prolongation::HarmonicExtension);
+	direct.CoarseMatrixMaxRows = (int)nFaceDoFs;
+	EXPECT_LE(solveSingular(direct, 1e-3, "one level"), 2);
+	EXPECT_EQ(direct.NumberOfLevels(), 1);
+
+	// Functions not in the kernel: the system with Dirichlet faces
+	fhhos4::Solver notSingular = solver(fhhos4::Prolongation::HarmonicExtension);
+	notSingular.SingularMatrix = true;
+	try
+	{
+		notSingular.SetupSym(regular.A_TT, regular.A_TF, regular.A_FF, cellFunctions, V.replicate(regular.A_FF.rows() / 4, 1));
+		ADD_FAILURE() << "SingularMatrix accepted on a regular matrix";
+	}
+	catch (const fhhos4::Error& e)
+	{
+		EXPECT_NE(std::string(e.what()).find("near null space functions are not in the kernel"), std::string::npos) << e.what();
+	}
 }

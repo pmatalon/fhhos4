@@ -334,13 +334,14 @@ namespace fhhos4
 		// cell and face don't tell it): -1 (the default) is 1 if Dimension and the degrees are set (the setup writes 1),
 		// and refused if one of them is inferred.
 		int VectorComponents = -1;
-		// The matrix is singular, its kernel spanned by the constants (cellNearNullSpace, faceNearNullSpace: the
-		// interpolation of 1; with VectorComponents n, the constant of each component: the n translations, e.g. the pure
-		// Neumann vector Laplacian, not elasticity, whose kernel has the rotations too), e.g. the pure Neumann problem:
-		// SetupSym() only. The setup checks that the constants are in the kernel; each solve projects the condensed
-		// right-hand side onto the image of the matrix (the data of a pure Neumann problem are compatible up to the
+		// The matrix is singular, its kernel spanned by the near null space given to the setup (cellNearNullSpace,
+		// faceNearNullSpace): the constants (the interpolation of 1; with VectorComponents n, the constant of each
+		// component: the n translations, e.g. the pure Neumann problem, the pure Neumann vector Laplacian), or all the
+		// functions given beyond them (e.g. the rigid body modes: pure traction elasticity, no Dirichlet face). SetupSym()
+		// only. The setup checks that these functions are in the kernel; each solve projects the condensed right-hand side
+		// onto the image of the matrix (the data of a pure Neumann or pure traction problem are compatible up to the
 		// rounding or quadrature errors; at Verbosity >= 1, a message if the component removed is larger). The solution is
-		// defined up to a constant (one per component): shift it to the
+		// defined up to an element of the kernel (a constant per component, or a rigid motion): shift it to the
 		// normalization you want (e.g. zero mean).
 		bool SingularMatrix = false;
 
@@ -466,8 +467,8 @@ namespace fhhos4
 		//     order (the translations); or, for linear elasticity, the rigid body modes, the translations and the
 		//     rotations (3 columns in 2D, 6 in 3D), in any order or any basis of the space they span: required for the
 		//     solver to converge unless the displacement is imposed on the whole boundary. With the rotations:
-		//     SetupSym() only, FaceDegree and CellDegree >= 1, no SingularMatrix; with MixedPrecision, only the levels of
-		//     degree >= 1 are in single precision.
+		//     SetupSym() only, FaceDegree and CellDegree >= 1; with MixedPrecision, only the levels of degree >= 1 are in
+		//     single precision. With SingularMatrix, the kernel is all the functions given (pure traction).
 		//   The bases must be hierarchical (ordered by degree: for each d, the first functions span P^d, or Q^d whose
 		//   degree is the largest partial degree; with PCoarsening::ToZero, only the degree 0 first, or the degrees 0
 		//   and 1 with the rotations) with a constant first function phi_0, of any scale, which may differ from one
