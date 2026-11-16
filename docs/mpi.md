@@ -71,7 +71,8 @@ program too: `-DENABLE_PROGRAM=ON`).
   discretization not set inferred from the blocks of each process, one gather: `docs/library.md`),
   `SetupSym(..., GhostGlobalNumbers faceGhostGlobalNumbers)` (local columns: own faces then
   ghosts, one numbering for `A_TF` and `A_FF`, `A_FF` in full: a triangular one refused, `CheckTriangles()`),
-  `SetupNonSym(..., faceGhostGlobalNumbers, cellGhostGlobalNumbers)`
+  the near null space on the own cells and faces (beyond the constants: its coefficients on the ghost faces from
+  their owners, `docs/uamg.md`), `SetupNonSym(..., faceGhostGlobalNumbers, cellGhostGlobalNumbers)`
   (`A_FT`: rows of the own faces, columns own cells then ghost cells; turned once by the setup into the rows of all
   the local faces, the columns of the own cells: `RowsWithGhosts`, kept by the condensation, which then runs as the
   symmetric one), `DistributedStaticCondensation.h`, `CollectiveCheck()` (errors of the inputs on all the processes;
@@ -121,7 +122,8 @@ program too: `-DENABLE_PROGRAM=ON`).
 `MUMPSTest.cpp`: the coarse solver alone, with an empty first process, MUMPS's host; `LibraryTest.cpp`'s
 `EmptyProcess`: the library with an empty first process, NGSolve's, in block CSR; `InferredDiscretization`: the
 discretization inferred from the blocks of the processes, with an empty first process too, in the iterations of all
-set);
+set; `NearNullSpaceBeyondTheConstants`: a third function on 2 components, the iterations of one process within 1 when
+the level of the functions is the coarsest, an empty first process);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; 3D k=0
 `-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses

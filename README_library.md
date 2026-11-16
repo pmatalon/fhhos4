@@ -82,7 +82,7 @@ directory of the library in the RPATH of the executable. A library compiled with
       - [x] with translation kernel (e.g. pure Neumann diffusion)
       - [ ] user-defined kernel vectors (e.g. for elasticity problems)
 - [x] Vector-valued unknowns
-   - [x] Linear elasticity, with the rigid body modes given as the near null space (one process)
+   - [x] Linear elasticity, with the rigid body modes given as the near null space
 - [x] `P` and `Q` polynomial spaces in the cells and faces
 - [x] Arbitrary polynomial degree:
    - [x] Hierarchical bases **ordered by degree**
@@ -185,9 +185,8 @@ It can also an Eigen map of your own arrays (see [Inputs](#inputs)).
     in this order.
   - **Linear elasticity**: the rigid body modes, i.e. the translations and the rotations (3 columns in 2D, 6 in 3D),
     in any order, or any basis of the space they span. Without the rotations, the solver only converges if the
-    displacement is imposed on the whole boundary. With them: `SetupSym()` on one process, `FaceDegree` and
-    `CellDegree` at least 1, no `SingularMatrix`; with `MixedPrecision`, only the levels of degree >= 1 are in
-    single precision.
+    displacement is imposed on the whole boundary. With them: `SetupSym()`, `FaceDegree` and `CellDegree` at least
+    1, no `SingularMatrix`; with `MixedPrecision`, only the levels of degree >= 1 are in single precision.
 
   The bases must be **hierarchical** (ordered by degree: for each d, the first functions of a block span P^d, or Q^d
   whose degree is the largest partial degree; with `PCoarsening::ToZero`, only the degree 0 first, or the degrees 0 and
@@ -366,8 +365,8 @@ solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) 
   don't tell.
 - **The near null space** of the operator (no default), `MatSetNearNullSpace()`: the vectors of [Inputs](#inputs), on
   all the DoFs (a scalar unknown: the interpolation of 1 on your bases; a vector-valued one: of the constant of each
-  component; elasticity on one process: the rigid body modes interpolated on your bases, orthonormalized as PETSc
-  requires: any basis of their span is accepted. Not `MatNullSpaceCreateRigidBody()`, whose vectors are nodal values).
+  component; elasticity: the rigid body modes interpolated on your bases, orthonormalized as PETSc requires: any
+  basis of their span is accepted. Not `MatNullSpaceCreateRigidBody()`, whose vectors are nodal values).
   At degree 0 on one component, it can be the constant vector (`MatNullSpaceCreate(comm, PETSC_TRUE, 0, NULL, ...)`).
 - **Symmetric or not**: the symmetric setup if the operator is known to be symmetric
   (`MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE)`, or `MAT_SPD`) or with `-pc_fhhos4_symmetric`, the non-symmetric one

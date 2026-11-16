@@ -50,12 +50,13 @@ public:
 	// UncondensedLevel::VectorComponents).
 	int VectorComponents = 1;
 	// Near null space functions beyond the VectorComponents constants (m columns, e.g. the rigid body modes of
-	// elasticity; fhhos4::Solver; one process, p-levels before the h-levels), if not empty: their coefficients on the
-	// first DoFs of each cell and face (the same number of rows per block, at most the DoFs of degree 1: the functions
-	// are of degree <= 1). The finest level and the p-levels of degree >= 1 stay in the given bases; the last p-level
-	// (degree 0 in the code) has their m coefficients as the DoFs of each block, instead of the constants: its
-	// prolongation has these blocks instead of the injection (UncondensedLevel::CellNearNullSpace), and each function
-	// has the coordinate 1 on all its blocks, as the constants on the h-levels, which have blocks of m DoFs.
+	// elasticity; fhhos4::Solver; p-levels before the h-levels), if not empty: their coefficients on the DoFs of degree
+	// <= 1 of each cell and face (the first VectorComponents dim(P^1) or dim(Q^1) DoFs: the functions are of degree
+	// <= 1; on several processes, the cells and faces of the process). The finest level and the p-levels of degree >= 1
+	// stay in the given bases; the last p-level (degree 0 in the code) has their m coefficients as the DoFs of each
+	// block, instead of the constants: its prolongation has these blocks instead of the injection
+	// (UncondensedLevel::CellNearNullSpace), and each function has the coordinate 1 on all its blocks, as the constants
+	// on the h-levels, which have blocks of m DoFs.
 	DenseMatrix CellNearNullSpace;
 	DenseMatrix FaceNearNullSpace;
 
@@ -477,6 +478,7 @@ protected:
 			{
 				coarse->CellNearNullSpace = &CellNearNullSpace;
 				coarse->FaceNearNullSpace = &FaceNearNullSpace;
+				coarse->FaceNearNullSpaceDoFs = VectorComponents * (int)PolynomialSpaceDimension(_dim - 1, 1, _polynomialSpaceQ);
 			}
 		}
 		else

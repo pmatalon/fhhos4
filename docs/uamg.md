@@ -97,16 +97,19 @@ n: it counts rows); `CoupledComponents`, the blocks ⊗ C: the direct solution; 
 ## Near null space beyond the constants (elasticity)
 
 `UncondensedAMG::CellNearNullSpace`, `FaceNearNullSpace` with m columns (the library only, `fhhos4::Solver` with more
-near null space functions than components: the rigid body modes, m = 3 in 2D, 6 in 3D; one process): the coefficients
-of these functions on the DoFs of degree <= 1 of each cell and face, B_T and B_F. They take the place of the n
-constants:
+near null space functions than components: the rigid body modes, m = 3 in 2D, 6 in 3D): the coefficients of these
+functions on the DoFs of degree <= 1 of each cell and face (`UncondensedLevel::FaceNearNullSpaceDoFs` per face), B_T
+and B_F. They take the place of the n constants:
 - the finest level and the p-levels of degree >= 1 are in the given bases, extracted as usual (k, k - 2, ...; the
   functions are of degree <= 1, within the first DoFs of their blocks);
 - the last p-level (degree 0 in the code, `CreateCoarseLevel()`) has m DoFs per block, the coefficients of the
   functions: its prolongation is block-diagonal, B_F on the first DoFs of each face instead of the injection
   (`ProlongIn()`, `RestrictIn()`), and its blocks are the Galerkin ones, B_i^T A_ij B_j
   (`ExtractCoarseMatrix()` with the functions; for `A_TF`, B_T^T A_TF B_F). There each function has the coordinate 1
-  on every cell and face, as the constant of a scalar unknown after the rescaling by its interpolation of 1;
+  on every cell and face, as the constant of a scalar unknown after the rescaling by its interpolation of 1. On
+  several processes, each one gives the functions of its own cells and faces; those of its ghost faces, which the
+  columns of `Offd` and of `A_TF` read, come from their owners (`GhostFunctions()`, a halo exchange per function, in
+  `SetupOperatorByBlockExtractionDistributed()`);
 - the h-levels have m DoFs per face, and the passes treat them as constants (`UncondensedLevel::VectorComponents` and
   `CoarseningPass::VectorComponents` = m): the injection of the kept faces copies the same m coordinates, i.e. the
   same global function, to all the fine faces of a coarse face.
@@ -121,8 +124,9 @@ level (`SetupOperatorByBlockExtraction()`).
 
 Keeping the degree 1 on the h-levels without them (`-hp-cs h`) does not carry the rotations: the injection gives all
 the fine faces of a coarse face the same coefficients, and the constant part of a rotation differs from one face to
-another. Checked by `UAMGLibrary.NearNullSpaceBeyondTheConstants` (algebraic: a third function on 2 components);
-elasticity itself only on Disk++'s `linear_elasticity` (`docs/clients.md`).
+another. Checked by `UAMGLibrary.NearNullSpaceBeyondTheConstants` (algebraic: a third function on 2 components),
+on several processes by `DistributedLibrary.NearNullSpaceBeyondTheConstants`; elasticity itself only on Disk++'s
+`linear_elasticity` (`docs/clients.md`, one process).
 
 ## Non-symmetric matrices
 

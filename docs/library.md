@@ -83,14 +83,16 @@ PETSc's options:
 ## The near null space
 
 `cellNearNullSpace`, `faceNearNullSpace` (`detail::ConstMatrixView`: the columns of the caller's matrix, read in place),
-after the block sizes (`Impl::ReduceNearNullSpace()`, collective):
+after the block sizes (`Impl::ReduceNearNullSpace()`, collective: the same number of columns on all the processes,
+so that they take the same path):
 - As many columns as `VectorComponents`: they must be the constants of the components on hierarchical bases
   (`ConstantsOnly()`: the column c non-zero on the DoF c of each block only, to 1e-10 relative; proportional to the
   first column), reduced to the interpolation of 1 of each block, the first column's: what `UncondensedAMG` takes.
   Otherwise an error. The setups and the results are those of the former input, one coefficient per block.
-- More columns (the rigid body modes): `Impl::NearNullSpaceBeyondConstants()`, `SetupSym()` on one process, degrees
-  >= 1, no `SingularMatrix`. `LowDegreeFunctions()` keeps the rows of the DoFs of degree <= 1 of each cell and face
-  (checked: the coefficients beyond the degree 1 zero to 1e-8 relative, the functions independent on each block), given
+- More columns (the rigid body modes): `Impl::NearNullSpaceBeyondConstants()`, `SetupSym()`, degrees >= 1, no
+  `SingularMatrix`. `LowDegreeFunctions()` keeps the rows of the DoFs of degree <= 1 of each cell and face (checked:
+  the coefficients beyond the degree 1 zero to 1e-8 relative, the functions independent on each block; on several
+  processes, those of the process, by `CollectiveCheck()`), given
   to the multigrid (`UncondensedAMG::CellNearNullSpace`, `FaceNearNullSpace`, `docs/uamg.md`) with ones as
   interpolations of 1. The blocks are read in place as in the other setups, and the whole solver works on the system
   as given: no change of basis outside the last p-level. `MixedPrecision` applies to the levels of degree >= 1 only

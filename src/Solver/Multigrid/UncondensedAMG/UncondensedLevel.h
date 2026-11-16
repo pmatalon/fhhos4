@@ -128,8 +128,11 @@ public:
 	// Set by UncondensedAMG on the p-level of the near null space functions (UncondensedAMG::CellNearNullSpace): their
 	// coefficients on the first DoFs of each cell and face of the finer level, the columns of the prolongation from this
 	// level, block by block, instead of the injection (see ExtractCoarseMatrix() and ProlongIn()). Null on the others.
+	// On several processes, those of the owned cells and faces. FaceNearNullSpaceDoFs: the rows of FaceNearNullSpace per
+	// face (also on a process that owns no face).
 	const DenseMatrix* CellNearNullSpace = nullptr;
 	const DenseMatrix* FaceNearNullSpace = nullptr;
+	int FaceNearNullSpaceDoFs = 0;
 
 	// Local matrices of the operator, shared by the levels (set by UncondensedAMG). If null, the Galerkin products
 	// of the coarsening passes are global sparse products.
@@ -1407,7 +1410,7 @@ public:
 		UncondensedLevel* fine = dynamic_cast<UncondensedLevel*>(FinerLevel);
 		if (fine->IsDistributed())
 		{
-			SetupOperatorByBlockExtractionDistributed(dynamic_cast<UncondensedLevelOf&>(*fine));
+			SetupOperatorByBlockExtractionDistributed(*fine);
 			return;
 		}
 
@@ -1451,23 +1454,37 @@ public:
 	}
 
 	// On several processes: the same blocks of the rows of the process, the same faces (FaceMap, and the columns of the
-	// operator), from those of the finer level in double (the finest level or a p-level).
-	void SetupOperatorByBlockExtractionDistributed(const UncondensedLevelOf& fine)
+	// operator), from those in double of the finer level (the finest level or a p-level, possibly in single precision).
+	// The level of the near null space functions also needs them on the ghost faces (the columns of Offd and of A_T_F),
+	// from their owners.
+	void SetupOperatorByBlockExtractionDistributed(UncondensedLevel& fine)
 	{
-		if (FaceNearNullSpace)
-			Utils::FatalError("UncondensedAMG: near null space functions beyond the constants are not available on several processes.");
 		if (ComputeCoarseA_F_F)
 			Utils::FatalError("UncondensedAMG: on several processes, the p-coarsening runs without the block A_F_F.");
 		const DistributedMatrix& fineA = *fine.DistributedOperator;
-		int ffbs = fine._faceBlockSize, fcbs = fine._cellBlockSize;
+		int ffbs = fine.FaceBlockSize();
+		int fcbs = fine.CellBlockSize();
 		BigNumber nElems = fine.A_T_F->rows() / fcbs;
-		BigNumber nOwnedFaces = fineA.RowMap->NOwned, nGhostFaces = fineA.ColMap->NGhosts();
+		BigNumber nOwnedFaces = fineA.RowMap->NOwned;
+		BigNumber nGhostFaces = fineA.ColMap->NGhosts();
+		DenseMatrix operatorGhostFunctions, faceMapFunctions; // the functions on the ghosts of ColMap, on the faces of FaceMap
+		const DenseMatrix* ghostFunctions = nullptr;
+		const DenseMatrix* localFunctions = nullptr;
+		if (FaceNearNullSpace)
+		{
+			operatorGhostFunctions = GhostFunctions(*fineA.ColMap);
+			faceMapFunctions.resize(fine.FaceMap->NLocal() * FaceNearNullSpaceDoFs, FaceNearNullSpace->cols());
+			faceMapFunctions.topRows(FaceNearNullSpace->rows()) = *FaceNearNullSpace;
+			faceMapFunctions.bottomRows(fine.FaceMap->NGhosts() * FaceNearNullSpaceDoFs) = GhostFunctions(*fine.FaceMap);
+			ghostFunctions = &operatorGhostFunctions;
+			localFunctions = &faceMapFunctions;
+		}
 		_extractedOperator.RowMap = fineA.RowMap;
 		_extractedOperator.ColMap = fineA.ColMap;
 		_extractedOperator.RowBlockSize = _faceBlockSize;
 		_extractedOperator.ColBlockSize = _faceBlockSize;
-		_extractedOperator.Diag = ExtractCoarseMatrix(fineA.Diag, nOwnedFaces, nOwnedFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize);
-		_extractedOperator.Offd = ExtractCoarseMatrix(fineA.Offd, nOwnedFaces, nGhostFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize);
+		_extractedOperator.Diag = ExtractCoarseMatrix(fineA.Diag, nOwnedFaces, nOwnedFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize, FaceNearNullSpace, FaceNearNullSpace);
+		_extractedOperator.Offd = ExtractCoarseMatrix(fineA.Offd, nOwnedFaces, nGhostFaces, ffbs, ffbs, _faceBlockSize, _faceBlockSize, FaceNearNullSpace, ghostFunctions);
 		this->DistributedOperator = &_extractedOperator;
 		this->OperatorMatrix = &_extractedOperator.Diag;
 		if constexpr (std::is_same_v<T, float>)
@@ -1479,15 +1496,24 @@ public:
 				this->SingleOperatorMatrix = &_singleExtractedOperator.Diag;
 		}
 		if (UsesCellBlocks())
-			_extractedA_T_T = ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize);
-		_extractedA_T_F = ExtractCoarseMatrix(*fine.A_T_F, nElems, fine.FaceMap->NLocal(), fcbs, ffbs, _cellBlockSize, _faceBlockSize);
+			_extractedA_T_T = ExtractCoarseMatrix(*fine.A_T_T, nElems, nElems, fcbs, fcbs, _cellBlockSize, _cellBlockSize, CellNearNullSpace, CellNearNullSpace, Symmetric);
+		_extractedA_T_F = ExtractCoarseMatrix(*fine.A_T_F, nElems, fine.FaceMap->NLocal(), fcbs, ffbs, _cellBlockSize, _faceBlockSize, CellNearNullSpace, localFunctions);
 		if (fine.A_F_T)
-			_extractedA_F_T = ExtractCoarseMatrix(*fine.A_F_T, fine.FaceMap->NLocal(), nElems, ffbs, fcbs, _faceBlockSize, _cellBlockSize);
+			_extractedA_F_T = ExtractCoarseMatrix(*fine.A_F_T, fine.FaceMap->NLocal(), nElems, ffbs, fcbs, _faceBlockSize, _cellBlockSize, localFunctions, CellNearNullSpace);
 		this->A_T_T = UsesCellBlocks() ? &_extractedA_T_T : nullptr;
 		this->A_T_F = &_extractedA_T_F;
 		this->A_F_F = nullptr;
 		this->A_F_T = fine.A_F_T ? &_extractedA_F_T : nullptr;
 		this->FaceMap = fine.FaceMap;
+	}
+
+	// FaceNearNullSpace on the ghosts of faces, from their owners, one column after the other (collective on the halo)
+	DenseMatrix GhostFunctions(const IndexMap& faces) const
+	{
+		DenseMatrix ghosts(faces.NGhosts() * FaceNearNullSpaceDoFs, FaceNearNullSpace->cols());
+		for (Eigen::Index j = 0; j < ghosts.cols(); j++)
+			faces.UpdateGhosts(FaceNearNullSpace->col(j).data(), ghosts.col(j).data(), FaceNearNullSpaceDoFs);
+		return ghosts;
 	}
 
 private:
@@ -1503,8 +1529,8 @@ private:
 	{
 		if (rowFunctions)
 		{
-			int lowRows = (int)(rowFunctions->rows() / nBlockRows);
-			int lowCols = (int)(colFunctions->rows() / nBlockCols);
+			int lowRows = nBlockRows > 0 ? (int)(rowFunctions->rows() / nBlockRows) : 0; // no block (a process without cells, faces or ghosts): nothing read
+			int lowCols = nBlockCols > 0 ? (int)(colFunctions->rows() / nBlockCols) : 0;
 			assert(rowFunctions->cols() == coarseBlockRows && colFunctions->cols() == coarseBlockCols && lowRows <= fineBlockRows && lowCols <= fineBlockCols);
 			return SparseMatrixOps::BuildByRows(nBlockRows * coarseBlockRows, nBlockCols * coarseBlockCols, coarseBlockRows,
 				[&](BigNumber firstRow, BigNumber lastRow, SparseMatrixOps::RowChunk& chunk)
@@ -2010,7 +2036,7 @@ private:
 			if (const DenseMatrix* functions = coarseLevel->FaceNearNullSpace)
 			{
 				// The coarse coefficients are those of the near null space functions, on the first DoFs of each face
-				auto nFunctionDoFs = functions->rows() / nFaces;
+				int nFunctionDoFs = coarseLevel->FaceNearNullSpaceDoFs;
 				for (BigNumber i = 0; i < nFaces; i++)
 					vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nFunctionDoFs) = functions->middleRows(i*nFunctionDoFs, nFunctionDoFs).template cast<T>() * vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
 				return vectorOnThisLevel;
@@ -2049,7 +2075,7 @@ private:
 			if (const DenseMatrix* functions = coarseLevel->FaceNearNullSpace)
 			{
 				// The transpose of the prolongation
-				auto nFunctionDoFs = functions->rows() / nFaces;
+				int nFunctionDoFs = coarseLevel->FaceNearNullSpaceDoFs;
 				for (BigNumber i = 0; i < nFaces; i++)
 					vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns) = functions->middleRows(i*nFunctionDoFs, nFunctionDoFs).transpose().template cast<T>() * vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nFunctionDoFs);
 				return vectorOnTheCoarserLevel;

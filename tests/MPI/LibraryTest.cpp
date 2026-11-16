@@ -1,4 +1,6 @@
+#include <random>
 #include <gtest/gtest.h>
+#include <Eigen/Cholesky>
 #include <fhhos4>
 #include "support/CartesianHybridSystem.h"
 #include "support/Kronecker.h"
@@ -351,6 +353,121 @@ TEST(DistributedLibrary, InferredDiscretization)
 			int inferred = ExpectSolvesTheUncondensedSystem(fhhos4::Prolongation::HarmonicExtension, asymmetry, false, 1, true, nullptr, false, false, shape, true);
 			EXPECT_EQ(inferred, set) << "asymmetry " << asymmetry;
 		}
+	}
+}
+
+// More near null space functions than the constants (the rigid body modes of elasticity; here, as in
+// UAMGLibrary.NearNullSpaceBeyondTheConstants, a third function on 2 components): the Cartesian system ⊗ dense blocks
+// (2D, k = l = 1: 6 DoFs per cell, 4 per face) whose near kernel the 3 functions span, the functions of the cells and
+// faces of each process, on blocks of processes and with a process that owns nothing. With the level of the functions
+// as the coarsest one (CoarseMatrixMaxRows), the multigrid has no aggregation: that of one process, and its iterations
+// within 1 (the operator of that level reads the functions of the ghost faces, received from their owners: wrong ones
+// cost 83 iterations instead of 5); with the h-levels under it, each process aggregates its cells. Refused on all the
+// processes: dependent functions on a cell of one process, another number of functions on one process.
+TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
+{
+	int n = 40;
+	CartesianHybridSystem global(n, 0);
+	// The dense blocks of DenseBlocks() (UAMGLibraryTest.cpp): C_TT symmetric positive definite, G = C_TF^T C_TT^-1 C_TF
+	std::mt19937 generator(6);
+	std::uniform_real_distribution<double> coefficient(0.5, 1);
+	Eigen::MatrixXd B = Eigen::MatrixXd::NullaryExpr(6, 6, [&]() { return coefficient(generator); });
+	Eigen::MatrixXd C_TT = B * B.transpose() + 6 * Eigen::MatrixXd::Identity(6, 6);
+	Eigen::MatrixXd C_TF = Eigen::MatrixXd::NullaryExpr(6, 4, [&]() { return coefficient(generator); });
+	Eigen::MatrixXd G = C_TF.transpose() * C_TT.llt().solve(C_TF);
+	// Added to the block of each face: the DoF 3 out of the near kernel, which the 3 functions then span (S ⊗ G alone
+	// has all the 1 ⊗ v)
+	Eigen::MatrixXd H = Eigen::MatrixXd::Zero(4, 4);
+	H(3, 3) = 4 * G.diagonal().maxCoeff();
+	// The near kernel on the faces scaled by d (the faces of the system scaled by d_f, different from one face to the
+	// next: the functions of the ghosts must be those of their faces): 1/d_f on the DoFs 0, 1 (the constants of the 2
+	// components) and 2 of each face; on the cells, those DoFs
+	auto functions = [](const Vector& scale, int blockSize)
+	{
+		Eigen::MatrixXd F = Eigen::MatrixXd::Zero(scale.rows() * blockSize, 3);
+		for (Eigen::Index b = 0; b < scale.rows(); b++)
+			F.block(b * blockSize, 0, 3, 3) = Eigen::MatrixXd::Identity(3, 3) / scale[b];
+		return F;
+	};
+	struct Solution
+	{
+		int Iterations;
+		Vector X_T, X_F;
+	};
+	auto solve = [](MPI_Comm comm, int coarseMatrixMaxRows, const fhhos4::SparseMatrix& A_TT, const fhhos4::SparseMatrix& A_TF, const fhhos4::SparseMatrix& A_FF,
+	                const Eigen::MatrixXd& cellFunctions, const Eigen::MatrixXd& faceFunctions, const vector<int64_t>& ghosts, const Vector& b_T, const Vector& b_F)
+	{
+		fhhos4::Solver solver = CartesianSolver(comm);
+		solver.FaceDegree = 1;
+		solver.CellDegree = 1;
+		solver.VectorComponents = 2;
+		if (coarseMatrixMaxRows > 0)
+			solver.CoarseMatrixMaxRows = coarseMatrixMaxRows;
+		solver.SetupSym(A_TT, A_TF, A_FF, cellFunctions, faceFunctions, ghosts);
+		Solution solution{ 0, Vector(b_T.rows()), Vector::Zero(b_F.rows()) };
+		fhhos4::Result result = solver.Solve(b_T, b_F, solution.X_T, solution.X_F);
+		EXPECT_TRUE(result.Converged);
+		solution.Iterations = result.Iterations;
+		return solution;
+	};
+
+	for (PartitionShape shape : { PartitionShape::Blocks, PartitionShape::StripsWithFirstProcessEmpty })
+	{
+		if (shape == PartitionShape::StripsWithFirstProcessEmpty && World().Size() == 1)
+			continue;
+		PartitionedSystem system(global, n, shape, World());
+		const IndexMap& faces = *system.Faces;
+		const IndexMap& cells = *system.Cells;
+		Vector d = Vector::LinSpaced(faces.GlobalSize, 0, faces.GlobalSize - 1).unaryExpr([](double f) { return 1 + fmod(f, 5) / 4; });
+		Eigen::MatrixXd cellFunctions = functions(Vector::Ones(cells.GlobalSize), 6);
+		Eigen::MatrixXd faceFunctions = functions(d, 4);
+		Vector b_T = Vector::LinSpaced(6 * cells.GlobalSize, 1, 2);
+		Vector b_F = Vector::Zero(4 * faces.GlobalSize);
+		int functionsLevelRows = 3 * (int)faces.GlobalSize; // the coarsest: the level of the functions
+		SparseMatrix scaledA_TF = system.Global.A_TF * d.asDiagonal();
+		SparseMatrix scaledA_FF = d.asDiagonal() * system.Global.A_FF * d.asDiagonal();
+		SparseMatrix identity(faces.GlobalSize, faces.GlobalSize);
+		identity.setIdentity();
+
+		SparseMatrix ownA_TF = scaledA_TF.middleRows(cells.Begin, cells.NOwned);
+		SparseMatrix ownA_FF = scaledA_FF.middleRows(faces.Begin, faces.NOwned);
+		SparseMatrix ownIdentity = identity.middleRows(faces.Begin, faces.NOwned);
+		vector<BigNumber> ghostFaces = ReversedGhosts({ &ownA_TF, &ownA_FF }, faces);
+		fhhos4::SparseMatrix A_TT = Kron(system.A_TT, C_TT);
+		fhhos4::SparseMatrix A_TF = Kron(LocalColumns(ownA_TF, faces, ghostFaces), C_TF);
+		fhhos4::SparseMatrix A_FF = Kron(LocalColumns(ownA_FF, faces, ghostFaces), G) + Kron(LocalColumns(ownIdentity, faces, ghostFaces), H);
+		Eigen::MatrixXd ownCellFunctions = cellFunctions.middleRows(6 * cells.Begin, 6 * cells.NOwned);
+		Eigen::MatrixXd ownFaceFunctions = faceFunctions.middleRows(4 * faces.Begin, 4 * faces.NOwned);
+		vector<int64_t> ghosts(ghostFaces.begin(), ghostFaces.end());
+		Vector ownB_T = b_T.segment(6 * cells.Begin, 6 * cells.NOwned);
+		Vector ownB_F = b_F.segment(4 * faces.Begin, 4 * faces.NOwned);
+
+		for (int coarseMatrixMaxRows : { functionsLevelRows, 0 })
+		{
+			Solution expected = solve(MPI_COMM_SELF, coarseMatrixMaxRows, Kron(system.Global.A_TT, C_TT), Kron(scaledA_TF, C_TF), Kron(scaledA_FF, G) + Kron(identity, H), cellFunctions, faceFunctions, {}, b_T, b_F);
+			Solution distributed = solve(World().Comm(), coarseMatrixMaxRows, A_TT, A_TF, A_FF, ownCellFunctions, ownFaceFunctions, ghosts, ownB_T, ownB_F);
+			string where = to_string(World().Size()) + " processes, shape " + to_string((int)shape) + ", CoarseMatrixMaxRows " + to_string(coarseMatrixMaxRows);
+			Vector allX_T = Gathered(distributed.X_T);
+			Vector allX_F = Gathered(distributed.X_F);
+			EXPECT_LE((allX_F - expected.X_F).norm(), 1e-8 * expected.X_F.norm()) << where;
+			EXPECT_LE((allX_T - expected.X_T).norm(), 1e-8 * expected.X_T.norm()) << where;
+			if (coarseMatrixMaxRows > 0)
+				EXPECT_LE(abs(distributed.Iterations - expected.Iterations), 1) << where;
+			else
+				EXPECT_LE(distributed.Iterations, expected.Iterations + 4) << where;
+			if (World().IsRoot())
+				cout << "\t" << where << ": " << distributed.Iterations << " iterations (" << expected.Iterations << " on one)" << endl;
+		}
+
+		if (shape != PartitionShape::Blocks || World().Size() == 1)
+			continue;
+		bool last = World().Rank() == World().Size() - 1;
+		Eigen::MatrixXd dependent = ownCellFunctions;
+		if (last)
+			dependent.block(0, 2, 6, 1) = dependent.block(0, 0, 6, 1);
+		EXPECT_THROW(solve(World().Comm(), 0, A_TT, A_TF, A_FF, dependent, ownFaceFunctions, ghosts, ownB_T, ownB_F), fhhos4::Error);
+		Eigen::Index nFunctions = last ? 2 : 3; // the last process: the constants only
+		EXPECT_THROW(solve(World().Comm(), 0, A_TT, A_TF, A_FF, ownCellFunctions.leftCols(nFunctions), ownFaceFunctions.leftCols(nFunctions), ghosts, ownB_T, ownB_F), fhhos4::Error);
 	}
 }
 

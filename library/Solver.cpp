@@ -530,6 +530,10 @@ namespace fhhos4
 		// Collective: the same answer on all the processes.
 		bool ReduceNearNullSpace(const Solver& s, const NearNullSpace& cells, const NearNullSpace& faces, Eigen::Index nCellDoFs, Eigen::Index nFaceDoFs, Vector& cellInterpOfOne, Vector& faceInterpOfOne) const
 		{
+			// The same functions on all the processes, so that they all take the same path
+			int functions = (int)cells.cols();
+			if (Comm.Min(functions) != Comm.Max(functions))
+				Utils::FatalError("fhhos4::Solver: cellNearNullSpace has " + to_string(Comm.Min(functions)) + " to " + to_string(Comm.Max(functions)) + " columns on the processes: the same functions on all of them.");
 			bool constants = false;
 			CollectiveCheck(Comm, [&]()
 			{
@@ -538,8 +542,6 @@ namespace fhhos4
 				constants = ConstantsOnly(faces, FaceBlockSize, s.VectorComponents, faceInterpOfOne) && cellConstants;
 				if (!constants && cells.cols() == s.VectorComponents)
 					Utils::FatalError("fhhos4::Solver: cellNearNullSpace or faceNearNullSpace is not the interpolation of the constants on hierarchical bases whose first function is constant, with " + to_string(CellBlockSize) + " DoFs per cell and " + to_string(FaceBlockSize) + " per face: " + (s.VectorComponents == 1 ? "the interpolation of the function 1 has one non-zero coefficient per cell and per face, the first" : "the column c is the interpolation of the constant of the component c, which has one non-zero coefficient per cell and per face, that of its DoF c") + " (the others at most 1e-10 times it). Wrong bases (see PCoarsening, ReorderByDegree()), block sizes (Dimension, the degrees, PolynomialSpace, VectorComponents), or the former input, one coefficient per cell and per face?");
-				if (!constants && IsDistributed())
-					Utils::FatalError("fhhos4::Solver: more near null space functions than the constants of the components (e.g. the rotations): on one process only.");
 			});
 			return !constants;
 		}
@@ -621,15 +623,9 @@ namespace fhhos4
 			GivenA_FT = std::move(A_FT);
 			NCellDoFs = A_TF.rows();
 			NFaceDoFs = A_TF.cols();
-			NearNullSpaceFunctions = (int)faceFunctions.cols();
 
 			ProgramArguments args = Arguments(s);
-			CreateSolvers(args, s);
-			if (NearNullSpaceFunctions > 0)
-			{
-				Multigrid->CellNearNullSpace = std::move(cellFunctions);
-				Multigrid->FaceNearNullSpace = std::move(faceFunctions);
-			}
+			CreateSolvers(args, s, std::move(cellFunctions), std::move(faceFunctions));
 
 			Condensation = make_unique<StaticCondensation>(A_TT, A_TF, GivenA_FT.get(), CellBlockSize);
 			A = Condensation->CondensedMatrix(A_FF, Symmetric);
@@ -648,8 +644,10 @@ namespace fhhos4
 
 		// On several processes: from the blocks of the uncondensed system, the rows of the process (see
 		// Solver::SetupSym()), A_FF in full; A_FT on the rows of all the faces of faces and the columns of the cells
-		// of the process (DistributedStaticCondensation), empty if the system is symmetric
-		void SetupDistributed(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, SparseMatrix A_FT, const SparseMatrix& A_FF, shared_ptr<const IndexMap> faces, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne)
+		// of the process (DistributedStaticCondensation), empty if the system is symmetric. cellFunctions,
+		// faceFunctions: as in Setup(), on the cells and faces of the process.
+		void SetupDistributed(const Solver& s, const SparseMatrix& A_TT, const SparseMatrix& A_TF, SparseMatrix A_FT, const SparseMatrix& A_FF, shared_ptr<const IndexMap> faces, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne,
+		                      DenseMatrix cellFunctions, DenseMatrix faceFunctions)
 		{
 			auto start = chrono::steady_clock::now();
 			Reset();
@@ -658,7 +656,7 @@ namespace fhhos4
 			NFaceDoFs = A_FF.rows();
 
 			ProgramArguments args = Arguments(s);
-			CreateSolvers(args, s);
+			CreateSolvers(args, s, std::move(cellFunctions), std::move(faceFunctions));
 
 			DistributedCondensation = make_unique<DistributedStaticCondensation>(A_TT, A_TF, std::move(A_FT), faces, CellBlockSize, FaceBlockSize);
 			DistributedA = DistributedCondensation->CondensedMatrix(A_FF);
@@ -725,13 +723,19 @@ namespace fhhos4
 
 		// The multigrid, and the Krylov method preconditioned by one cycle (SolverPreconditioner), as SolverFactory (-s
 		// fcguamg, gcruamg), except the residual replacement: the tolerance applies to the true residual
-		// (Result::RelativeResidual = |b - Ax|/|b|)
-		void CreateSolvers(const ProgramArguments& args, const Solver& s)
+		// (Result::RelativeResidual = |b - Ax|/|b|). cellFunctions, faceFunctions: see Setup().
+		void CreateSolvers(const ProgramArguments& args, const Solver& s, DenseMatrix cellFunctions, DenseMatrix faceFunctions)
 		{
 			ExportModule out;
 			Multigrid.reset(AlgebraicSolverFactory::CreateUncondensedAMG(args, s.Dimension, s.FaceDegree, PolynomialSpaceQ, CellBlockSize, FaceBlockSize, FaceBlockSize, out, AlgebraicSolverFactory::AlgebraicCoarseSolvers(s.Dimension, out)));
 			Multigrid->SingularMatrix = s.SingularMatrix;
 			Multigrid->VectorComponents = s.VectorComponents;
+			NearNullSpaceFunctions = (int)faceFunctions.cols();
+			if (NearNullSpaceFunctions > 0)
+			{
+				Multigrid->CellNearNullSpace = std::move(cellFunctions);
+				Multigrid->FaceNearNullSpace = std::move(faceFunctions);
+			}
 			if (Krylov == fhhos4::Krylov::FCG)
 			{
 				auto fcg = make_unique<FlexibleConjugateGradient>(s.Restart > 0 ? s.Restart : 1);
@@ -857,7 +861,15 @@ namespace fhhos4
 			CheckTriangles(*a_FF, "A_FF", true, "on several processes, the setup");
 		});
 		Vector cellOne, faceOne;
-		_impl->ReduceNearNullSpace(*this, MapNearNullSpace(cellNearNullSpace), MapNearNullSpace(faceNearNullSpace), a_TF->rows(), a_FF->rows(), cellOne, faceOne);
+		DenseMatrix cellFunctions, faceFunctions;
+		NearNullSpace cellVectors = MapNearNullSpace(cellNearNullSpace);
+		NearNullSpace faceVectors = MapNearNullSpace(faceNearNullSpace);
+		if (_impl->ReduceNearNullSpace(*this, cellVectors, faceVectors, a_TF->rows(), a_FF->rows(), cellOne, faceOne))
+		{
+			CollectiveCheck(comm, [&]() { tie(cellFunctions, faceFunctions) = _impl->NearNullSpaceBeyondConstants(*this, cellVectors, faceVectors); });
+			cellOne = Vector::Ones(a_TF->rows() / cbs);
+			faceOne = Vector::Ones(a_FF->rows() / fbs);
+		}
 		// The faces of the process and its ghosts (collective, checks the ghosts on all the processes)
 		IndexMap owners(comm, a_FF->rows() / fbs);
 		faces = make_shared<const IndexMap>(IndexMap::InOrder(owners, vector<GlobalNumber>(faceGhostGlobalNumbers.Numbers, faceGhostGlobalNumbers.Numbers + faceGhostGlobalNumbers.Count)));
@@ -871,7 +883,7 @@ namespace fhhos4
 			auto cells = make_shared<const IndexMap>(IndexMap::InOrder(cellOwners, vector<GlobalNumber>(cellGhostGlobalNumbers.Numbers, cellGhostGlobalNumbers.Numbers + cellGhostGlobalNumbers.Count)));
 			localA_FT = DistributedMatrix::FromLocalColumns(make_shared<const IndexMap>(owners), cells, *a_FT, fbs, cbs).RowsWithGhosts(*faces, cellOwners);
 		}
-		_impl->SetupDistributed(*this, *a_TT, *a_TF, std::move(localA_FT), *a_FF, faces, cellOne, faceOne);
+		_impl->SetupDistributed(*this, *a_TT, *a_TF, std::move(localA_FT), *a_FF, faces, cellOne, faceOne, std::move(cellFunctions), std::move(faceFunctions));
 	}
 
 	Result Solver::SolveCondensed(detail::ConstVectorView b, detail::VectorView x)
