@@ -47,12 +47,19 @@ the given bases.
   the smallest rank that has it, whose coefficients the eliminations take from its owner; its owner pins its row and
   its column of `Diag`, the processes that have it as a ghost zero its column of `Offd`; the dot products are
   `Parallel::Dot`.
-- The finest level: the output of each cycle projected orthogonally to z (`UncondensedAMG::ExecuteOneIteration()`): the
-  smoothers' kernel components would accumulate in the iterates until the rounding errors of A x stall the true
-  residual at small tolerances.
-- No projection on the intermediate levels: their residuals stay in Im(A) up to rounding (z^T A = 0, R = P^T), so the
-  levels in single precision are kept. (The geometric multigrid's per-level hooks `ApplyZeroMeanCondition`/
-  `EnforceCompatibilityCondition` are in double only.)
+- The finest level (`UncondensedAMG::ExecuteOneIteration()`): the right-hand side of each cycle (the residual of the
+  outer Krylov method) projected onto Im(A), its output orthogonally to z. The residual regains a kernel component, the
+  rounding of A x (about eps |A| |x|), which stays as the residual decreases: sent down the levels, the cycles push
+  their iterates along the kernel, and the step lengths of the K-cycle go wrong (a stall at small tolerances on fine
+  meshes, pure traction elasticity). Without the projection of the output, the smoothers' kernel components would
+  accumulate in the iterates until the rounding errors of A x stall the true residual.
+- The other levels in double (`Multigrid::EnforceCompatibilityCondition`, set with `SingularMatrix`): their right-hand
+  side, the restricted residual, projected onto Im(A) (`UncondensedLevel::EnforceCompatibilityCondition()`, the kernel
+  of the level computed at the setup as the coarsest's: `UncondensedLevel::Kernel`). In exact arithmetic it is in Im(A)
+  already (z_c^T P^T r = (P z_c)^T r = 0, P mapping the kernel of the level into that of the finer one); this removes
+  the rounding errors of the finer levels. The levels in single precision have none (the hook is in double): their
+  right-hand sides come from the finest, projected. Their iterates are not projected (the geometric multigrid's
+  `ApplyZeroMeanCondition`): with compatible right-hand sides, nothing pushes them along the kernel.
 - The library checks |A z| / (|A| |z|) < 1e-8 for each vector of the kernel after the setup of the multigrid (an error
   otherwise: a Dirichlet face in the system, e.g. a clamped one), and projects the condensed right-hand side of each
   solve onto Im(A). The solution is returned up to an element of the kernel: the client shifts it (the library has no
@@ -182,8 +189,8 @@ ADR-0010. `Solver::MixedPrecision` (library default true), `Multigrid::MixedPrec
 - Supported (`UncondensedAMG::MixedPrecisionApplies()`): symmetric and non-symmetric matrices (on several processes
   too: `docs/mpi.md`), the flat passes with the chained prolongations and the Galerkin operators, no option needing
   `A_F_F` (p-levels after h-levels), the Chebyshev and Gauss-Seidel smoothers (of the block size of the finest level
-  and scalar), no zero-mean/compatibility conditions nor exports; otherwise the levels are in double (the reason
-  logged).
+  and scalar), no zero-mean condition nor exports (the compatibility condition of `SingularMatrix` runs on the levels
+  in double only); otherwise the levels are in double (the reason logged).
 
 ## Block CSR storage
 

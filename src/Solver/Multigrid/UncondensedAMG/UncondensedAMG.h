@@ -311,10 +311,12 @@ public:
 
 	// SingularMatrix: the coarse solver wrapped by SingularSolver, with the kernel of the coarsest level: its interpolation
 	// of 1 of each of its components (the m functions on their p-level and the h-levels under it), or the functions on a
-	// level in the given bases (the coarsening stopped before their p-level)
+	// level in the given bases (the coarsening stopped before their p-level); and the compatibility condition of the
+	// other coarse levels (UncondensedLevel::Kernel)
 	void InitializeCoarseSolver() override
 	{
 		Multigrid::InitializeCoarseSolver();
+		this->EnforceCompatibilityCondition = _singular;
 		if (!_singular)
 			return;
 		Level* level = this->_fineLevel;
@@ -329,20 +331,38 @@ public:
 		UncondensedLevel& coarsest = dynamic_cast<UncondensedLevel&>(*level);
 		bool inGivenBases = coarsest.PolynomialDegree() > 0;
 		singular->SetKernel(coarsest.FaceInterpOfOne, coarsest.FaceBlockSize(), coarsest.VectorComponents, inGivenBases ? Functions() : nullptr, FaceNearNullSpaceDoFs());
+
+		// The kernels of the levels in double between the finest and the coarsest, as the coarsest's (the levels in single
+		// precision have none: their right-hand sides come from the finest, projected by ExecuteOneIteration())
+		for (Level* l = this->_fineLevel->CoarserLevel; l && !l->IsCoarsestLevel(); l = l->CoarserLevel)
+		{
+			UncondensedLevel& uncondensed = dynamic_cast<UncondensedLevel&>(*l);
+			if (!l->InSinglePrecision())
+				uncondensed.Kernel = SingularSolver::Kernel(uncondensed.FaceInterpOfOne, uncondensed.FaceBlockSize(), l->OperatorMatrix->rows(), uncondensed.VectorComponents, l->PolynomialDegree() > 0 ? Functions() : nullptr, FaceNearNullSpaceDoFs());
+		}
 	}
 
-	// SingularMatrix: the output of the cycle projected orthogonally to the kernel. The kernel component added by the
-	// smoothers, invisible to A, would accumulate in the iterates of the Krylov method until the rounding errors of A x
-	// on it stall the convergence at small tolerances.
+	// SingularMatrix: the right-hand side of the cycle projected onto Im(A), and its output orthogonally to the kernel.
+	// The right-hand side of the cycle, the residual of the outer Krylov method, regains a kernel component, the rounding
+	// of A x (about eps |A| |x|), which stays as the residual decreases: sent down the levels, it stalls the K-cycle at
+	// small tolerances (pure traction elasticity on a fine mesh). The kernel component added by the smoothers, invisible
+	// to A, would accumulate in the iterates of the Krylov method until the rounding errors of A x on it stall the
+	// convergence.
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
-		IterationResult result = Multigrid::ExecuteOneIteration(b, x, xEquals0, computeResidual, computeAx, oldResult);
+		Vector compatibleB;
+		if (_singular)
+		{
+			compatibleB = b;
+			SingularSolver::Project(compatibleB, _kernel);
+		}
+		IterationResult result = Multigrid::ExecuteOneIteration(_singular ? compatibleB : b, x, xEquals0, computeResidual, computeAx, oldResult);
 		if (_singular)
 		{
 			SingularSolver::Project(x, _kernel);
 			result.SetX(x);
 		}
-		return result;
+		return result; // the only return: elided (IterationResult's copy constructor starts a new iteration, without Ax)
 	}
 
 	Vector Solve(const Vector& b, string initialGuessCode) override
@@ -381,8 +401,9 @@ private:
 
 	// Mixed precision: the levels in single precision run the default options (UncondensedLevel::MixedPrecisionApplies(),
 	// the Galerkin operators, without the options that need A_F_F, e.g. p-levels after h-levels) and smoothers that have
-	// a single precision version (Chebyshev, Gauss-Seidel), without the zero-mean and compatibility conditions nor the
-	// exports of the multigrid. Otherwise the levels are in double (the reason printed).
+	// a single precision version (Chebyshev, Gauss-Seidel), without the zero-mean condition nor the exports of the
+	// multigrid (SingularMatrix: the compatibility condition only on the levels in double). Otherwise the levels are in
+	// double (the reason printed).
 	bool MixedPrecisionApplies(const UncondensedLevel& fine) const
 	{
 		// Those of the blocks of the finest level and of the levels of degree 0 (scalar: the scalar Gauss-Seidel)
@@ -396,8 +417,8 @@ private:
 		string unsupported;
 		if (!fine.MixedPrecisionApplies(this->H_CS, this->FaceCoarseningStgy) || !this->UseGalerkinOperator || A_F_FNeeded())
 			unsupported = "the coarsening options other than the flat passes with the chained coarsening prolongations, the Galerkin operators and the p-levels before the h-levels";
-		else if (this->ApplyZeroMeanCondition || this->EnforceCompatibilityCondition)
-			unsupported = "the zero-mean and compatibility conditions";
+		else if (this->ApplyZeroMeanCondition)
+			unsupported = "the zero-mean condition";
 		else if (this->ExportComponents || this->ExportIterationVectors)
 			unsupported = "the exports of the multigrid";
 		else if (!smootherSupports(this->PreSmoother, this->PreSmoothingIterations) || !smootherSupports(this->PostSmoother, this->PostSmoothingIterations))

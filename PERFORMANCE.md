@@ -2333,23 +2333,34 @@ Kept as they were written there; some repeat entries of "Done" in another form.
   lambda = mu = 1). Iterations Dirichlet / pure traction (Disk++'s solver time: setup and solve), L2 errors (pure
   traction: after the removal of the rigid motion, its L2 projection on the modes):
   - Triangles n=16/32/64/128: k1 24/26, 26/27, 27/27, 27/29 (n=128: 1.13 s / 1.30 s, x1.15); k2 18/21, 18/21, 19/21,
-    19/not converged (below). L2 errors within 10% of Dirichlet's, the same rates (k1 n=128 3.62e-6 / 3.67e-6, k2
-    1.320e-8 / 1.324e-8).
+    19/not converged (21 since the compatibility condition, below). L2 errors within 10% of Dirichlet's, the same
+    rates (k1 n=128 3.62e-6 / 3.67e-6, k2 1.320e-8 / 1.324e-8).
   - Tetrahedra n=4/8/12/16: k1 23/35, 29/38, 32/39, 34/40 (n=16: 5.85 s / 7.91 s, x1.35; 3.0 GB of RSS); k2 n=4/8/12
     25/36, 27/35, 26/35 (n=12: 6.34 s / 8.27 s, x1.30; 4.2 GB). L2 errors 3 to 30% above Dirichlet's (the most on the
     coarsest mesh: k1 n=16 1.06e-3 / 1.14e-3, k2 n=12 1.22e-4 / 1.27e-4).
   - The iterations are flat in h, 2-3 above Dirichlet in 2D, 6-12 in 3D. The right-hand side's component along the
     modes removed by the library (quadrature of the traction): at most 8e-7 relative (tetrahedra n=12 k1).
-  - Triangles n=128 k2 stalls: the true residual 2.3e-10 from iteration 21 on, 200 iterations (10.4 s), the L2 error
-    that of Dirichlet. The K-cycle: with a V-cycle (`FHHOS4_TEST_VCYCLE`, a PROTOTYPE switch of the app) 43 iterations
-    to 8.7e-11 (Dirichlet: 44); one level (`FHHOS4_TEST_COARSE`, the Cholesky of the condensed matrix pinned on the
-    modes: 10.5 s of setup, 2.0 GB) 4.5e-12, the attainable accuracy (eps |A| |x| / |b| = 2.5e-12). Not the cause: the
-    single precision (2.29e-10 with all the levels in double), the cycle's A e of the unprojected e (FCG computing
-    A d itself: 2.55e-10), the kernel (|A q| / |A| = 1.6e-15 on the orthonormalized modes; the residual has no
-    component along them). Below a residual of 1e-9, the kernel component of the cycle's output (removed by the
-    projection on the finest level) grows from about its size to 1e3-7e3 times the rest, of constant absolute size:
-    the residual converges to a direction that the cycle sends into the kernel. Not fixed (open: projections in the
-    K-cycle's inner iterations on the singular coarse levels?).
+  - Triangles n=128 k2 stalled (before 2026-11-17): the true residual 2.3e-10 from iteration 21 on, 200 iterations
+    (10.4 s), the L2 error that of Dirichlet. With a V-cycle (`FHHOS4_TEST_VCYCLE`, a PROTOTYPE switch of the app) 43
+    iterations to 8.7e-11 (Dirichlet: 44); one level (`FHHOS4_TEST_COARSE`, the Cholesky of the condensed matrix
+    pinned on the modes) 4.5e-12, the attainable accuracy (eps |A| |x| / |b| = 2.5e-12). Not the cause: the single
+    precision (2.29e-10 with all the levels in double), the cycle's A e of the unprojected e, the kernel (|A q| / |A| =
+    1.6e-15 on the orthonormalized modes).
+  - The cause (2026-11-17): the kernel component of the outer residual, the rounding of A x (eps |A| |x|, constant as
+    the residual decreases), sent down the levels. Its share of the residual restricted into the level of the
+    functions: 2e-16 at the first iteration, x30 every 3 iterations (the rate of the residual), 3e-3 from the 20th (5e-2
+    two levels below); the same with all the levels in double. Fixed by the compatibility condition (the right-hand
+    side of each cycle and the restricted residuals of the levels in double projected onto Im(A), `docs/uamg.md`): 21
+    iterations to 7.1e-11 (2.34 s; Dirichlet 19, 1.92 s on 2026-11-16), and 26 iterations to 9.8e-13 at the tolerance
+    1e-12. Each part alone fixed it in a prototype (the right-hand side of the cycle; the restricted residuals; or the
+    iterates of the levels in double projected after the post-smoothing instead), with the same iterations on the
+    table; recomputing the K-cycle's A c after a projection changed nothing. Elsewhere the same iterations (triangles
+    n=128 k1 29 -> 28) and L2 errors; the 3D gap to Dirichlet unchanged (another cause). Triangles k3 (a p-level of
+    degree 1 in single precision, with inner K-cycle iterations): Dirichlet / before / after, n=64 15/19/19, n=128
+    16/23/19. The scalar pure Neumann: Disk++'s `poisson_solver` (the 11 runs of `build/bench/logs_neumann_1030`,
+    rerun with the library before and after) the same iterations and L2 errors, the residuals within rounding; the
+    program's `-tc fullneumann -mesh tri -k 2 -n 128 -s fcglibuamg` reached 1e-12 in 23 iterations before the fix, in
+    double and with `-uamg-mixed` (no floor). Logs: `logs_elast/final_traction_summary.txt`.
 - **`PCoarsening::ToZero`** vs Minus2 (FCG, 2026-10-19; `bgs,rbgs` / `bcheb4`): Square-tri n=64 k=3 10 -> 19 / 14 -> 27,
   k=4 9 -> 21 / 14 -> 30, k=5 7 -> 23 / 11 -> 32; Cube-tet n=8 k=3 29 -> 37 / 50 -> 60.
 - **Interpolation of 1**: without the rescaling of the constant modes, L2-orthonormal bases slow U-AMG down (Cube-tet

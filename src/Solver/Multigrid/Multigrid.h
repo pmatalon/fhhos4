@@ -636,11 +636,12 @@ private:
 			// Residual equation Ae=r solved on the coarse grid //
 			//--------------------------------------------------//
 
+			// The compatibility condition of the coarser level, in double (under a level in single precision: below)
 			if constexpr (!single)
 			{
 				if (this->EnforceCompatibilityCondition)
 				{
-					level->CoarserLevel->EnforceCompatibilityCondition(rc);               result.AddWorkInFlops(level->EnforceCompatibilityConditionCost(rc));
+					level->CoarserLevel->EnforceCompatibilityCondition(rc);               result.AddWorkInFlops(level->CoarserLevel->EnforceCompatibilityConditionCost(rc));
 				}
 			}
 
@@ -650,6 +651,10 @@ private:
 			if (single && !level->CoarserLevel->IsCoarsestLevel() && !level->CoarserLevel->InSinglePrecision())
 			{
 				Vector rcInDouble = rc.template cast<double>();
+				if (this->EnforceCompatibilityCondition)
+				{
+					level->CoarserLevel->EnforceCompatibilityCondition(rcInDouble);   result.AddWorkInFlops(level->CoarserLevel->EnforceCompatibilityConditionCost(rcInDouble));
+				}
 				ec = CoarseCorrection<double>(level, rcInDouble, result).template cast<T>();
 			}
 			else

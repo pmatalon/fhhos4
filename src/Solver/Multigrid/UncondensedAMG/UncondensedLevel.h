@@ -8,6 +8,7 @@
 #include "../AggregAMG/AlgebraicMesh.h"
 #include "../DownwindOrder.h"
 #include "../Level.h"
+#include "../../Direct/SingularSolver.h"
 #include "../../../Utils/SparseMatrixOps.h"
 using namespace std;
 
@@ -124,6 +125,23 @@ public:
 	// Set by UncondensedAMG: the number of components of the unknown (UncondensedAMG::VectorComponents), whose constants
 	// are the first VectorComponents DoFs of each block, each of coordinate c (the interpolation of 1 of the block)
 	int VectorComponents = 1;
+
+	// SingularMatrix: the kernel of the operator of this level (on the faces of the process), orthonormal vectors, set by
+	// UncondensedAMG on the levels in double between the finest and the coarsest (whose coarse solver has its own) for
+	// their compatibility condition. Empty otherwise.
+	vector<Vector> Kernel;
+
+	// The right-hand side of this level (the restricted residual) projected onto Im(A), the orthogonal of the kernel (A
+	// symmetric). In exact arithmetic it is there already (P maps the kernel of this level into that of the finer one);
+	// the rounding errors of the finer levels add a kernel component, along which the cycle would push its iterate.
+	void EnforceCompatibilityCondition(Vector& b) override
+	{
+		SingularSolver::Project(b, Kernel);
+	}
+	Flops EnforceCompatibilityConditionCost(Vector& b) override
+	{
+		return Kernel.size() * (Cost::Dot(b) + Cost::VectorDAXPY(b));
+	}
 
 	// Set by UncondensedAMG on the p-level of the near null space functions (UncondensedAMG::CellNearNullSpace): their
 	// coefficients on the first DoFs of each cell and face of the finer level, the columns of the prolongation from this
