@@ -11,9 +11,9 @@ from their sources or documentation unless marked "unchecked".
 | HArDCore3D | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()` (diffusion), `SetupNonSym()` (diffusion-advection-reaction) |
 | Disk++ | client (fork, branch `fhhos4`) | itself, Eigen row-major | blocks | no | `SetupSym()`, `VectorComponents` (vector Laplacian), the rigid body modes (linear elasticity) |
 | NGSolve | client (the adapter, Python) | itself (`ngla`), CSR; partial rows on several processes | monolithic matrix (product space) | optional | `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; on several processes the adapter sums the shared rows itself |
-| PETSc users | target: the preconditioner (`mpi/12`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | `-pc_type fhhos4` (`ENABLE_PETSC_PC`: `MergeOffDiag()` from `MatMPIAIJGetSeqAIJ()`); `MatCreateSubMatrix()` then the merge for a monolithic matrix; `SplitVector()`/`JoinVector()` |
+| PETSc users | the preconditioner (`library/petsc`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | `-pc_type fhhos4` (`ENABLE_PETSC_PC`: `MergeOffDiag()` from `MatMPIAIJGetSeqAIJ()`); for a monolithic matrix, `PCFHHOS4SetIS()`: `MatCreateSubMatrix()` then the merge |
 | DOLFINx | target (`mpi/04`) | itself (`MatrixCSR`) or PETSc (AIJ, MATNEST) | blocks or monolithic matrix | always | through PETSc: as PETSc users; native `MatrixCSR`: to study |
-| Code_Aster | target, studied only (no code yet) | itself (`MATR_ASSE`, MORSE storage); PETSc in its parallel versions | monolithic matrix, uncondensed | yes | through PETSc: a `KSP_UTIL` function of the user's script (petsc4py) builds the index sets, the blocks and `-pc_type fhhos4` (see below) |
+| Code_Aster | target: a prototype (an adapter outside the repository), one process or a distributed mesh | itself (`MATR_ASSE`, MORSE storage); PETSc in its parallel versions | monolithic matrix, uncondensed | yes | through PETSc: a `KSP_UTIL` function of the user's script (petsc4py) builds the index sets and `-pc_type fhhos4` (see below) |
 | MFEM | possible | itself, then hypre (`ParallelAssemble()`: `HypreParMatrix`, ParCSR) | blocks (`BlockOperator`) or monolithic matrix | yes | `MergeOffDiag()` (ParCSR has PETSc's layout); unchecked |
 | deal.II | possible | itself, into PETSc or Trilinos (Tpetra) matrices | blocks (block matrices) or monolithic matrix | yes | through PETSc: as PETSc users; Tpetra (one CSR, local columns, any global numbers): no helper; unchecked |
 
@@ -46,7 +46,8 @@ Non-symmetric: one process only. Towards hypre and PETSc NGSolve sends its parti
 block on several processes is an MPIAIJ: two CSRs (the owned and the other columns) and `garray`, the global DoF
 numbers of the other columns. A copy before the library is accepted (as for hypre, AmgX, MUMPS). The interpolation of
 1 is the near-null space vector (`MatGetNearNullSpace`). fhhos4's preconditioner, `-pc_type fhhos4` (`library/petsc`,
-loaded by `-dll_append`), takes a MATNEST of the four blocks; a monolithic AIJ matrix with index sets: not yet.
+loaded by `-dll_append`), takes a MATNEST of the four blocks, or a monolithic AIJ matrix with the index sets of the
+cells and faces (`PCFHHOS4SetIS()`: the blocks extracted by `MatCreateSubMatrix()`, the rows left out the identity).
 
 **DOLFINx.** Each process assembles its own cells into owned and ghost rows (local columns: owned, then ghosts), then
 `scatter_rev()` adds the ghost rows to their owners; or PETSc matrices, including MATNEST (nest assembly). HDG: a cell
@@ -95,6 +96,53 @@ From its sources (gitlab.com/codeaster/src, main of 2026-10-21; checked 2026-11-
   space from the subdomains' Neumann matrices, assembled from the elementary matrices (`apmams.F90`). The test suite
   uses MUMPS or `LDLT_SP` with HHO and HPDDM only with Lagrange elements, but EDF's studies, not in the repository,
   use HPDDM with HHO (someone at EDF, 2026-11-17): the solver to beat on large cases.
+
+The adapter (2026-11-17; conda-forge's `code-aster` 18.1.8, OpenMPI, PETSc 3.25 and petsc4py: build directory
+`build-aster`, env `code-aster`): `KSP_UTIL` returns a `preonly` KSP with `-pc_type fhhos4` on Code_Aster's matrix and
+the index sets of the cells and faces of each process in the library's order (`PCFHHOS4SetIS()`, composed by
+petsc4py), with the library's own FCG to `RESI_RELA` (on the condensed residual); `-ksp_type fcg -pc_fhhos4_krylov
+none` in `OPTION_PETSC` for PETSc's FCG around one cycle instead. One process, or several with a distributed mesh
+(`ParallelMesh`: `readMedFile()`, `buildCube()`, then `refine()`). The library registered by
+`PetscDLLibraryRegister_fhhos4_petsc()` (ctypes). What it relies on:
+- The DoF names give the order: `getNodeAndComponentFromDOF()` without argument (all the DoFs in one call; one call per
+  DoF takes 260 us), the components interleaved by sorting each node's DoFs by (basis function, component). On a
+  distributed mesh (`ParallelDOFNumbering`) these are the local DoFs, ghosts included: `getNoGhostDOFs()` gives the
+  owned ones, all those of the nodes the process owns (whole cells and faces), and `getLocalToGlobalMapping()` their
+  PETSc rows (0-based, contiguous on each process: `NUME.NULG`, `apalmh.F90`). A sequential mesh on several processes:
+  refused by the adapter (untried). The rigid body modes from `HHO(model).projectOnHHOSpace([FORMULE...])` are in
+  the matrix's numbering (A v = 0 to rounding away from the Dirichlet rows; on a distributed mesh, on the local DoFs,
+  the rotations about a centre reduced over the processes); the bases pass the library's checks (hierarchical,
+  constant first), and the discretization is inferred (`-pc_fhhos4_vector_components` given: 3).
+- Code_Aster does not set `MAT_SYMMETRIC`, and on several processes its matrix is symmetric to rounding only (the
+  beam refined once on 2 processes: |A - A^T|_inf / |A|_inf = 9e-17, on entries that are zero but for rounding): the
+  adapter tests it to 1e-12 |A|_inf.
+- The eliminated faces (`AFFE_CHAR_CINE`: rows and columns zeroed, 1 on the diagonal) are refused by the library ("a
+  face belongs to no cell"): the adapter leaves them out of the blocks, as the library's contract wants the Dirichlet
+  faces, and the preconditioner is the identity there. A face fixed in some components only: refused (faces of
+  different sizes, `uamg/04`). The stored zeros change nothing (the same residuals without them).
+- Code_Aster calls `KSP_UTIL` at each new matrix, keeps the KSP's type, inserts `OPTION_PETSC` and calls
+  `PCSetFromOptions()` then `PCSetUp()` (`appcpr.F90`), and only then sets the tolerances (`RESI_RELA`, `NMAX_ITER`:
+  10000 if 0) and calls `KSPSetFromOptions()` (`apksp.F90`): the adapter sets the library's Krylov method in
+  `KSP_UTIL` (the setup builds it) and passes the tolerances in a pre-solve hook (`KSPSetPreSolve()`). Not the norm type: with `-ksp_type fcg`, `-ksp_norm_type unpreconditioned`, else
+  `RESI_RELA` applies to FCG's preconditioned residual (the beam `ssnv303e`: 1e-6 of it is 2e-2 of the true one). After
+  the solve, Code_Aster checks the true residual against `sqrt(RESI_RELA)`, in its linear operators only (hidden
+  keyword `RESI_RELA_PC`, -1 in `STAT_NON_LINE`: `c_solveur.py`; `apmain.F90`, error `PETSC_16`). With `preonly`, a
+  solve of the library that does not converge is not reported (PETSc's `CONVERGED_ITS`).
+- Code_Aster sets OpenBLAS's threads itself (`openblas_set_num_threads()` in `libbibfor`, to `ncpus`): on several
+  processes the library's MUMPS (one OpenMP thread) then hangs in OpenBLAS's products (`docs/mpi.md`); the adapter
+  sets OpenBLAS to one thread from `KSP_UTIL` to the end of each solve (a post-solve hook gives Code_Aster's back).
+- A Python object that the KSP keeps (a `PCPYTHON` context, a pre-solve hook) must not refer to it: KSP -> object ->
+  KSP is a cycle through C that Python's collector cannot see, and each matrix's KSP and hierarchy would never be
+  freed.
+- Code_Aster's `PRE_COND="GAMG"` fails on HHO: its rigid body modes (`MatNullSpaceCreateRigidBody()`) need a constant
+  number of DoFs per node (`PETSC_18`, a warning; then 10000 iterations). `projectOnHHOSpace()` of a nodal field does
+  not exist for mechanics in 18.1.8 (option `HHO_PROJ2_MECA`): the modes from functions, 6 projections per model
+  (`PERFORMANCE.md`). conda-forge's PETSc has GAMG and hypre, not HPDDM.
+- `create_custom_ksp()` does not check the result of the function: a Python exception there is a segmentation fault
+  without its message (the adapter must print it). Code_Aster operators run inside `KSP_UTIL` (`projectOnHHOSpace()`)
+  invalidate the matrix it was given ("Not for factored matrix"): compute before the solve.
+- PETSc is initialized by the import of `code_aster.Utilities.PETSc` (petsc4py), before `OPTION_PETSC` can reach
+  `PetscInitialize()`: the initialization options through the environment (`PETSC_OPTIONS=-no_signal_handler`).
 
 **MFEM, deal.II.** Not studied: from memory.
 

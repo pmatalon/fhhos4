@@ -1,6 +1,6 @@
 // fhhos4's preconditioner for PETSc, PCFHHOS4 (-pc_type fhhos4): the U-AMG of the library for the uncondensed system
 // of a hybrid discretization, given as a MATNEST [[A_TT, A_TF], [A_FT, A_FF]] of AIJ blocks (the cells, then the
-// faces). One application: one cycle (Krylov::None, MaxIterations 1), i.e. the condensation of the residual, one cycle
+// faces), or as one AIJ matrix with the index sets of its cells and faces (PCFHHOS4SetIS()). One application: one cycle (Krylov::None, MaxIterations 1), i.e. the condensation of the residual, one cycle
 // on the condensed system, and the cell unknowns. The default K-cycle is non-linear: PETSc's Krylov method must be
 // flexible (fcg, fgmres, gcr). Written in PETSc's style, on PETSc's interface for the implementations of
 // preconditioners and the public header of the library, with its inference of the discretization (header-only,
@@ -9,8 +9,10 @@
 #include <fhhos4>
 #include "fhhos4_petsc.h"
 #include "Solver/DiscretizationInference.h"
+#include <algorithm>
 #include <cmath>
 #include <new>
+#include <numeric>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -30,7 +32,8 @@ namespace
 		PetscBool SymmetricSet = PETSC_FALSE;  // -pc_fhhos4_symmetric given; otherwise MatIsSymmetricKnown() of the operator
 		PetscBool Symmetric = PETSC_FALSE;
 		PetscBool SetUpSymmetric = PETSC_FALSE; // that of the last setup
-		IS Cells = nullptr, Faces = nullptr;    // the rows of the blocks in the operator (MatNestGetISs())
+		IS Cells = nullptr, Faces = nullptr;    // the rows of the blocks in the operator (MatNestGetISs(), or PCFHHOS4SetIS())
+		PetscBool RowsLeftOut = PETSC_FALSE;    // rows of the operator in neither: the identity there
 		fhhos4::DistributedBlocks Merged;       // several processes: the blocks merged (MergeOffDiag())
 		fhhos4::SparseMatrix A_FT;              // one process, non-symmetric: a copy, read by the solves
 	};
@@ -108,11 +111,16 @@ namespace
 
 	// A block of the operator, an AIJ matrix: on several processes (MATMPIAIJ), in two parts, Diag, Offd, and the global
 	// numbers of the columns of Offd (OffdColumns); on one process, Diag alone (MATSEQAIJ, or MATMPIAIJ, whose Diag is
-	// then the whole block)
+	// then the whole block). OffdEigen() and OffdGlobals(): Offd as MergeOffDiag() takes it, its global numbers
+	// increasing.
 	struct Block
 	{
 		SeqAIJ Diag, Offd;
 		const PetscInt* OffdColumns = nullptr;
+		// Offd's columns in the order of their global numbers (a copy), if OffdColumns is not: MatCreateSubMatrix() with an
+		// index set that is not increasing leaves them so
+		std::vector<PetscInt> SortedRowPointers, SortedColumns, SortedOffdColumns;
+		std::vector<PetscScalar> SortedValues;
 
 		PetscErrorCode Get(Mat A)
 		{
@@ -125,10 +133,53 @@ namespace
 				PetscCall(MatMPIAIJGetSeqAIJ(A, &Ad, &Ao, &OffdColumns));
 				PetscCall(Diag.Get(Ad));
 				PetscCall(Offd.Get(Ao));
+				if (!std::is_sorted(OffdColumns, OffdColumns + Offd.Cols))
+					SortOffd();
 			}
 			else
 				PetscCall(Diag.Get(A));
 			PetscFunctionReturn(PETSC_SUCCESS);
+		}
+
+		void SortOffd()
+		{
+			std::vector<PetscInt> order(Offd.Cols), sortedColumn(Offd.Cols);
+			std::vector<std::pair<PetscInt, PetscScalar>> row;
+			std::iota(order.begin(), order.end(), 0);
+			std::sort(order.begin(), order.end(), [this](PetscInt a, PetscInt b) { return OffdColumns[a] < OffdColumns[b]; });
+			SortedOffdColumns.resize(Offd.Cols);
+			for (PetscInt k = 0; k < Offd.Cols; k++)
+			{
+				sortedColumn[order[k]] = k;
+				SortedOffdColumns[k] = OffdColumns[order[k]];
+			}
+			SortedRowPointers.assign(Offd.RowPointers, Offd.RowPointers + Offd.Rows + 1);
+			SortedColumns.resize(Offd.RowPointers[Offd.Rows]);
+			SortedValues.resize(Offd.RowPointers[Offd.Rows]);
+			for (PetscInt i = 0; i < Offd.Rows; i++)
+			{
+				row.clear();
+				for (PetscInt q = Offd.RowPointers[i]; q < Offd.RowPointers[i + 1]; q++)
+					row.push_back({ sortedColumn[Offd.Columns[q]], Offd.Values[q] });
+				std::sort(row.begin(), row.end());
+				for (size_t k = 0; k < row.size(); k++)
+				{
+					SortedColumns[Offd.RowPointers[i] + k] = row[k].first;
+					SortedValues[Offd.RowPointers[i] + k] = row[k].second;
+				}
+			}
+		}
+
+		Map OffdEigen() const
+		{
+			if (SortedOffdColumns.empty())
+				return Offd.Eigen();
+			return Map(Offd.Rows, Offd.Cols, SortedValues.size(), SortedRowPointers.data(), SortedColumns.data(), SortedValues.data());
+		}
+
+		const PetscInt* OffdGlobals() const
+		{
+			return SortedOffdColumns.empty() ? OffdColumns : SortedOffdColumns.data();
 		}
 
 		PetscErrorCode Restore()
@@ -264,11 +315,11 @@ namespace
 		PC_FHHOS4* ctx = (PC_FHHOS4*)pc->data;
 		fhhos4::Solver& solver = ctx->Solver;
 		MPI_Comm comm = PetscObjectComm((PetscObject)pc);
-		Mat P = pc->pmat, A_TT, A_TF, A_FT = nullptr, A_FF;
+		Mat P = pc->pmat, A_TT, A_TF, A_FT = nullptr, A_FF, extracted[4] = {};
 		PetscMPIInt size;
-		PetscBool nest, set, symmetric;
-		PetscInt nRows, nCols, tBegin, tEnd, fBegin, fEnd;
-		IS rows[2];
+		PetscBool nest, aij, set, symmetric;
+		PetscInt nRows, nCols, nCellRows, nFaceRows, tBegin, tEnd, fBegin, fEnd;
+		IS rows[2] = {};
 		int cbs = 0, fbs = 0;
 		Block tt, tf, ft, ff;
 		Eigen::MatrixXd cellNearNullSpace, faceNearNullSpace;
@@ -281,10 +332,6 @@ namespace
 #else
 		PetscCheck(size == 1, comm, PETSC_ERR_SUP, "fhhos4: the library is compiled without MPI (-DENABLE_MPI=OFF): one process only");
 #endif
-		PetscCall(PetscObjectTypeCompare((PetscObject)P, MATNEST, &nest));
-		PetscCheck(nest, comm, PETSC_ERR_SUP, "fhhos4: the operator must be a MATNEST [[A_TT, A_TF], [A_FT, A_FF]] of AIJ blocks (the cells, then the faces), not %s", ((PetscObject)P)->type_name);
-		PetscCall(MatNestGetSize(P, &nRows, &nCols));
-		PetscCheck(nRows == 2 && nCols == 2, comm, PETSC_ERR_SUP, "fhhos4: the operator must be a MATNEST of 2 x 2 blocks [[A_TT, A_TF], [A_FT, A_FF]] (the cells, then the faces), not %" PetscInt_FMT " x %" PetscInt_FMT, nRows, nCols);
 		symmetric = ctx->Symmetric;
 		if (!ctx->SymmetricSet)
 		{
@@ -295,11 +342,40 @@ namespace
 				symmetric = (PetscBool)(set && symmetric);
 			}
 		}
-		PetscCall(SubMatrix(P, 0, 0, "A_TT", &A_TT));
-		PetscCall(SubMatrix(P, 0, 1, "A_TF", &A_TF));
-		PetscCall(SubMatrix(P, 1, 1, "A_FF", &A_FF));
-		if (!symmetric)
-			PetscCall(SubMatrix(P, 1, 0, "A_FT", &A_FT));
+		PetscCall(PetscObjectTypeCompare((PetscObject)P, MATNEST, &nest));
+		if (nest)
+		{
+			PetscCall(MatNestGetSize(P, &nRows, &nCols));
+			PetscCheck(nRows == 2 && nCols == 2, comm, PETSC_ERR_SUP, "fhhos4: the operator must be a MATNEST of 2 x 2 blocks [[A_TT, A_TF], [A_FT, A_FF]] (the cells, then the faces), not %" PetscInt_FMT " x %" PetscInt_FMT, nRows, nCols);
+			PetscCall(SubMatrix(P, 0, 0, "A_TT", &A_TT));
+			PetscCall(SubMatrix(P, 0, 1, "A_TF", &A_TF));
+			PetscCall(SubMatrix(P, 1, 1, "A_FF", &A_FF));
+			if (!symmetric)
+				PetscCall(SubMatrix(P, 1, 0, "A_FT", &A_FT));
+			PetscCall(MatNestGetISs(P, rows, nullptr));
+		}
+		else // one AIJ matrix: its blocks extracted with the index sets of PCFHHOS4SetIS(), destroyed after the setup
+		{
+			PetscCall(PetscObjectBaseTypeCompareAny((PetscObject)P, &aij, MATSEQAIJ, MATMPIAIJ, ""));
+			PetscCheck(aij, comm, PETSC_ERR_SUP, "fhhos4: the operator must be a MATNEST [[A_TT, A_TF], [A_FT, A_FF]] of AIJ blocks (the cells, then the faces), or an AIJ matrix with the rows of its cells and faces (PCFHHOS4SetIS()), not %s", ((PetscObject)P)->type_name);
+			PetscCall(PetscObjectQuery((PetscObject)pc, "fhhos4_cells", (PetscObject*)&rows[0]));
+			PetscCall(PetscObjectQuery((PetscObject)pc, "fhhos4_faces", (PetscObject*)&rows[1]));
+			PetscCheck(rows[0] && rows[1], comm, PETSC_ERR_ARG_WRONGSTATE, "fhhos4: give the rows of the cells and of the faces in the operator, an AIJ matrix: PCFHHOS4SetIS() (or the operator as a MATNEST [[A_TT, A_TF], [A_FT, A_FF]] of the blocks)");
+			PetscCall(MatCreateSubMatrix(P, rows[0], rows[0], MAT_INITIAL_MATRIX, &extracted[0]));
+			PetscCall(MatCreateSubMatrix(P, rows[0], rows[1], MAT_INITIAL_MATRIX, &extracted[1]));
+			PetscCall(MatCreateSubMatrix(P, rows[1], rows[1], MAT_INITIAL_MATRIX, &extracted[3]));
+			if (!symmetric)
+				PetscCall(MatCreateSubMatrix(P, rows[1], rows[0], MAT_INITIAL_MATRIX, &extracted[2]));
+			A_TT = extracted[0];
+			A_TF = extracted[1];
+			A_FT = extracted[2];
+			A_FF = extracted[3];
+		}
+		PetscCall(ISGetSize(rows[0], &nCellRows));
+		PetscCall(ISGetSize(rows[1], &nFaceRows));
+		PetscCall(MatGetSize(P, &nRows, nullptr));
+		PetscCheck(nCellRows + nFaceRows <= nRows, comm, PETSC_ERR_ARG_WRONG, "fhhos4: more rows of cells and faces (%" PetscInt_FMT " + %" PetscInt_FMT ") than in the operator (%" PetscInt_FMT "): the index sets overlap", nCellRows, nFaceRows, nRows);
+		ctx->RowsLeftOut = (PetscBool)(nCellRows + nFaceRows < nRows);
 
 		// The DoFs of each process: whole cells and faces
 		PetscCall(InferDiscretization(solver, A_TT, A_TF, comm));
@@ -316,7 +392,6 @@ namespace
 		PetscCall(MatGetOwnershipRange(A_FF, &fBegin, &fEnd));
 		PetscCall(CheckOnAll(comm, tBegin % cbs == 0 && (tEnd - tBegin) % cbs == 0 && fBegin % fbs == 0 && (fEnd - fBegin) % fbs == 0,
 		                     "each process must own the DoFs of whole cells and faces (" + std::to_string(cbs) + " DoFs per cell, " + std::to_string(fbs) + " per face): the first of its rows of A_TT and A_FF and their numbers multiples of these"));
-		PetscCall(MatNestGetISs(P, rows, nullptr));
 		PetscCall(PetscObjectReference((PetscObject)rows[0]));
 		PetscCall(PetscObjectReference((PetscObject)rows[1]));
 		PetscCall(ISDestroy(&ctx->Cells));
@@ -339,9 +414,9 @@ namespace
 				if (tt.Offd.Eigen().nonZeros() > 0)
 					error = "A_TT has entries in the columns of the cells of other processes: a cell belongs to one process";
 				else if (symmetric)
-					ctx->Merged = fhhos4::MergeOffDiag(tf.Diag.Eigen(), tf.Offd.Eigen(), tf.OffdColumns, ff.Diag.Eigen(), ff.Offd.Eigen(), ff.OffdColumns, fbs);
+					ctx->Merged = fhhos4::MergeOffDiag(tf.Diag.Eigen(), tf.OffdEigen(), tf.OffdGlobals(), ff.Diag.Eigen(), ff.OffdEigen(), ff.OffdGlobals(), fbs);
 				else
-					ctx->Merged = fhhos4::MergeOffDiag(tf.Diag.Eigen(), tf.Offd.Eigen(), tf.OffdColumns, ft.Diag.Eigen(), ft.Offd.Eigen(), ft.OffdColumns, ff.Diag.Eigen(), ff.Offd.Eigen(), ff.OffdColumns, fbs, cbs);
+					ctx->Merged = fhhos4::MergeOffDiag(tf.Diag.Eigen(), tf.OffdEigen(), tf.OffdGlobals(), ft.Diag.Eigen(), ft.OffdEigen(), ft.OffdGlobals(), ff.Diag.Eigen(), ff.OffdEigen(), ff.OffdGlobals(), fbs, cbs);
 			}
 			catch (const fhhos4::Error& e)
 			{
@@ -374,12 +449,15 @@ namespace
 		}
 		for (Block* block : { &tt, &tf, &ft, &ff })
 			PetscCall(block->Restore());
+		for (Mat& A : extracted)
+			PetscCall(MatDestroy(&A));
 		PetscCheck(allOk, comm, PETSC_ERR_ARG_WRONG, "fhhos4: %s", error.empty() ? "an input is wrong on another process (see its error)" : error.c_str());
 		PetscCheck(error.empty(), comm, PETSC_ERR_LIB, "fhhos4: %s", error.c_str());
 		PetscFunctionReturn(PETSC_SUCCESS);
 	}
 
-	// z = M^{-1} r: the cells and faces of r and z (VecGetSubVector() with the index sets of the operator's rows)
+	// z = M^{-1} r: the cells and faces of r and z (VecGetSubVector() with the index sets of the operator's rows); the
+	// identity on the rows in neither
 	PetscErrorCode PCApply_FHHOS4(PC pc, Vec r, Vec z)
 	{
 		PC_FHHOS4* ctx = (PC_FHHOS4*)pc->data;
@@ -389,6 +467,8 @@ namespace
 		PetscInt nT, nF;
 		std::string error;
 		PetscFunctionBegin;
+		if (ctx->RowsLeftOut)
+			PetscCall(VecCopy(r, z));
 		PetscCall(VecGetSubVector(r, ctx->Cells, &r_T));
 		PetscCall(VecGetSubVector(r, ctx->Faces, &r_F));
 		PetscCall(VecGetSubVector(z, ctx->Cells, &z_T));
@@ -535,5 +615,16 @@ PETSC_EXTERN PetscErrorCode PetscDLLibraryRegister_fhhos4_petsc(void)
 {
 	PetscFunctionBegin;
 	PetscCall(PCRegister(PCFHHOS4, PCCreate_FHHOS4));
+	PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PETSC_EXTERN PetscErrorCode PCFHHOS4SetIS(PC pc, IS cells, IS faces)
+{
+	PetscFunctionBegin;
+	PetscValidHeaderSpecific(pc, PC_CLASSID, 1);
+	PetscValidHeaderSpecific(cells, IS_CLASSID, 2);
+	PetscValidHeaderSpecific(faces, IS_CLASSID, 3);
+	PetscCall(PetscObjectCompose((PetscObject)pc, "fhhos4_cells", (PetscObject)cells));
+	PetscCall(PetscObjectCompose((PetscObject)pc, "fhhos4_faces", (PetscObject)faces));
 	PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -2,7 +2,10 @@
 // (ctest PETScPC_np1...4): the Cartesian hybrid system partitioned among the processes (PartitionedSystem), each
 // process giving the rows of its cells and faces to a MATNEST of AIJ blocks (MATSEQAIJ on one process, MATMPIAIJ on
 // several), solved by PETSc's Krylov methods preconditioned by fhhos4, against the library's solve of the whole system
-// on one process. The results printed by the first process; a test fails if it fails on one process.
+// on one process; or as one AIJ matrix with the index sets of its cells and faces (PCFHHOS4SetIS()). The results
+// printed by the first process; a test fails if it fails on one process.
+#include <algorithm>
+#include <numeric>
 #include <random>
 #include <sstream>
 #include <gtest/gtest.h>
@@ -76,11 +79,9 @@ namespace
 		return n;
 	}
 
-	// The parts of a vector of the operator on the cells and faces of the process
-	void SetParts(Mat P, Vec v, const Vector& v_T, const Vector& v_F)
+	// The parts of a vector of the operator on the cells and faces of the process (rows: theirs in the operator)
+	void SetParts(IS const (&rows)[2], Vec v, const Vector& v_T, const Vector& v_F)
 	{
-		IS rows[2];
-		PetscCallAbort(PETSC_COMM_WORLD, MatNestGetISs(P, rows, nullptr));
 		for (auto [is, values] : { pair{ rows[0], &v_T }, pair{ rows[1], &v_F } })
 		{
 			Vec part;
@@ -93,13 +94,11 @@ namespace
 		}
 	}
 
-	Vector Part(Mat P, Vec v, int i)
+	Vector Part(IS const (&rows)[2], Vec v, int i)
 	{
-		IS rows[2];
 		Vec part;
 		const PetscScalar* a;
 		PetscInt n;
-		PetscCallAbort(PETSC_COMM_WORLD, MatNestGetISs(P, rows, nullptr));
 		PetscCallAbort(PETSC_COMM_WORLD, VecGetSubVector(v, rows[i], &part));
 		PetscCallAbort(PETSC_COMM_WORLD, VecGetLocalSize(part, &n));
 		PetscCallAbort(PETSC_COMM_WORLD, VecGetArrayRead(part, &a));
@@ -115,11 +114,14 @@ namespace
 	// rows of each process, with the right-hand side, the interpolation of 1 as near null space (PETSc's orthonormal
 	// vectors: one per component, normalized), and the solution and iterations of the library on one process. The
 	// vectors: those of MatCreateVecs() (plain, with the layout of the nest), or nestVectors, VECNEST ones (a sub-vector
-	// for the cells, one for the faces)
+	// for the cells, one for the faces). MakeMonolithic(): the operator as one AIJ matrix instead.
 	struct PETScSystem
 	{
 		int c;
 		Mat Blocks[4] = {}, P = nullptr;
+		IS Rows[2] = {};            // of the cells and of the faces of the process in P
+		IS GivenFaces = nullptr;    // P one AIJ matrix: the faces given to the PC (as PCFHHOS4SetIS()), Rows[1] or fewer
+		Eigen::Index CellOffset, FaceOffset; // of the DoFs of the process in the global vectors
 		Vec b = nullptr;
 		Vector ExpectedX_T, ExpectedX_F;
 		int ExpectedIterations = 0;       // by the setup of the system's symmetry
@@ -158,6 +160,11 @@ namespace
 			ExpectedNonSymIterations = asymmetry == 0 ? reference(false, x_T, x_F) : ExpectedIterations;
 			SparseMatrix globals[4] = { OnEachComponent(system.Global.A_TT, c), OnEachComponent(system.Global.A_TF, c), OnEachComponent(system.Global.A_FT, c), OnEachComponent(system.Global.A_FF, c) };
 			P = Nest(globals, cells, faces, c, c, Blocks);
+			PetscCallAbort(PETSC_COMM_WORLD, MatNestGetISs(P, Rows, nullptr));
+			for (IS rows : Rows)
+				PetscCallAbort(PETSC_COMM_WORLD, PetscObjectReference((PetscObject)rows));
+			CellOffset = c * cells.Begin;
+			FaceOffset = c * faces.Begin;
 			if (symmetricFlag)
 				PetscCallAbort(PETSC_COMM_WORLD, MatSetOption(P, MAT_SYMMETRIC, PETSC_TRUE));
 			if (nestVectors)
@@ -171,7 +178,7 @@ namespace
 			}
 			else
 				PetscCallAbort(PETSC_COMM_WORLD, MatCreateVecs(P, nullptr, &b));
-			SetParts(P, b, b_T.segment(c * cells.Begin, c * cells.NOwned), b_F.segment(c * faces.Begin, c * faces.NOwned));
+			SetParts(Rows, b, b_T.segment(CellOffset, c * cells.NOwned), b_F.segment(FaceOffset, c * faces.NOwned));
 			if (nearNullSpace != NearNullSpace::None)
 			{
 				vector<Vec> ones(nearNullSpace == NearNullSpace::Constant ? 0 : c);
@@ -180,7 +187,7 @@ namespace
 					// The component k of 1: the first function of each block on that component
 					auto onComponent = [&](BigNumber blocks) { Vector v = Vector::Zero(c * blocks); v(Eigen::seqN(k, blocks, c)).setOnes(); return v; };
 					PetscCallAbort(PETSC_COMM_WORLD, VecDuplicate(b, &ones[k]));
-					SetParts(P, ones[k], onComponent(cells.NOwned), onComponent(faces.NOwned));
+					SetParts(Rows, ones[k], onComponent(cells.NOwned), onComponent(faces.NOwned));
 					PetscCallAbort(PETSC_COMM_WORLD, VecNormalize(ones[k], nullptr));
 				}
 				MatNullSpace space;
@@ -194,10 +201,104 @@ namespace
 
 		~PETScSystem()
 		{
+			for (IS& rows : Rows)
+				PetscCallAbort(PETSC_COMM_WORLD, ISDestroy(&rows));
+			PetscCallAbort(PETSC_COMM_WORLD, ISDestroy(&GivenFaces));
 			PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&b));
 			PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&P));
 			for (Mat& A : Blocks)
 				PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&A));
+		}
+
+		// The operator as one AIJ matrix (MatConvert() of the MATNEST), its rows shuffled on each process (the DoFs of the
+		// cells and faces mixed, Rows following them), given to the PC with PCFHHOS4SetIS(); the right-hand side and the
+		// near null space permuted alike (VecPermute()). With leftOutEvery > 0, every leftOutEvery-th face of the process
+		// eliminated as Dirichlet DoFs, MatZeroRowsColumns() with the expected solution (the system's solution unchanged),
+		// and left out of GivenFaces.
+		void MakeMonolithic(int leftOutEvery)
+		{
+			Mat A, permuted;
+			IS permutation;
+			PetscInt begin, end;
+			PetscBool set, symmetric;
+			MatNullSpace nearNullSpace;
+			PetscCallAbort(PETSC_COMM_WORLD, MatConvert(P, MATAIJ, MAT_INITIAL_MATRIX, &A));
+			PetscCallAbort(PETSC_COMM_WORLD, MatGetOwnershipRange(A, &begin, &end));
+			vector<PetscInt> order(end - begin), position(end - begin);
+			std::iota(order.begin(), order.end(), begin);
+			std::shuffle(order.begin(), order.end(), std::mt19937(World().Rank()));
+			for (PetscInt k = 0; k < end - begin; k++)
+				position[order[k] - begin] = begin + k;
+			PetscCallAbort(PETSC_COMM_WORLD, ISCreateGeneral(PETSC_COMM_WORLD, end - begin, order.data(), PETSC_COPY_VALUES, &permutation));
+			PetscCallAbort(PETSC_COMM_WORLD, MatPermute(A, permutation, permutation, &permuted)); // its row k: the row order[k] of A
+			for (IS& rows : Rows)
+			{
+				const PetscInt* indices;
+				PetscInt n;
+				PetscCallAbort(PETSC_COMM_WORLD, ISGetLocalSize(rows, &n));
+				PetscCallAbort(PETSC_COMM_WORLD, ISGetIndices(rows, &indices));
+				vector<PetscInt> moved(n);
+				for (PetscInt k = 0; k < n; k++)
+					moved[k] = position[indices[k] - begin];
+				PetscCallAbort(PETSC_COMM_WORLD, ISRestoreIndices(rows, &indices));
+				PetscCallAbort(PETSC_COMM_WORLD, ISDestroy(&rows));
+				PetscCallAbort(PETSC_COMM_WORLD, ISCreateGeneral(PETSC_COMM_WORLD, n, moved.data(), PETSC_COPY_VALUES, &rows));
+			}
+			PetscCallAbort(PETSC_COMM_WORLD, VecPermute(b, permutation, PETSC_FALSE));
+			PetscCallAbort(PETSC_COMM_WORLD, MatGetNearNullSpace(P, &nearNullSpace));
+			if (nearNullSpace)
+			{
+				PetscBool hasConstant;
+				PetscInt n;
+				const Vec* vectors;
+				MatNullSpace permutedSpace;
+				PetscCallAbort(PETSC_COMM_WORLD, MatNullSpaceGetVecs(nearNullSpace, &hasConstant, &n, &vectors));
+				vector<Vec> moved(n);
+				for (PetscInt k = 0; k < n; k++)
+				{
+					PetscCallAbort(PETSC_COMM_WORLD, VecDuplicate(vectors[k], &moved[k]));
+					PetscCallAbort(PETSC_COMM_WORLD, VecCopy(vectors[k], moved[k]));
+					PetscCallAbort(PETSC_COMM_WORLD, VecPermute(moved[k], permutation, PETSC_FALSE));
+				}
+				PetscCallAbort(PETSC_COMM_WORLD, MatNullSpaceCreate(PETSC_COMM_WORLD, hasConstant, n, moved.data(), &permutedSpace));
+				PetscCallAbort(PETSC_COMM_WORLD, MatSetNearNullSpace(permuted, permutedSpace));
+				PetscCallAbort(PETSC_COMM_WORLD, MatNullSpaceDestroy(&permutedSpace));
+				for (Vec& v : moved)
+					PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&v));
+			}
+			if (leftOutEvery > 0)
+			{
+				Vec x;
+				const PetscInt* faceRows;
+				PetscInt nF, nT;
+				vector<PetscInt> eliminated, kept;
+				PetscCallAbort(PETSC_COMM_WORLD, ISGetLocalSize(Rows[0], &nT));
+				PetscCallAbort(PETSC_COMM_WORLD, ISGetLocalSize(Rows[1], &nF));
+				PetscCallAbort(PETSC_COMM_WORLD, VecDuplicate(b, &x));
+				SetParts(Rows, x, ExpectedX_T.segment(CellOffset, nT), ExpectedX_F.segment(FaceOffset, nF));
+				PetscCallAbort(PETSC_COMM_WORLD, ISGetIndices(Rows[1], &faceRows));
+				for (PetscInt f = 0; f < nF / c; f++)
+				{
+					vector<PetscInt>& to = f % leftOutEvery == 0 ? eliminated : kept;
+					to.insert(to.end(), faceRows + c * f, faceRows + c * (f + 1));
+				}
+				PetscCallAbort(PETSC_COMM_WORLD, ISRestoreIndices(Rows[1], &faceRows));
+				PetscCallAbort(PETSC_COMM_WORLD, MatZeroRowsColumns(permuted, eliminated.size(), eliminated.data(), 1.0, x, b));
+				PetscCallAbort(PETSC_COMM_WORLD, VecDestroy(&x));
+				PetscCallAbort(PETSC_COMM_WORLD, ISCreateGeneral(PETSC_COMM_WORLD, kept.size(), kept.data(), PETSC_COPY_VALUES, &GivenFaces));
+			}
+			else
+			{
+				GivenFaces = Rows[1];
+				PetscCallAbort(PETSC_COMM_WORLD, PetscObjectReference((PetscObject)GivenFaces));
+			}
+			PetscCallAbort(PETSC_COMM_WORLD, MatIsSymmetricKnown(P, &set, &symmetric));
+			if (set && symmetric)
+				PetscCallAbort(PETSC_COMM_WORLD, MatSetOption(permuted, MAT_SYMMETRIC, PETSC_TRUE));
+			PetscCallAbort(PETSC_COMM_WORLD, ISDestroy(&permutation));
+			PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&A));
+			PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&P));
+			P = permuted;
 		}
 
 		struct Result
@@ -222,6 +323,11 @@ namespace
 			PetscCallAbort(PETSC_COMM_WORLD, KSPSetType(ksp, kspType));
 			PetscCallAbort(PETSC_COMM_WORLD, KSPGetPC(ksp, &pc));
 			PetscCallAbort(PETSC_COMM_WORLD, PCSetType(pc, PCFHHOS4)); // registered by -dll_append
+			if (GivenFaces) // PCFHHOS4SetIS() composes them so; the library not linked here (-dll_append)
+			{
+				PetscCallAbort(PETSC_COMM_WORLD, PetscObjectCompose((PetscObject)pc, "fhhos4_cells", (PetscObject)Rows[0]));
+				PetscCallAbort(PETSC_COMM_WORLD, PetscObjectCompose((PetscObject)pc, "fhhos4_faces", (PetscObject)GivenFaces));
+			}
 			if (string(kspType) != KSPPREONLY)
 			{
 				PetscCallAbort(PETSC_COMM_WORLD, KSPSetTolerances(ksp, 1e-10, PETSC_CURRENT, PETSC_CURRENT, 200));
@@ -244,7 +350,7 @@ namespace
 				PetscCallAbort(PETSC_COMM_WORLD, KSPGetIterationNumber(ksp, &result.Iterations));
 				PetscCallAbort(PETSC_COMM_WORLD, KSPGetConvergedReason(ksp, &result.Reason));
 				Vector allX(ExpectedX_T.rows() + ExpectedX_F.rows()), expected(allX.rows());
-				allX << Gathered(Part(P, x, 0)), Gathered(Part(P, x, 1));
+				allX << Gathered(Part(Rows, x, 0)), Gathered(Part(Rows, x, 1));
 				expected << ExpectedX_T, ExpectedX_F;
 				result.Error = (allX - expected).norm() / expected.norm();
 				if (World().IsRoot())
@@ -266,7 +372,7 @@ namespace
 	{
 		if (World().IsRoot())
 			cout << "\t\tthe library alone on one process: " << expectedIterations << " iterations" << endl;
-		EXPECT_EQ(result.ErrorCode, PETSC_SUCCESS);
+		EXPECT_EQ(result.ErrorCode, PETSC_SUCCESS) << LastError;
 		EXPECT_GT(result.Reason, 0);
 		EXPECT_LE(result.Error, 1e-8);
 		EXPECT_LE(abs(result.Iterations - expectedIterations), World().Size() == 1 ? 1 : 4);
@@ -318,7 +424,32 @@ TEST(PETScPC, PreonlyAndConstantNearNullSpace)
 {
 	PETScSystem system(0, 1, true, NearNullSpace::Constant);
 	PETScSystem::Result result = system.Solve(KSPPREONLY, "preonly_", Degrees + " -pc_fhhos4_krylov fcg -pc_fhhos4_max_it 100 -pc_fhhos4_rtol 1e-10");
-	EXPECT_EQ(result.ErrorCode, PETSC_SUCCESS);
+	EXPECT_EQ(result.ErrorCode, PETSC_SUCCESS) << LastError;
+	EXPECT_LE(result.Error, 1e-8);
+}
+
+// The operator as one AIJ matrix, its rows shuffled on each process, with the index sets of its cells and faces
+// (PCFHHOS4SetIS()): the iterations of the MATNEST, symmetric (2 components) or not. Every fifth face of each process
+// eliminated (MatZeroRowsColumns()) and left out of the index sets: the identity there, the same solution.
+TEST(PETScPC, MonolithicOperator)
+{
+	string options = Degrees + " -pc_fhhos4_vector_components 2";
+	PETScSystem nest(0, 2, true), monolithic(0, 2, true), dirichlet(0, 2, true);
+	monolithic.MakeMonolithic(0);
+	PETScSystem::Result expected = nest.Solve(KSPFCG, "nestsym_", options);
+	PETScSystem::Result result = monolithic.Solve(KSPFCG, "monosym_", options);
+	ExpectSolves(result, monolithic.ExpectedIterations);
+	EXPECT_EQ(result.Iterations, expected.Iterations);
+	PETScSystem nonsymmetricNest(0.3, 1, false), nonsymmetric(0.3, 1, false);
+	nonsymmetric.MakeMonolithic(0);
+	expected = nonsymmetricNest.Solve(KSPFGMRES, "nestnonsym_", Degrees);
+	result = nonsymmetric.Solve(KSPFGMRES, "mononsym_", Degrees);
+	ExpectSolves(result, nonsymmetric.ExpectedIterations);
+	EXPECT_EQ(result.Iterations, expected.Iterations);
+	dirichlet.MakeMonolithic(5);
+	result = dirichlet.Solve(KSPFCG, "dirichlet_", options);
+	EXPECT_EQ(result.ErrorCode, PETSC_SUCCESS) << LastError;
+	EXPECT_GT(result.Reason, 0);
 	EXPECT_LE(result.Error, 1e-8);
 }
 
@@ -422,7 +553,7 @@ TEST(PETScPC, Ambiguity)
 // Refused on all the processes: the degrees not given (inferred) without -pc_fhhos4_vector_components, no near null
 // space, a near null space that is not the interpolation of 1 (the constant vector on 2 components), the DoFs of the
 // processes not whole blocks (7 components: neither the 3600 cells nor the 7080 faces are multiples of 7), a monolithic
-// operator
+// operator without PCFHHOS4SetIS()
 TEST(PETScPC, Errors)
 {
 	PETScSystem system(0, 1, true);
@@ -437,6 +568,7 @@ TEST(PETScPC, Errors)
 	PetscCallAbort(PETSC_COMM_WORLD, MatConvert(system.P, MATAIJ, MAT_INITIAL_MATRIX, &monolithic));
 	std::swap(monolithic, system.P);
 	EXPECT_NE(system.Solve(KSPFCG, "monolithic_", Degrees).ErrorCode, PETSC_SUCCESS);
+	EXPECT_NE(LastError.find("PCFHHOS4SetIS()"), string::npos) << LastError;
 	std::swap(monolithic, system.P);
 	PetscCallAbort(PETSC_COMM_WORLD, MatDestroy(&monolithic));
 }

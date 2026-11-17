@@ -159,7 +159,12 @@ run path `$ORIGIN` (the programs that load it don't link `libfhhos4`: found next
 `-dll_append` loads the library). One file in PETSc's style, on PETSc's interface for the implementations of
 preconditioners (`petsc/private/pcimpl.h`), `fhhos4.h` and `src/Solver/DiscretizationInference.h` (header-only,
 compiled into it: moving into PETSc, `src/ksp/pc/impls`, means installing this header too).
-- Setup (`PCSetUp_FHHOS4()`): the operator a 2 x 2 MATNEST of AIJ blocks, the cells first; the options of the
+- Setup (`PCSetUp_FHHOS4()`): the operator a 2 x 2 MATNEST of AIJ blocks, the cells first, or an AIJ matrix with the
+  index sets of its cells and faces composed on the PC (`"fhhos4_cells"`, `"fhhos4_faces"`: `PCFHHOS4SetIS()`), its
+  blocks extracted by `MatCreateSubMatrix()` and destroyed at the end of the setup (the library keeps what it needs);
+  from an index set that is not increasing, PETSc leaves the global numbers of a block's off-diagonal columns
+  (`garray`) unsorted: `Block::SortOffd()` copies that part sorted, as `MergeOffDiag()` takes it. The rows in neither
+  index set (`RowsLeftOut`): the identity, `VecCopy()` before the application. The options of the
   discretization not given inferred first (`InferDiscretization()`: `AnalyzeBlocks()` on the diagonal parts of `A_TT`
   and `A_TF`, its own `MPI_Allgather()`, the messages with the options' names; written into the solver's members; the
   dimension and the degrees given, the space alone, without analysis if P and Q have the same DoFs and solver, P if the
@@ -173,11 +178,13 @@ compiled into it: moving into PETSc, `src/ksp/pc/impls`, means installing this h
   read it). Several: `A_TT`'s diagonal part, the others by `MergeOffDiag()` (its errors local: reduced before the
   setup). The symmetric setup if `MatIsSymmetricKnown()` or `MatIsSPDKnown()`, or with `-pc_fhhos4_symmetric`.
 - Application (`PCApply_FHHOS4()`): `Solve(r_T, r_F, z_T, z_F)` on the parts of the vectors (`VecGetSubVector()` with
-  the nest's index sets: plain vectors, or VECNEST ones, whose `VecGetSubVector()` takes the MATNEST's index sets; also
-  for the near null space), `z_F` zero first; `Krylov::None`, `MaxIterations = 1` by default: one cycle.
+  the index sets: plain vectors, or VECNEST ones, whose `VecGetSubVector()` takes the MATNEST's index sets; also for
+  the near null space; with an AIJ operator's index sets, not contiguous, a copy through a scatter each time), `z_F`
+  zero first; `Krylov::None`, `MaxIterations = 1` by default: one cycle.
 - Options `-pc_fhhos4_*` (`PCSetFromOptions_FHHOS4()`), `PCView_FHHOS4()` (`-ksp_view`).
 - Tests: `tests/PETSc/PCTest.cpp` (`fhhos4_petsc_tests`, its own `main()`: MPI, then PETSc; `ctest -R PETScPC`, 1-4
-  processes, the library loaded by `-dll_append`, as by a user's program); the examples of `README_library.md`,
+  processes, the library loaded by `-dll_append`, as by a user's program: not linked, it composes the index sets
+  itself); the examples of `README_library.md`,
   `examples/petsc_preconditioner.cpp` and `.py` (`ctest -R ExamplePETScPreconditioner`: `Cpp`, linked to the library,
   built with the tests; `Python`, if petsc4py is installed). Their HHO, the local matrix of the reference square, was
   checked by hand: symmetric, its kernel the interpolation of 1, exact on x^2; the C++ one (`examples/HHO_diffusion.h`,

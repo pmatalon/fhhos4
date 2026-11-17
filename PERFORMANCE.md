@@ -2437,3 +2437,93 @@ repository.
   process: `UAMG()` 0.43 / 0.73 / 0.54 / 0.40 s, of which the setup 0.25 / 0.38 / 0.30 / 0.21 s (the preparation on one
   process: 0.09 s; on several, 0.18-0.34 s: the full blocks extracted, the exchanges). Without a barrier before the
   setup, the empty rank 0 waited 1.4-1.8 s inside it on 2 processes.
+
+### Code_Aster
+
+Through `KSP_UTIL` (2026-11-17; `docs/clients.md`; the adapter outside the repository): Code_Aster 18.1.8 (conda-forge,
+OpenMPI, PETSc 3.25.6), one process, build directory `build-aster`. Its test `ssnv303e` (a clamped beam, 3D_HHO
+`LINEAIRE`: k = l = 1, 120 HEXA27, 5994 DoFs, the 6 clamped faces eliminated by `AFFE_CHAR_CINE`, E = 1e7, nu = 0.3),
+`STAT_NON_LINE`, `RESI_RELA` 1e-6 (Code_Aster's default), the test's 14 `TEST_RESU` pass (non-regression to 1e-6):
+the library's own FCG (`-ksp_type preonly`, the adapter's default since): 50 iterations; PETSc's FCG preconditioned by
+one K-cycle on the true residual (`KSP_NORM_UNPRECONDITIONED`): 48 with the rigid body modes, 2705 to 1e-8 with the
+translations only; on FCG's default preconditioned residual, 39 and 2199 to 1e-8, but 1e-6 of that residual is 2e-2
+of the true one on a random right-hand side. 1e-8 is below what this load can reach: the library's FCG stalls at
+4.5e-7 (10000 iterations, Code_Aster's `NMAX_ITER`), PETSc's reported 1e-8 at 58 iterations on its recursively
+updated residual (on a random right-hand side of the dump: reported 1e-8, true 9e-7). The library alone
+on the same blocks, random right-hand sides: the condensed matrix (4500 rows) has a condition number of 3.5e9
+(eigenvalues 0.36 to 1.2e9: a plate 10 x 1 x 0.1, one element in the thickness, bent across it), so double precision
+cannot bring the relative residual below eps |A_c| |x| / |b_c|: 6e-10 to 8e-9 for normal right-hand sides, 7e-8 for
+uniform ones in [0, 1) (PETSc's `VecSetRandom()`). To 1e-6: 39 to 53 iterations, `MixedPrecision` true and false
+within 3 of each other. To 1e-8, at the floor: 50 to 99 iterations with normal right-hand sides, in no order between
+the precisions (58 against 90 for one of them); never with uniform ones, the residual wandering by x100 at the floor
+until the last iteration (300; the same through PETSc with `-ksp_type preonly -pc_fhhos4_krylov fcg`). The first cycle
+multiplies the 2-norm of the residual by 13 to 1200 (the smoother the right-hand side, the more) while the energy norm
+of the error drops to x0.85-0.90, what FCG's first step minimizes. Also to 1e-8, so within the floor's noise: 72
+iterations with `BlockGaussSeidel`, 53 with `SymmetricBlockGaussSeidel` in double precision, 56 with the V-cycle; the
+translations only diverge (200 iterations, 13).
+
+Against Code_Aster's solvers (2026-11-17; `~/code/fhhos4-aster/bench`: `run.sh`, `table.py`): linear elasticity
+3D_HHO k = l = 1, `STAT_NON_LINE` (one Newton iteration), one process, `RESI_RELA` 1e-6, E = 1e7, nu = 0.3. The
+plate of `ssnv303e` refined (`Mesh.refine()`: 10 x 1 x 0.1, clamped on one end, `FORCE_FACE` on the other) and a unit
+cube (`Mesh.buildCube(refine)`, clamped on one face, `FORCE_FACE` on the opposite one). Times: Code_Aster's
+factorization (with PETSc, also its conversion of the matrix and the preconditioner's setup) plus its solve; peak: the
+resident memory of the whole run (Code_Aster alone: 0.4 GB). fhhos4: the adapter (`KSP_UTIL`, the library's own FCG,
+the rigid body modes); GAMG + modes: CG with GAMG, its near null space the same modes (`KSP_UTIL`). Every solution
+within 1.6e-7 of MUMPS's.
+
+| Case, DoFs | Threads | MUMPS | `LDLT_SP` | GAMG + modes | fhhos4 (iterations) | Peak: MUMPS, fhhos4 |
+|---|---|---|---|---|---|---|
+| plate, 6k | 1 | 0.04 s | 0.18 s | 0.85 s (720) | 0.12 s (50) | 0.40, 0.42 GB |
+| plate, 43k | 1 | 0.32 s | 0.78 s | 20.5 s (776) | 1.08 s (46) | 0.58, 0.73 GB |
+| plate, 321k | 1 | 5.02 s | 20.1 s | | 8.09 s (34) | 2.00, 2.79 GB |
+| plate, 321k | 8 | 3.93 s | 17.0 s | | 5.25 s (34) | 2.00, 2.80 GB |
+| cube, 22k | 1 | 0.23 s | 0.21 s | 1.11 s (37) | 0.43 s (17) | 0.50, 0.57 GB |
+| cube, 167k | 1 | 4.74 s | 3.59 s | 10.8 s (38) | 3.56 s (17) | 1.50, 1.69 GB |
+| cube, 167k | 8 | 2.89 s | 2.64 s | | 2.34 s (17) | 1.51, 1.70 GB |
+
+- fhhos4's iterations do not grow with the refinement (plate 50, 46, 34; cube 17, 17); MUMPS's time grows x21 from
+  the cube's 22k to 167k DoFs (one thread), fhhos4's x8.3. The next cube (1.3M DoFs) does not fit in the machine's
+  13 GB with either. The plate (four elements in the thickness at 321k DoFs) is close to a 2D problem, which favors
+  the factorizations; the single-precision factorization `LDLT_SP` loses there (88 iterations; the condition number
+  of the plate is beyond single precision's).
+- Code_Aster's own `PRE_COND="GAMG"` fails on HHO (10000 iterations, `PETSC_5`, both plates): its rigid body modes
+  need a constant number of DoFs per node (`PETSC_18`). With the HHO modes it converges, slowly on the plate.
+- fhhos4's 5.25 s on the plate, 8 threads: Code_Aster's conversion to PETSc 0.9 s (all its PETSc solvers), the
+  adapter per matrix 1.2 s (the eliminated faces 0.65 s: the CSR arrays copied to numpy; `isSymmetric(0.0)` 0.2 s;
+  the four blocks copied by `createSubMatrix()`), the library's setup 0.77 s, its solve 2.3 s (its cycles x1.5 faster
+  on 8 threads than on one: 35 cycles, 2.85 s against 4.26 s). PETSc's FCG around one cycle instead of the
+  library's: 36 iterations, 4.6 s for the solve (its product by the whole AIJ matrix on one thread); the scatters of
+  the `PCPYTHON` 0.04 s (the adapter of 11-17).
+- The adapter's one-time setup per model, not in the table: 10.9 s on the plate's 321k DoFs, 5.8 s on the cube's
+  167k, nearly all in `projectOnHHOSpace()` (6 modes; 0.13 s per mode at 43k DoFs even for a constant vector:
+  Code_Aster's projection itself; `DEFI_FONCTION`/`DEFI_CONSTANTE` instead of `FORMULE`: x1.6 faster). The DoF order
+  takes 0.08 s at 43k with `getNodeAndComponentFromDOF()` for all the DoFs, 11 s with one call per DoF.
+
+On several processes (2026-11-18): the same cases on a distributed mesh (`ParallelMesh`: the plate refined, then
+partitioned; the cube by `ParallelMesh.buildCube()`), the machine's 8 cores as processes x threads. The adapter of
+11-18: Code_Aster's matrix with the index sets of each process (`PCFHHOS4SetIS()`), OpenBLAS on one thread
+(`docs/clients.md`). Times as above, of the slowest process; the library's setup and solve from its log; peak: the
+resident memory summed over the processes (`bench/peak_rss.py`). |u| within 2e-7 of MUMPS's on one process (MUMPS's own
+on several processes too: the accuracy of a condition number of 3.5e9).
+
+| Case, DoFs | Processes x threads | MUMPS | fhhos4 (iterations) | fhhos4: library setup, solve | Peak: MUMPS, fhhos4 | Adapter per model |
+|---|---|---|---|---|---|---|
+| cube, 167k | 1 x 8 | 2.89 s | 2.39 s (17) | 0.47 s, 0.70 s | 1.51, 1.58 GB | 5.8 s |
+| cube, 167k | 2 x 4 | 3.52 s | 2.49 s (17) | 0.73 s, 0.58 s | 2.10, 2.23 GB | 3.3 s |
+| cube, 167k | 4 x 2 | 3.92 s | 2.62 s (16) | 0.75 s, 0.61 s | 3.14, 3.27 GB | 2.4 s |
+| plate, 321k | 1 x 8 | 3.93 s | 5.52 s (34) | 0.78 s, 2.24 s | 2.00, 2.54 GB | 11.0 s |
+| plate, 321k | 2 x 4 | 4.75 s | 6.02 s (38) | 1.29 s, 2.33 s | 2.56, 3.30 GB | 6.6 s |
+| plate, 321k | 4 x 2 | 4.58 s | 5.39 s (37) | 1.16 s, 1.92 s | 3.49, 4.52 GB | 4.1 s |
+
+- On one node, processes instead of threads speed up neither solver: MUMPS 2.89 -> 3.92 s on the cube. fhhos4 stays
+  faster than MUMPS on the cube (its time x0.67 to x0.83 of MUMPS's) and slower on the plate (x1.18 to x1.40); its
+  iterations barely move (cube 16-17, plate 34 -> 37-38). Each process adds ~0.5 GB (Code_Aster's own). Where several
+  processes should pay, sizes beyond one process's memory, is beyond this machine's 13 GB.
+- The library's setup is slower on 2 and 4 processes than on one (plate 0.78 -> 1.16-1.29 s, cube 0.47 -> 0.73-0.75 s;
+  not broken down). fhhos4's factorization time (Code_Aster's conversion, the adapter per matrix, the extraction of the
+  blocks, the setup): 3.2 s on one process, 3.4-3.6 s on several, on the plate.
+- The adapter's one-time setup divides with the processes (`projectOnHHOSpace()` on each process's DoFs): plate 11.0 ->
+  4.1 s on 4 processes.
+- The index sets instead of the MATNEST and its `PCPYTHON` (one process, 8 threads): the same times within the noise
+  (cube 2.34 -> 2.39 s, plate 5.25 -> 5.52 s), less memory (plate 2.80 -> 2.54 GB: the extracted blocks freed after
+  the setup).

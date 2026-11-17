@@ -37,7 +37,9 @@ program too: `-DENABLE_PROGRAM=ON`).
   stagnates; the default smoother is Chebyshev, ADR-0017; the l1 Gauss-Seidel of the rows coupled to other processes,
   `l1hbgs` (the default for a non-symmetric matrix), makes it one: `docs/uamg.md`, Smoothers),
   Cholesky/LU by MUMPS (ADR-0021; `Solver/Direct/MUMPS.h`: on one OpenMP thread (`ICNTL(16)`: its BLAS calls from
-  several threads, each threaded by BLIS, oversubscribed the cores); each process gives its rows of the matrix and of the
+  several threads, each threaded by BLIS, oversubscribed the cores; MUMPS sets OpenMP's threads to 1 during its calls,
+  which OpenBLAS's OpenMP build follows, unless its own were set by `openblas_set_num_threads()`: its products then
+  hang, the parallel region having one thread, conda-forge's OpenBLAS 0.3.34 with LLVM's OpenMP, a Code_Aster process); each process gives its rows of the matrix and of the
   right-hand side; the solution, as MUMPS distributes it, goes to the owners of its rows by an `IndexMap` whose ghosts
   are the rows held for other processes, built at the first solve; `INFOG(1) = -9`, its estimate of its working space
   too small, e.g. MUMPS 5.7.3 on 3 processes: `ICNTL(14)` doubled and the factorization again, up to 4 times; not

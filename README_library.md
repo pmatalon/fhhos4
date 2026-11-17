@@ -272,7 +272,9 @@ waiting.
 - With several threads per process, give MUMPS's BLAS one thread (`BLIS_NUM_THREADS=1` with conda-forge's MUMPS,
   which uses BLIS; `OPENBLAS_NUM_THREADS=1` or `MKL_NUM_THREADS=1` with others): a threaded BLAS makes the many small
   products of the coarsest solves much slower (BLIS starts its threads at each call). MUMPS itself runs on one thread
-  (its matrix is small). The same holds for `CoarseSolver::MUMPS` on one process.
+  (its matrix is small). The same holds for `CoarseSolver::MUMPS` on one process. With the OpenMP build of OpenBLAS,
+  if your code sets its threads (`openblas_set_num_threads()`, which the environment can't override), its products
+  inside MUMPS hang: call `openblas_set_num_threads(1)` before the setups and solves.
 
 In Python: see [Python](#the-python-interface).
 
@@ -355,10 +357,15 @@ solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) 
   line, `PETSC_OPTIONS`, `petsc4py.init()`); or link `fhhos4::petsc` and call `PetscDLLibraryRegister_fhhos4_petsc()`
   once after `PetscInitialize()` (`#include <fhhos4_petsc.h>`, which defines `PCFHHOS4`).
 - **The operator**: a `MATNEST` of 2 x 2 AIJ blocks `[[A_TT, A_TF], [A_FT, A_FF]]`, the cells first, assembled as usual
-  (`MatSetValues()` of the local matrices of each cell, `MatAssemblyEnd()`). On several processes, each process owns
-  the DoFs of whole cells and faces. The setup copies the blocks into the format of the library (`MergeOffDiag()`, see
-  [Other matrix formats](#other-matrix-formats)) but `A_TT`, read in place. The vectors: plain (`MatCreateVecs()` of
-  the MATNEST) or nested (`VECNEST`, the cells then the faces).
+  (`MatSetValues()` of the local matrices of each cell, `MatAssemblyEnd()`); or one AIJ matrix in your numbering, with
+  the rows of its cells and of its faces, `PCFHHOS4SetIS(pc, cells, faces)` before the setup (petsc4py:
+  `pc.compose("fhhos4_cells", cells)` and `pc.compose("fhhos4_faces", faces)`), listed cell by cell and face by face,
+  the DoFs of each in the order of [Inputs](#inputs) (the components interleaved). The rows in neither index set (e.g.
+  Dirichlet DoFs eliminated by `MatZeroRowsColumns()`) get the identity. On several processes, each process owns the
+  DoFs of whole cells and faces (and gives its own rows in the index sets). The setup copies the blocks into the format
+  of the library (`MergeOffDiag()`, see [Other matrix formats](#other-matrix-formats)) but `A_TT`, read in place; from
+  one AIJ matrix, it first extracts them (`MatCreateSubMatrix()`, freed after the setup). The vectors: plain
+  (`MatCreateVecs()` of the operator) or, with a MATNEST, nested (`VECNEST`, the cells then the faces).
 - **The discretization**: give its options (the table below); or, to try the preconditioner, only
   `-pc_fhhos4_vector_components` (`1` for a scalar unknown): the others are then inferred from the blocks, under the
   assumptions of [Inputs](#inputs), and an ambiguity names the option to give. With the dimension and the degrees
@@ -373,7 +380,9 @@ solve: [`examples/petsc_preconditioner.cpp`](examples/petsc_preconditioner.cpp) 
   (`MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE)`, or `MAT_SPD`) or with `-pc_fhhos4_symmetric`, the non-symmetric one
   otherwise.
 - **The Krylov method**: each application is one K-cycle, a non-linear preconditioner: use a flexible method, `-ksp_type
-  fcg` (symmetric), `fgmres` or `gcr`, not PETSc's default GMRES. `-ksp_view` shows the setup.
+  fcg` (symmetric), `fgmres` or `gcr`, not PETSc's default GMRES. `-ksp_view` shows the setup. PETSc's FCG tests
+  the preconditioned residual by default, far from the true one on badly conditioned systems (elasticity of thin
+  structures): `-ksp_norm_type unpreconditioned` for `-ksp_rtol` on `b - A x`, as the library's own solve.
 
 | Option | Default | Parameter |
 |---|---|---|
