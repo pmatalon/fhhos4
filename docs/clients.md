@@ -13,7 +13,7 @@ from their sources or documentation unless marked "unchecked".
 | NGSolve | client (the adapter, Python) | itself (`ngla`), CSR; partial rows on several processes | monolithic matrix (product space) | optional | `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; on several processes the adapter sums the shared rows itself |
 | PETSc users | target: the preconditioner (`mpi/12`) | PETSc (`MatSetValues`, `MatAssemblyEnd`) | MATNEST of AIJ blocks, or monolithic AIJ + index sets | yes (or one process) | `-pc_type fhhos4` (`ENABLE_PETSC_PC`: `MergeOffDiag()` from `MatMPIAIJGetSeqAIJ()`); `MatCreateSubMatrix()` then the merge for a monolithic matrix; `SplitVector()`/`JoinVector()` |
 | DOLFINx | target (`mpi/04`) | itself (`MatrixCSR`) or PETSc (AIJ, MATNEST) | blocks or monolithic matrix | always | through PETSc: as PETSc users; native `MatrixCSR`: to study |
-| Code_Aster | target, studied only (no code yet) | itself (`MATR_ASSE`, MORSE storage); PETSc in its parallel versions | monolithic matrix, uncondensed | yes | one process: `ExtractBlocksSym()`/`NonSym()`, `SplitVector()`/`JoinVector()`; several: through its PETSc conversion (to study) |
+| Code_Aster | target, studied only (no code yet) | itself (`MATR_ASSE`, MORSE storage); PETSc in its parallel versions | monolithic matrix, uncondensed | yes | through PETSc: a `KSP_UTIL` function of the user's script (petsc4py) builds the index sets, the blocks and `-pc_type fhhos4` (see below) |
 | MFEM | possible | itself, then hypre (`ParallelAssemble()`: `HypreParMatrix`, ParCSR) | blocks (`BlockOperator`) or monolithic matrix | yes | `MergeOffDiag()` (ParCSR has PETSc's layout); unchecked |
 | deal.II | possible | itself, into PETSc or Trilinos (Tpetra) matrices | blocks (block matrices) or monolithic matrix | yes | through PETSc: as PETSc users; Tpetra (one CSR, local columns, any global numbers): no helper; unchecked |
 
@@ -61,9 +61,40 @@ system, cell and face unknowns, into one matrix. Mechanics: a vector-valued unkn
 at each Newton iteration (a setup each time). Several processes: the elements distributed over the processes
 (`MATR_DISTRIBUEE`), PETSc only in the parallel versions, with its own global numbering (blocks of contiguous rows per
 process); its preconditioners through PETSc (`PRE_COND`: `LDLT_SP`, `GAMG`, `BOOMER`, `ML`, `HPDDM`, `FIELDSPLIT`,
-and `UTILISATEUR`, a preconditioner in Python: a possible entry point, unchecked). Unchecked: whether MORSE stores half
-of a symmetric matrix; whether its Dirichlet conditions by Lagrange multipliers (`AFFE_CHAR_MECA`) can be avoided by
-elimination (`AFFE_CHAR_CINE`) with HHO: the multigrid preconditioners require no multipliers.
+`UTILISATEUR`).
+
+From its sources (gitlab.com/codeaster/src, main of 2026-10-21; checked 2026-11-17):
+- **The PETSc matrix** (`bibfor/third_party_interf/apalm*.F90`, `apmam*.F90`): one MPIAIJ (SEQAIJ on one process),
+  both triangles (a symmetric MORSE matrix stores half: the conversion writes the transpose), all the stored entries,
+  zeros included (`ADD_VALUES`, no `MAT_IGNORE_ZERO_ENTRIES`). PETSc with 32- or 64-bit indices
+  (`ASTER_PETSC_64BIT_INDICES`).
+- **The entry point**: `SOLVEUR=_F(METHODE="PETSC", PRE_COND="UTILISATEUR", KSP_UTIL=f)`: Code_Aster calls `f(mat)`
+  (`bibcxx/Solvers/MatrixToPetsc.cxx`, `create_custom_ksp`; petsc4py builds only, `ASTER_HAVE_PETSC4PY`) with its
+  matrix as a petsc4py `Mat`, and solves with the KSP returned. Its test `astest/petsc05b.comm` does what we need: the
+  script builds `NUM = NUME_DDL(MODELE=..., CHARGE=...)`, then `f` builds index sets from it (`getPhysicalDOFs()`,
+  restricted to the ownership range on several processes) and the blocks (`createSubMatrix()`). Without `KSP_UTIL`,
+  `PRE_COND="UTILISATEUR"` only inserts `OPTION_PETSC` and calls `PCSetFromOptions()` (`appcpr.F90`). `OPTION_PETSC`
+  also goes to `PetscInitialize()` at the first PETSc solve (`apetsc.F90`), where `-dll_append` loads a library.
+- **HHO's unknowns** (`catalo/cataelem`): on the center node of each face (`HHO_FX1..n`, `HHO_FY..`, `HHO_FZ..`)
+  and of each cell (`HHO_CX..`, `HHO_CY..`, `HHO_CZ..`); meshes with those nodes (`HEXA27`...). The component names
+  give the cell and face index sets (`DOFNumbering.getNodeAndComponentFromDOF()`). Within a node, the components
+  follow the physical quantity's order: all of x, then all of y (structure of arrays), where the library wants them
+  interleaved (`phi_i e_c` is the DoF `n i + c`): the face index set must list them in the library's order.
+  Gradient-enhanced models (`_GRAD_HHO`) add `HHO_VR`, `HHO_LG` unknowns.
+- **The bases** are L2-orthonormal by default (`BASIS_ORTHO`, `bibfor/hho/HHO_basis_module.F90`): the interpolation
+  of 1 is not ones, so the near null space must be given. `HHO.projectOnHHOSpace()` (Python) projects a function per
+  component onto the HHO unknowns: the translations and rotations (`MatSetNearNullSpace`). Code_Aster's own rigid
+  body modes for GAMG/ML (`MatNullSpaceCreateRigidBody` from the nodal coordinates) do not fit HHO.
+- **Dirichlet conditions**: by elimination (`AFFE_CHAR_CINE`) in 83 of its 88 HHO mechanics tests. The eliminated
+  unknowns stay in the matrix: their rows and columns zeroed, 1 on the diagonal (`asmchc.F90`), the zeros stored.
+  A Dirichlet face therefore stays a face block, decoupled; a face fixed in one component only is half decoupled.
+  `LIAISON_*` couplings and contact add Lagrange multipliers (`ELIM_LAGR="OUI"` exists for PETSc; untried with HHO).
+- **Its solvers**: MUMPS by default; with PETSc, `LDLT_SP` (a single-precision MUMPS factorization as preconditioner,
+  refactorized when a solve takes more than `REAC_PRECOND` iterations, `pcmump.F90`). `PRE_COND="HPDDM"`: HPDDM with
+  GenEO (symmetric; `HARMO` otherwise), only with a distributed mesh (`appcpr.F90`): MUMPS on each subdomain, the coarse
+  space from the subdomains' Neumann matrices, assembled from the elementary matrices (`apmams.F90`). The test suite
+  uses MUMPS or `LDLT_SP` with HHO and HPDDM only with Lagrange elements, but EDF's studies, not in the repository,
+  use HPDDM with HHO (someone at EDF, 2026-11-17): the solver to beat on large cases.
 
 **MFEM, deal.II.** Not studied: from memory.
 
@@ -76,3 +107,5 @@ elimination (`AFFE_CHAR_CINE`) with HHO: the multigrid preconditioners require n
 - PETSc's and hypre's distributed matrices (two CSRs per block): `MergeOffDiag()`.
 - Partial rows (NGSolve, PETSc's MATIS): summed by the client today.
 - Repeated setups on the same pattern (Code_Aster's Newton iterations): the setup time matters.
+- Dirichlet unknowns kept in the matrix as decoupled rows (Code_Aster's `AFFE_CHAR_CINE`), possibly for some
+  components of a face only: untested in the library.
