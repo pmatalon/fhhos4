@@ -1949,6 +1949,19 @@ sorted by degree, though with 40-45% fewer iterations; end to end 1.1-1.8x faste
   double: the larger gains need the block storage. Stationary use (`Krylov::None`): the defect b - A x and the residual
   each cost a fine product in double per iteration (one could be saved: the residual of an iteration is the defect of
   the next).
+- **32-bit indices for the levels in a 64-bit build** (`ENABLE_64BIT_INDEX`) — measured as an upper bound
+  (2026-11-18), large effort, bit-identical. A 64-bit build stores every level in `int64_t`; the hierarchy could use
+  `int` (the client's matrices and the condensed one keep `fhhos4::SparseIndex`). Upper bound: the whole program in
+  `int` against in `int64_t` (`build-mpi` / `build-mpi-bigindex` at `0e13e5e9`, 1 process x 8 threads, `fcguamg
+  -uamg-mixed -smoothers bcheb4,bcheb4 -cycle K,2,2`, alternated, best of 2, plugged in; `build/index_ab/`): the same
+  iterations; solve Cube-tet k=0 n=32 0.403 -> 0.372 s (x0.92), k=1 n=16 0.205 -> 0.184 s (x0.90), k=2 n=16 0.638 ->
+  0.599 s (x0.94), Square-tri k=1 n=256 0.506 -> 0.458 s (x0.91; the other `int` run 0.505); setup x0.76-0.96, mostly
+  the setup's own arrays (`BigNumber`), which this change would not touch. The real gain is smaller: FCG's product in
+  double keeps its 64-bit indices. A level needs 64-bit offsets only above 2^31 non-zeros (Eigen's CSR: one index type
+  for the offsets and the columns), i.e. on one process ~150M tetrahedra at k=0, 17M at k=1, 4.6M at k=2, 1.5M at k=3
+  (~470 non-zeros per cell at k=2): only the fine level, and only in scalar CSR (block CSR counts blocks). The smaller
+  index types on the coarse levels of a 32-bit build: not worth it (block CSR leaves 0.11 of the 4.13 bytes per
+  non-zero to the index at k=2; 16 bits fit only levels of < 32768 rows, which stay in the 16 MB L3).
 - **Fewer Lanczos iterations for lambdaMax** — estimated, small effort, changes the Chebyshev coefficients (a decision:
   the iteration counts may move). 10 iterations, 143 / 67 ms of the setup (1 / 8 threads) at k=2 in 3D, 0.30 / 0.13 s
   in 2D (10-14%). The inverse diagonal blocks would make each iteration cheaper anyway.
