@@ -27,8 +27,9 @@ conda-forge --experimental`, ~1 min; rattler-build is in the conda env `rattler`
   packaged: the name `fhhos4` is the library's, the clients install it.
 - Run dependencies: Eigen >= 3.4 (ADR-0013) and the compiler's runtime (`libstdcxx`, `libgcc`; the overlinking warning
   on `libgomp` is normal on conda-forge). `run_exports` pinned to major.minor, the SOVERSION.
-- Linux only. The library itself builds on macOS (release job `library-macos`, with llvm-openmp), but no package is
-  built there; Windows MSVC untested.
+- Linux and macOS (`llvm-openmp` on osx: OpenMP with clang). conda-forge's CI builds and tests the package on osx-64,
+  the release job `library-macos` the library on Apple Silicon. Not Windows: MSVC needs changes in the sources
+  (`FHHOS4_API` is a GCC attribute, `reduction(min:...)` needs OpenMP 3.1, `__builtin_prefetch`).
 - Its tests: `conda/recipe/test`, a CMake client (version, a solve on a lowest-order hybrid system), compiled as is,
   with `-march=native` (a client with other alignment settings than conda-forge's baseline) and with Eigen 3.4.
 - The source is the clone (`path: ../..`, without the gitignored files). The version is read from `project()` with
