@@ -61,25 +61,21 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 - **Profiling**: no sampling profiler, so temporary wall-clock timers around the steps, per multigrid level:
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
   commit the instrumentation.
-- **Validation of a change**:
-  1. `ctest` (199 tests).
-  2. `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
-     paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
-     compares their iteration tables (iteration, inner iterations, residual): they must be identical.
-     The runs: Cube-cart n=32, Cube-tet n=16, Complex-tet (`-geo platewith4holes`) n=4, Heterog1e8 n=256,
-     Cube-cart-aniso100 n=32, Cube-tet-aniso20 n=16 and Cube-tet n=32 (Fig. 4.4), each with `fcguamg` and
-     `fcgaggregamg`; Cube-tet n=16 with `-cs mpa|dpa`; Cube-tet n=16 and Cube-cart-aniso100 n=32 with
-     `-coarsening-prolong 3|4|5|6`; the biharmonic Table 3 runs (n=8,16, `-bihar-prec s|no`) and the commented-out
-     k=3 runs (`-opt2 0|2`) of `2023_biharmonic_problem.md`. After a change that reorders operations, the residuals
-     may differ in their last digits: the iteration counts must be identical.
-  3. When replacing a computation: temporary bit-for-bit checks of each new matrix against the old computation,
-     with `scripts/perf/BitCheck.h` (same structure, `memcmp` of the values), on the runs of `amg_papers.sh`
-     (`grep BITCHECK` in the logs).
-  4. For a change of the solve phase (smoothers, cycle): `scripts/perf/solutions.sh <output dir> <binary before>
-     [binary after]` compares the solution vectors (exported with 17 digits: exactly) and the iteration tables of 32
-     cases covering the code paths of the smoothers, sequential and parallel, in ~10 minutes. A bit-identical change
-     gives `OK` everywhere, except the known differences listed in the script. A change that reorders operations gives
-     `DIFF` and `RESIDUALS-DIFF` (expected), but never `ITERATIONS-DIFF`.
+- **Validation of a change**: the `validate` skill (`.claude/skills/validate/SKILL.md`): the version before saved,
+  `scripts/perf/solutions.sh` (the solutions of ~40 cases bit for bit against it), `ctest` (the papers' iteration
+  counts), the other build trees. Also:
+  - `scripts/perf/amg_papers.sh <output dir> [binary]`: the AMG configurations of the papers, at reduced sizes (the
+    paper sizes don't fit in 13 GB), 30 runs in ~6 minutes. Then `scripts/perf/fingerprint.sh <dir before> <dir after>`
+    compares their iteration tables (iteration, inner iterations, residual): they must be identical.
+    The runs: Cube-cart n=32, Cube-tet n=16, Complex-tet (`-geo platewith4holes`) n=4, Heterog1e8 n=256,
+    Cube-cart-aniso100 n=32, Cube-tet-aniso20 n=16 and Cube-tet n=32 (Fig. 4.4), each with `fcguamg` and
+    `fcgaggregamg`; Cube-tet n=16 with `-cs mpa|dpa`; Cube-tet n=16 and Cube-cart-aniso100 n=32 with
+    `-coarsening-prolong 3|4|5|6`; the biharmonic Table 3 runs (n=8,16, `-bihar-prec s|no`) and the commented-out
+    k=3 runs (`-opt2 0|2`) of `2023_biharmonic_problem.md`. After a change that reorders operations, the residuals
+    may differ in their last digits: the iteration counts must be identical.
+  - When replacing a computation: temporary bit-for-bit checks of each new matrix against the old computation,
+    with `scripts/perf/BitCheck.h` (same structure, `memcmp` of the values), on the runs of `amg_papers.sh`
+    (`grep BITCHECK` in the logs).
 - **Setup only (U-AMG)**: `scripts/perf/UAMGDump.h` dumps the inputs of `UncondensedAMG::Setup()` (the condensed
   operator, A_TT, A_TF, A_FF and the parameters of the multigrid; temporary instrumentation, see the header), and
   `scripts/perf/uamg_harness.cpp` runs the setup alone on them (`build_uamg_harness.sh`: ~30 s to compile with the

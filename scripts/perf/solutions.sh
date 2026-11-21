@@ -1,18 +1,22 @@
 #!/bin/bash
 # Bitwise comparison of the results of two binaries: the solution vectors (exported with 17 significant digits, i.e.
 # exactly; -0 and 0 are considered equal) and the iteration tables (without the times), sequential (-threads 1) and
-# parallel (-threads 0). Stronger than fingerprint.sh (3-digit residuals): checks that a change of the solve phase is
-# bit-identical (status OK). For a change that reorders arithmetic operations, DIFF and RESIDUALS-DIFF are expected,
-# but not ITERATIONS-DIFF (different numbers of iterations or inner iterations).
+# parallel (-threads 0). Stronger than fingerprint.sh (3-digit residuals): checks that a change is bit-identical
+# (status OK). For a change that reorders arithmetic operations, DIFF and RESIDUALS-DIFF are expected, but not
+# ITERATIONS-DIFF (different numbers of iterations or inner iterations). The procedure: the validate skill
+# (.claude/skills/validate/SKILL.md).
 # The cases cover the code paths of the smoothers: scalar and block (sizes 3, 4, 6, 7, 8, 10) Gauss-Seidel, all the
 # directions, from x = 0 or not, with exact zeros in the right-hand side (-source one), standalone and in multigrids;
-# block SOR (also used by the standalone solvers bgs and rbgs).
-# 35 cases x 2 thread counts x 2 binaries, ~10 minutes.
+# block SOR (also used by the standalone solvers bgs and rbgs); and the library's path with its defaults (Chebyshev,
+# K-cycle, mixed precision, block CSR).
+# 39 cases x 2 thread counts x 2 binaries, ~12 minutes.
 #
-# Known differences: the hybrid smoothers (hbgs, hrbgs) in parallel vary from one run to the next (data race),
-# and 'fcgaggregamg' fails at k=1 (exit code 1, no vectors).
+# Known differences: the hybrid smoothers (hbgs, hrbgs) in parallel vary from one run to the next (data race).
+# 'fcgaggregamg' at k = 0 only: AggregAMG takes blocks of size 1 only (it stops at k >= 1).
 #
 # Usage (from build/, conda env activated): solutions.sh <output dir> <binary before> [binary after, default: ./bin/fhhos4]
+# A binary before saved from a build directory: .claude/skills/validate/save_before.sh (a copied program alone would
+# load the build's new library).
 # Writes one directory per run and result.txt: case | threads | status | iteration lines | exit code | arguments.
 OUT=${1:?Usage: solutions.sh <output dir> <binary before> [binary after]}
 BEFORE=${2:?Usage: solutions.sh <output dir> <binary before> [binary after]}
@@ -72,6 +76,12 @@ check -geo cube -mesh tetra -k 3 -n 4 -s fcguamg -smoothers bgs
 check -geo square -mesh tri -k 2 -n 32 -s fcguamg -smoothers bgs
 check -geo square -mesh tri -k 6 -n 8 -s fcguamg -smoothers bgs
 check -geo cube -mesh cart -mesher inhouse -k 1 -n 8 -aniso 100 -s fcguamg -smoothers bgs
+# The library's path (its defaults: Chebyshev, K-cycle, FCG), the passes kept at k >= 1, p-levels
+check -geo cube -mesh tetra -k 0 -n 16 -s fcglibuamg
+check -geo cube -mesh tetra -k 1 -n 8 -s fcglibuamg
+check -geo cube -mesh tetra -k 2 -n 8 -s fcglibuamg
+check -geo square -mesh tri -k 2 -n 32 -s fcglibuamg
+check -geo cube -mesh cart -mesher inhouse -k 1 -n 8 -aniso 100 -s fcglibuamg
 # Other smoothers and cycles
 check -geo cube -mesh tetra -k 2 -n 8 -s fcguamg -smoothers hbgs,hrbgs
 check -geo cube -mesh tetra -k 0 -n 16 -s fcguamg -smoothers sgs
@@ -94,7 +104,6 @@ check -geo square -mesh tri -k 5 -n 8 -s fcguamg -source one -smoothers rbgs,bgs
 check -geo square -mesh tri -k 7 -n 4 -s fcguamg -source one -smoothers bgs
 # Other multigrids
 check -geo cube -mesh tetra -k 0 -n 16 -s fcgaggregamg
-check -geo cube -mesh tetra -k 1 -n 8 -s fcgaggregamg
 check -geo square -mesh cart -mesher inhouse -k 1 -n 32 -s mg
 check -geo square -mesh cart -mesher inhouse -k 0 -n 32 -s mg -cycle V,1,1
 # Standalone smoothers
