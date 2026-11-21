@@ -185,21 +185,29 @@ public:
 		return r;
 	}
 
-	pair<Vector, Vector> ApplyAndComputeAe(const Vector& r)
+	// e and A e in vectors of the caller, allocated at its setup (the solver writes in them: no fresh memory)
+	void ApplyAndComputeAe(const Vector& r, Vector& e, Vector& Ae)
 	{
 		assert(_solver);
 		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
 		assert(iterSolver);
 
-		pair<Vector, Vector> p;
-		auto&[e, Ae] = p;
-
-		e = Vector::Zero(r.rows());
+		e.setZero(r.rows());
 		bool eEquals0 = true;
-		iterSolver->Solve(r, e, eEquals0, false, true);
-		Ae = std::move(iterSolver->Ax);
+		iterSolver->SolveInto(r, e, eEquals0, nullptr, &Ae);
+	}
 
-		return p;
+	// The same without A e: e in a vector of the caller
+	void Apply(const Vector& r, Vector& e)
+	{
+		IterativeSolver* iterSolver = dynamic_cast<IterativeSolver*>(_solver);
+		if (!iterSolver)
+		{
+			e = Apply(r);
+			return;
+		}
+		e.setZero(r.rows()); // as IterativeSolver::Solve(b): from 0
+		iterSolver->SolveInto(r, e, true, nullptr, nullptr);
 	}
 	
 	MFlops SetupComputationalWork() override

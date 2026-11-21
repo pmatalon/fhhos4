@@ -11,7 +11,6 @@ class Smoother
 protected:
 	IterativeSolver* _solver;
 	int _nSmoothingIterations;
-	FloatVector _singleResidual, _singleAx; // the residual and A x of the last smoothing in single precision
 
 public:
 
@@ -131,9 +130,11 @@ public:
 		xEquals0 = false;
 	}
 
-	void SmoothAndComputeResidualOrAx(Vector& x, const Vector& b, bool& xEquals0, bool computeResidual, bool computeAx)
+	// The residual and A x of the last iteration in residual and Ax if not null: vectors of the caller (the level's,
+	// allocated at the setup), written by the smoother
+	void SmoothAndComputeResidualOrAx(Vector& x, const Vector& b, bool& xEquals0, Vector* residual, Vector* Ax)
 	{
-		_solver->Solve(b, x, xEquals0, computeResidual, computeAx);
+		_solver->SolveInto(b, x, xEquals0, residual, Ax);
 		xEquals0 = false;
 	}
 
@@ -147,29 +148,10 @@ public:
 		xEquals0 = false;
 	}
 
-	void SmoothAndComputeResidualOrAx(FloatVector& x, const FloatVector& b, bool& xEquals0, bool computeResidual, bool computeAx)
+	void SmoothAndComputeResidualOrAx(FloatVector& x, const FloatVector& b, bool& xEquals0, FloatVector* residual, FloatVector* Ax)
 	{
-		_solver->SolveInSinglePrecision(b, x, xEquals0, computeResidual ? &_singleResidual : nullptr, computeAx ? &_singleAx : nullptr);
+		_solver->SolveInSinglePrecision(b, x, xEquals0, residual, Ax);
 		xEquals0 = false;
-	}
-
-	// The residual and A x of the last smoothing, in precision T
-	template <typename T>
-	VectorOf<T>&& TakeResidual()
-	{
-		if constexpr (std::is_same_v<T, float>)
-			return std::move(_singleResidual);
-		else
-			return Residual();
-	}
-
-	template <typename T>
-	VectorOf<T>&& TakeAx()
-	{
-		if constexpr (std::is_same_v<T, float>)
-			return std::move(_singleAx);
-		else
-			return Ax();
 	}
 
 	friend ostream& operator<<(ostream& os, const Smoother& s)
@@ -181,16 +163,6 @@ public:
 	MFlops SolvingComputationalWork()
 	{
 		return _solver->SolvingComputationalWork;
-	}
-
-	Vector&& Residual()
-	{
-		return std::move(_solver->Residual);
-	}
-
-	Vector&& Ax()
-	{
-		return std::move(_solver->Ax);
 	}
 
 	virtual ~Smoother()

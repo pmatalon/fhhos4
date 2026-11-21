@@ -514,20 +514,39 @@ public:
 	// not read). Collective on the halo.
 	VectorOf<T> Multiply(const VectorOf<T>& x, const BlockSparseMatrix<T>* diagBlocks) const
 	{
-		VectorOf<T> ghosts = GhostValues(x);
 		VectorOf<T> y;
+		Multiply(x, diagBlocks, y);
+		return y;
+	}
+
+	// The same in y, whose storage is reused if it has the size (the vectors of the cycle: no fresh memory)
+	void Multiply(const VectorOf<T>& x, const BlockSparseMatrix<T>* diagBlocks, VectorOf<T>& y) const
+	{
+		VectorOf<T> ghosts = GhostValues(x);
 		if (diagBlocks)
-			y = *diagBlocks * x;
+		{
+			y.resize(diagBlocks->Rows());
+			diagBlocks->Multiply(x.data(), y.data());
+		}
 		else
 			y.noalias() = Diag * x;
 		if (Offd.cols() > 0)
 			y.noalias() += Offd * ghosts;
-		return y;
 	}
 
 	VectorOf<T> operator*(const VectorOf<T>& x) const
 	{
 		return Multiply(x, nullptr);
+	}
+
+	// y += A x: Diag x, then Offd x_ghosts, added to y in that order (the rounding differs from y += Multiply(x)).
+	// Collective on the halo.
+	void MultiplyAdd(const VectorOf<T>& x, VectorOf<T>& y) const
+	{
+		VectorOf<T> ghosts = GhostValues(x);
+		y.noalias() += Diag * x;
+		if (Offd.cols() > 0)
+			y.noalias() += Offd * ghosts;
 	}
 
 	// For MultiplyTransposed()
@@ -541,10 +560,17 @@ public:
 	// are added to their owners. SetupTransposed() first. Collective on the halo.
 	VectorOf<T> MultiplyTransposed(const VectorOf<T>& x) const
 	{
+		VectorOf<T> y;
+		MultiplyTransposed(x, y);
+		return y;
+	}
+
+	// The same in y, whose storage is reused if it has the size
+	void MultiplyTransposed(const VectorOf<T>& x, VectorOf<T>& y) const
+	{
 		assert(_diagT.rows() == Diag.cols() && _offdT.rows() == Offd.cols());
-		VectorOf<T> y = _diagT * x;
+		y.noalias() = _diagT * x;
 		VectorOf<T> ghosts = _offdT * x;
 		ColMap->AddGhostsToOwners(ghosts.data(), y.data(), ColBlockSize);
-		return y;
 	}
 };

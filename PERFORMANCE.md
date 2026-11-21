@@ -1206,6 +1206,27 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   2.34-2.76 s), the analysis alone as the preconditioner does it (the diagonal parts, the gather; the slowest process,
   best of 5) 6.8-7.3 ms (0.3%).
 
+- **The vectors of the solve allocated at the setup** (2026-11-21, the user's request: "allocate the vectors once in
+  the setup", "think large size"; see `docs/uamg.md`, "Vectors of the solve"). The cycle allocated, at each visit of a
+  level, its residual, restriction, coarse correction, the K-cycle's vectors and P e; FCG z, A z and its new direction;
+  the smoothers their residual and A x. Below 32 MB, glibc reuses the freed blocks (no page fault after the second
+  iteration); above, each allocation is fresh memory (`mmap`), its page faults at each use: more than 4M unknowns per
+  process in double. Emulated on Cube-tet k=0 n=32 (318k faces) with `MALLOC_MMAP_THRESHOLD_=131072` (every vector
+  above 128 KB fresh), `-s fcglibuamg`, 8 threads, plugged in, medians of 5 interleaved runs, the same 24 iterations:
+
+  | | setup before / after | solve before / after | page faults of the run |
+  |---|---|---|---|
+  | as it is (vectors < 32 MB) | 0.554 / 0.574 s | 0.533 / 0.535 s | 263k / 266k |
+  | every vector fresh (a large problem) | 0.836 / 0.811 s | 0.864 / 0.558 s (x0.65) | 522k / 432k |
+
+  Page faults per FCG iteration after: 5.1k, 1.2k (the first writes of the vectors and of the directions), then 0
+  (vectors < 32 MB) or 12-48 (every vector fresh: the coarse solver's solution and temporaries, on the coarsest level).
+  A first version allocated the vectors at their first use and passed them between owners by Eigen's swaps (the
+  smoother's residual to the level, the multigrid's A x to FCG...): more distinct vectors, hence +36 ms of first writes
+  in the first 5 iterations (+3.6% of the solve as it is, the same 18.0 ms per iteration after). The setup's own
+  allocations remain (-37% of the setup with every vector fresh: 0.813 -> 0.511 s with glibc keeping the memory,
+  2026-11-21 in Current profile).
+
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from
@@ -1509,9 +1530,11 @@ elapsed setup / solve (s). Laptop: the same code (`build-mpi`), plugged in, 2026
 - OpenMP stops gaining beyond 4-8 threads (k=0 n=64, solve on 1 / 2 / 4 / 8 / 16 / 32 threads: 10.24 / 5.32 / 3.10 /
   2.36 / 1.53 / 1.41 s; the setup 5.6 times faster on 32 threads), MPI keeps scaling (the setup 23 times faster on 32
   processes, the solve 15): at 3.6M unknowns, 32 x 1 takes 0.35 of the time of 1 x 32, 0.59 of 4 x 8 (about one process
-  per NUMA node: not only NUMA). The sequential parts of the setup in a process (Next ideas 2 and 5 below the profile),
-  and the OpenMP efficiency of the solve. A client calling the library from one process with threads gets ~6x on 32
-  cores.
+  per NUMA node: not only NUMA). Why, not known yet: the laptop's profile by step on 1 and 8 threads (2026-11-21 in
+  Current profile) leaves one sequential step (the aggregation, 10% of the setup on 8 threads), steps that gain ~2x
+  (bandwidth on the laptop, unknown on the cluster) and the fresh memory (page faults: 9% of the setup on 8 threads,
+  nothing in the solve). A client
+  calling the library from one process with threads gets ~6x on 32 cores.
 - Below ~10k unknowns per process, no gain from more processes (k=0 n=32 solve on 8 / 16 / 32 processes: 0.21 / 0.18 /
   0.19 s; k=2 n=12, 32 x 1 slower than 16 x 1): threads per process help there (16 x 2, 4 x 8); see Next ideas 3 below.
 - Weak scaling, k=1, n = 16 P^(1/3) (~4.1k cells per process), one thread per process, setup / solve (s), iterations:
@@ -1549,6 +1572,30 @@ Next ideas:
    copies each matrix twice (chunks, then the matrix).
 
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
+
+**Setup and solve by step through the library, 1 / 8 threads** (2026-11-21, `3b42f153`, the question: why do
+threads gain less than processes on the cluster?). Cube-tet k=0 n=32 (318k faces, 24 iterations), `-s fcglibuamg`,
+`OMP_NUM_THREADS`, plugged in, the second of 2 runs (within 2% of the first); timers of `Prof.h` in a copy of the sources (`build/prof_omp/`). Setup 1.37
+/ 0.53 s (2.6x), solve 1.15 / 0.53 s (2.2x). By step, 1 / 8 threads (s):
+- The passes 1.13 / 0.41: prolongation 0.41 / 0.08, Galerkin products 0.17 / 0.05, `Build()` 0.16 / 0.06,
+  interface collapsing 0.11 / 0.04 (3-5x); chaining of P 0.16 / 0.08, decomposition 0.08 / 0.04 (2x); the pairwise
+  aggregation 0.035 / 0.052, slower on 8 threads (sequential: its order defines the aggregates). The freeing between
+  the passes is gone (0.001).
+- Outside the passes: the condensation 0.03 / 0.02 and the condensed matrix 0.09 / 0.04, the smoothers 0.06 / 0.035
+  (Lanczos), `R = P^T` 0.02 / 0.01, the assembly of the coarse operators 0.04 / 0.01.
+- Solve: the cycle 1.09 / 0.44; FCG's own vector operations (Eigen's dots and updates, sequential) 0.044 / 0.063,
+  slower on 8 threads: 12% of the solve there. Its `A d` comes from the cycle (0 s).
+- Fresh memory: with glibc keeping the freed memory mapped (`MALLOC_MMAP_THRESHOLD_=33554432
+  MALLOC_TRIM_THRESHOLD_=4294967296 MALLOC_TOP_PAD_=268435456`), on 8 threads, medians of 5 interleaved runs: setup
+  0.538 -> 0.491 s (-9%), solve 0.516 -> 0.516 s (the -15% / -16% of a first pair of runs was noise). Page faults
+  (`getrusage` in the timers): the setup 22.8k -> 13.9k (`R = P^T` 3.9k, condensed matrix 3.7k, chaining 3.6k,
+  prolongation 3.4k, decomposition 2.9k, `Build()` 2.5k...), the solve's cycle 6.7k -> 0 (~1 MB per iteration: glibc
+  already reuses most of the freed vectors), FCG 0: allocating the solve's vectors once gains nothing at this size;
+  with every vector fresh (a large problem), -35% of the solve (Done, "The vectors of the solve allocated at the
+  setup"). On 1 thread, too noisy that day to conclude (1.1-2.6 s for the same solve: an indexer running).
+
+On 8 threads, no step left dominates the setup: the steps that gain only ~2x may be the laptop's bandwidth (one thread
+reads half of it); the cluster's 32 cores need their own profile by step.
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
 |---|---|---|

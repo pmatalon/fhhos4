@@ -2,6 +2,7 @@
 #include "../IterativeSolver.h"
 #include "../Preconditioner.h"
 #include <list>
+#include <memory>
 using namespace std;
 
 class FlexibleConjugateGradient : public IterativeSolver
@@ -13,6 +14,11 @@ private:
 		Vector* Ad;
 		double d_dot_Ad;
 	};
+	// The vectors of the iterations, allocated at the setup (AllocateIterationVectors()): the solve allocates nothing (a
+	// large vector would be fresh memory at each allocation, see Level::CycleVectors). The spare vectors: those of the
+	// directions not in use, for the next ones.
+	Vector _z;
+	vector<unique_ptr<Vector>> _spareVectors;
 public:
 	SolverPreconditioner Precond;
 	int Truncation; // max number of previous search direction to use for A-orthogonalization
@@ -41,6 +47,7 @@ public:
 		IterativeSolver::Setup(A);
 		this->Precond.Setup(A);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.rows());
 	}
 
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
@@ -50,6 +57,7 @@ public:
 		IterativeSolver::Setup(A);
 		this->Precond.Setup(A, A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.rows());
 	}
 
 	// On several processes: A is read in full (both triangles)
@@ -58,6 +66,7 @@ public:
 		SetDistributedMatrix(A);
 		this->Precond.Setup(A);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.Diag.rows());
 	}
 
 	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
@@ -65,6 +74,7 @@ public:
 		SetDistributedMatrix(A);
 		this->Precond.Setup(A, A_T_T, A_T_F, A_F_T, faceMap, cellInterpOfOne, faceInterpOfOne);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.Diag.rows());
 	}
 
 public:
@@ -105,26 +115,25 @@ public:
 		{
 			result = IterationResult(result);
 
-			// Apply the preconditioner
-			Vector z, Az;
+			// Apply the preconditioner (A z: the A d of the new direction, before its orthogonalization)
+			Vector& z = _z;
+			Vector* Ad = nullptr;
 			if (Precond.CanOptimizeResidualComputation())
 			{
-				std::tie(z, Az) = Precond.ApplyAndComputeAe(r);    result.AddWorkInMFlops(Precond.SolvingComputationalWork());
+				Ad = SpareVector();
+				Precond.ApplyAndComputeAe(r, z, *Ad);              result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 			}
 			else
 			{
-				z = Precond.Apply(r);                              result.AddWorkInMFlops(Precond.SolvingComputationalWork());
+				Precond.Apply(r, z);                               result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 			}
 
 			// The final direction of research, d, is found by 
 			// A-orthogonalizing z with the previous directions of research, 
 			// according to the truncation / restart method chosen.
 
-			Vector* d = new Vector(z);
-
-			Vector* Ad = nullptr;
-			if (Precond.CanOptimizeResidualComputation())
-				Ad = new Vector(std::move(Az));
+			Vector* d = SpareVector();
+			*d = z;
 
 			for (Direction const& directionk : previousDirections)
 			{
@@ -143,10 +152,11 @@ public:
 			}
 			if (!Ad)
 			{
+				Ad = SpareVector();
 				if (this->Distributed)
-					Ad = new Vector(*this->Distributed * (*d));
+					this->Distributed->Multiply(*d, nullptr, *Ad);
 				else
-					Ad = new Vector(A.selfadjointView<Eigen::Lower>() * (*d));
+					Ad->noalias() = A.selfadjointView<Eigen::Lower>() * (*d);
 				                                                      result.AddWorkInFlops(Cost::MatVec(A));
 			}
 
@@ -212,12 +222,33 @@ private:
 		return b - this->Matrix->selfadjointView<Eigen::Lower>() * x;
 	}
 
+	// The vectors of the iterations, of n rows: r (Residual), z, and those of the Truncation + 1 directions in use at most
+	// (the previous ones and the new one)
+	void AllocateIterationVectors(BigNumber n)
+	{
+		this->Residual.resize(n);
+		_z.resize(n);
+		_spareVectors.clear();
+		for (int i = 0; i < 2 * (Truncation + 1); i++)
+			_spareVectors.push_back(make_unique<Vector>(n));
+	}
+
+	// A vector for a new direction: a spare one (allocated at the setup)
+	Vector* SpareVector()
+	{
+		if (_spareVectors.empty())
+			return new Vector();
+		Vector* v = _spareVectors.back().release();
+		_spareVectors.pop_back();
+		return v;
+	}
+
 	void Clear(list<Direction>& previousDirections)
 	{
 		for (Direction& directionk : previousDirections)
 		{
-			delete directionk.d;
-			delete directionk.Ad;
+			_spareVectors.emplace_back(directionk.d);
+			_spareVectors.emplace_back(directionk.Ad);
 		}
 		previousDirections.clear();
 	}
@@ -225,8 +256,8 @@ private:
 	void DeleteOldest(list<Direction>& previousDirections)
 	{
 		Direction& oldestDirection = previousDirections.front();
-		delete oldestDirection.d;
-		delete oldestDirection.Ad;
+		_spareVectors.emplace_back(oldestDirection.d);
+		_spareVectors.emplace_back(oldestDirection.Ad);
 		previousDirections.pop_front();
 	}
 };

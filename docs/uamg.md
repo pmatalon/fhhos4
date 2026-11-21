@@ -233,6 +233,27 @@ program `-uamg-bcsr`.
   tolerance applies to the true residual. Near the attainable accuracy the recurrence drifts; a tolerance below it runs
   `MaxIterations`, not converged.
 
+## Vectors of the solve
+
+The solve allocates no vector: a vector of more than 32 MB (glibc's largest reused block) would be fresh memory at each
+allocation, its page faults paid together by the threads of a process (the processes of a run each pay their own).
+Each vector the solve uses is allocated at the setup by the component that uses it, and written in place:
+- the levels: `Level::CycleVectors` (the residual, its restriction, the coarse correction, the K-cycle's vectors),
+  allocated at the end of `Multigrid::SetupLevels()` (`Level::AllocateCycleVectors()`); the transfers write in them
+  (`RestrictInto()`, `ResidualInto()`, `ApplyInto()`), and `ProlongAndAdd()` adds P e to x directly (no vector for P e:
+  on several processes, Diag e then Offd e_ghosts added to x);
+- the smoothers: their work vectors at their setup (`BlockChebyshev::AllocateWorkVectors()`, `GaussSeidel`'s products
+  of the sweep, shared with the post-smoother that copies the setup); they write the residual and A x of their last
+  iteration in the caller's vectors (`IterativeSolver::SolveInto()`; `Smoother::SmoothAndComputeResidualOrAx()`);
+- the multigrid as the preconditioner of the Krylov method writes its A e in the caller's vector (`SolveInto()`,
+  `SolverPreconditioner::ApplyAndComputeAe()`): FCG's new direction (its vectors, those of its `Truncation` + 1
+  directions, and GCR's `Restart` vectors z_j and c_j, at their setup).
+
+Exceptions: the coarse solver's solution (the coarsest level: small); the stand-alone solvers (`-s gs`, `-s uamg`...),
+whose stopping criteria read the residual of each iteration, keep `IterativeSolver::Solve()`'s loop (a vector per
+iteration). The first iteration writes the vectors first: on a NUMA machine their pages land where the solve's threads
+write them, not on the node of the setup's thread.
+
 ## Smoothers
 
 - Default: block Chebyshev of the fourth kind, degree 2, for a symmetric matrix (ADR-0017;

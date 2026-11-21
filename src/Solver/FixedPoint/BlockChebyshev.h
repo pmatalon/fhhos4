@@ -206,6 +206,7 @@ private:
 		else
 			_diagBlockSolver.Setup(A, _blockSize, DiagBlockSolveMethod::Inverse);
 		EstimateLambdaMaxAndCost<T>();
+		AllocateWorkVectors<T>();
 	}
 
 	template <typename T>
@@ -218,6 +219,18 @@ private:
 			Utils::FatalError("The block CSR storage of a Chebyshev smoother requires blocks of its block size (" + to_string(_blockSize) + ", > 1), got " + to_string(wrongBlockSize) + ".");
 		_diagBlockSolver.Setup(A, _blockSize, DiagBlockSolveMethod::Inverse);
 		EstimateLambdaMaxAndCost<T>();
+		AllocateWorkVectors<T>();
+	}
+
+	// The work vectors of the iterations in precision T, allocated once (the solve allocates nothing)
+	template <typename T>
+	void AllocateWorkVectors()
+	{
+		BigNumber n = Rows<T>();
+		Precision<T>& W = In<T>();
+		W.d.resize(n);
+		W.dNext.resize(n);
+		W.r.resize(n);
 	}
 
 	template <typename T>
@@ -241,6 +254,7 @@ public:
 		IterativeSolver::Setup(A);
 		_blockMatrix = nullptr;
 		CopySetup(*o);
+		AllocateWorkVectors<double>();
 		return true;
 	}
 
@@ -253,6 +267,7 @@ public:
 		_singleDistributed = nullptr;
 		_singleBlockMatrix = nullptr;
 		CopySetup(*o);
+		AllocateWorkVectors<float>();
 		return true;
 	}
 
@@ -265,6 +280,7 @@ public:
 		_singleDistributed = &A;
 		_singleBlockMatrix = nullptr;
 		CopySetup(*o);
+		AllocateWorkVectors<float>();
 		return true;
 	}
 
@@ -277,6 +293,7 @@ public:
 		this->Distributed = distributed;
 		_blockMatrix = &A;
 		CopySetup(*o);
+		AllocateWorkVectors<double>();
 		return true;
 	}
 
@@ -289,6 +306,7 @@ public:
 		_singleDistributed = distributed;
 		_singleBlockMatrix = &A;
 		CopySetup(*o);
+		AllocateWorkVectors<float>();
 		return true;
 	}
 
@@ -299,6 +317,7 @@ public:
 			return false;
 		SetDistributedMatrix(A);
 		CopySetup(*o);
+		AllocateWorkVectors<double>();
 		return true;
 	}
 
@@ -326,15 +345,23 @@ public:
 	// Each line is one pass over the block rows. The residual is that of the recurrence: b - A x up to rounding.
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
 	{
+		SolveInto(b, x, xEquals0, computeResidual ? &this->Residual : nullptr, computeAx ? &this->Ax : nullptr);
+	}
+
+	void SolveInto(const Vector& b, Vector& x, bool xEquals0, Vector* residual, Vector* Ax) override
+	{
 		if (this->MaxIterations == 0)
 		{
-			IterativeSolver::Solve(b, x, xEquals0, computeResidual, computeAx);
+			IterativeSolver::Solve(b, x, xEquals0, residual != nullptr, Ax != nullptr);
+			if (residual)
+				residual->swap(this->Residual);
+			if (Ax)
+				Ax->swap(this->Ax);
 			return;
 		}
 		assert(this->StoppingCrit == StoppingCriteria::MaxIterations); // a smoother only: a fixed polynomial
 
-		this->Residual = Vector();
-		Flops flops = Iterate(b, x, xEquals0, computeResidual ? &this->Residual : nullptr, computeAx ? &this->Ax : nullptr);
+		Flops flops = Iterate(b, x, xEquals0, residual, Ax);
 		this->IterationCount = this->MaxIterations;
 		this->SolvingComputationalWork = flops * 1e-6;
 	}
@@ -362,9 +389,7 @@ private:
 		vector<double> a, c;
 		Coefficients(m, a, c);
 
-		W.d.resize(n);
-		W.dNext.resize(n);
-		W.r.resize(n);
+		assert(W.d.rows() == n && W.dNext.rows() == n && W.r.rows() == n); // AllocateWorkVectors() at the setup
 		Flops matVec = Cost::SpMatVec(NonZeros<T>());
 		Flops update = (2 * _blockSize + 3) * n; // D^-1 r and the linear combination of d
 		Flops flops = 0;
@@ -386,15 +411,17 @@ private:
 			xEquals0 = false;
 			W.d.swap(W.dNext);
 		}
+		// The last residual in the caller's vector if requested (otherwise in W.r, for A x)
 		bool computeResidual = residual || Ax;
-		Pass<T>(computeResidual ? W.d.data() : nullptr, r, W.r.data(), W.d.data(), nullptr, 0, 0, x.data(), xEquals0); flops += (computeResidual ? matVec : 0) + n;
+		if (residual)
+			residual->resize(n);
+		VectorOf<T>& lastResidual = residual ? *residual : W.r;
+		Pass<T>(computeResidual ? W.d.data() : nullptr, r, lastResidual.data(), W.d.data(), nullptr, 0, 0, x.data(), xEquals0); flops += (computeResidual ? matVec : 0) + n;
 
 		if (Ax)
 		{
-			*Ax = b - W.r;                                                                                        flops += n;
+			*Ax = b - lastResidual;                                                                               flops += n;
 		}
-		if (residual)
-			*residual = std::move(W.r);
 		return flops;
 	}
 

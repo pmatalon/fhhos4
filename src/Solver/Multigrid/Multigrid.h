@@ -15,6 +15,12 @@ private:
 	int _nLevels;
 	SparseMatrix _coarseOperator;  // levels in single precision: the coarsest operator in double, for the coarse solver
 	DistributedMatrix _coarseDistributedOperator; // the same on several processes
+	// MixedPrecisionCycle(): its vectors, allocated at the setup (as Level::CycleVectors)
+	Vector _mixedPrecisionResidual;
+	FloatVector _singleResidual, _singleCorrection;
+	// SolveInto(): the caller's vectors for the residual and A x of the last cycle (ExecuteOneIteration())
+	Vector* _residualOutput = nullptr;
+	Vector* _AxOutput = nullptr;
 public:
 	ExportModule Out;
 	Solver* CoarseSolver = nullptr;
@@ -343,6 +349,17 @@ private:
 			}
 		}
 
+		// The vectors of the cycle, allocated once: the solve allocates nothing (but the coarse solver's solution)
+		for (Level* level = this->_fineLevel; level; level = level->CoarserLevel)
+			level->AllocateCycleVectors(this->Cycle == CycleType::K && level != this->_fineLevel && !level->IsCoarsestLevel());
+		if (this->_mixedPrecision)
+		{
+			BigNumber n = A.rows();
+			_mixedPrecisionResidual.resize(n);
+			_singleResidual.resize(n);
+			_singleCorrection.resize(n);
+		}
+
 		/*if (this->Cycle == CycleType::K)
 		{
 			Level* level = this->_fineLevel->CoarserLevel;
@@ -503,35 +520,50 @@ protected:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
-
+		// The residual and A x in the caller's vectors (SolveInto()), otherwise in the result's
+		Vector* residual = computeResidual ? (_residualOutput ? _residualOutput : &result.Residual) : nullptr;
+		Vector* Ax = computeAx ? (_AxOutput ? _AxOutput : &result.Ax) : nullptr;
 		if (_mixedPrecision)
-			MixedPrecisionCycle(b, x, xEquals0, computeResidual, computeAx, result);
+			MixedPrecisionCycle(b, x, xEquals0, residual, Ax, result);
 		else
-			MultigridCycle(this->_fineLevel, b, x, xEquals0, computeResidual, computeAx, result);
+			CycleIn<double>(this->_fineLevel, b, x, xEquals0, residual, Ax, result);
 		result.SetX(x);
 		return result;
 	}
 
-	void MultigridCycle(Level* level, const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
+public:
+	// A fixed number of cycles (the preconditioner of FCG: one), the residual and A x of the last one in the caller's
+	// vectors. Otherwise (the stopping criteria of a stand-alone solver, which read the result's residual), Solve().
+	void SolveInto(const Vector& b, Vector& x, bool xEquals0, Vector* residual, Vector* Ax) override
 	{
-		CycleIn<double>(level, b, x, xEquals0, computeResidual ? &result.Residual : nullptr, computeAx ? &result.Ax : nullptr, result);
+		if (this->StoppingCrit != StoppingCriteria::MaxIterations)
+		{
+			IterativeSolver::SolveInto(b, x, xEquals0, residual, Ax);
+			return;
+		}
+		_residualOutput = residual;
+		_AxOutput = Ax;
+		this->Solve(b, x, xEquals0, residual != nullptr, Ax != nullptr);
+		_residualOutput = nullptr;
+		_AxOutput = nullptr;
 	}
 
 private:
 	// Mixed precision: one cycle in single precision on the residual r = b - A x (b if x = 0), in double with the matrix of
 	// the solver, its correction e added to x (x = e if x = 0); the residual and A x in double (A full: a parallel product;
 	// on several processes, the distributed operator)
-	void MixedPrecisionCycle(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, IterationResult& result)
+	void MixedPrecisionCycle(const Vector& b, Vector& x, bool& xEquals0, Vector* residual, Vector* Ax, IterationResult& result)
 	{
 		Level& fine = *this->_fineLevel;
 		BigNumber n = b.rows();
-		Vector r;
+		Vector& r = _mixedPrecisionResidual;
 		if (!xEquals0)
 		{
-			r = fine.ResidualOf(b, x);                                             result.AddWorkInFlops(Cost::DAXPY(fine.LocalOperatorNonZeros<double>()));
+			fine.ResidualInto(b, x, r);                                            result.AddWorkInFlops(Cost::DAXPY(fine.LocalOperatorNonZeros<double>()));
 		}
 		const Vector& rhs = xEquals0 ? b : r;
-		FloatVector rSingle(n), eSingle;
+		FloatVector& rSingle = _singleResidual;
+		FloatVector& eSingle = _singleCorrection;
 		#pragma omp parallel for if (n > 20000)
 		for (BigNumber i = 0; i < n; i++)
 			rSingle[i] = (float)rhs[i];
@@ -543,12 +575,13 @@ private:
 		for (BigNumber i = 0; i < n; i++)
 			x[i] = xEquals0 ? (double)eSingle[i] : x[i] + eSingle[i];
 		xEquals0 = false;
-		if (computeAx || computeResidual)
+		if (Ax || residual)
 		{
-			result.Ax = fine.Apply(x);                                             result.AddWorkInFlops(Cost::SpMatVec(fine.LocalOperatorNonZeros<double>()));
-			if (computeResidual)
+			Vector& ax = Ax ? *Ax : r; // A x alone (r is no longer used)
+			fine.ApplyInto(x, ax);                                                 result.AddWorkInFlops(Cost::SpMatVec(fine.LocalOperatorNonZeros<double>()));
+			if (residual)
 			{
-				result.Residual = b - result.Ax;                                   result.AddWorkInFlops(Cost::AddVec(b));
+				*residual = b - ax;                                                result.AddWorkInFlops(Cost::AddVec(b));
 			}
 		}
 	}
@@ -592,21 +625,19 @@ private:
 
 			//auto flopBeforePreSmooth = result.IterationComputationalWork();
 
-			VectorOf<T> r;
+			Level::CycleVectors<T>& vectors = level->template CycleVectorsOf<T>();
+			VectorOf<T>& r = vectors.Residual;
 			if (level->PreSmoother->CanOptimizeResidualComputation())
 			{
 				// Smooth and compute residual
-				level->PreSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, true, false);    result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
-				
-				// Move residual vector
-				r = level->PreSmoother->template TakeResidual<T>();
+				level->PreSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, &r, (VectorOf<T>*)nullptr); result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
 			}
 			else
 			{
 				// Smooth
 				level->PreSmoother->Smooth(x, b, xEquals0);                               result.AddWorkInMFlops(level->PreSmoother->SolvingComputationalWork());
 				// Residual computation
-				r = level->ResidualOf(b, x);                                              result.AddWorkInFlops(Cost::DAXPY(level->template LocalOperatorNonZeros<T>()));
+				level->ResidualInto(b, x, r);                                             result.AddWorkInFlops(Cost::DAXPY(level->template LocalOperatorNonZeros<T>()));
 			}
 			
 			if constexpr (!single)
@@ -625,7 +656,8 @@ private:
 			auto flopBeforeRestrict = result.IterationComputationalWork();
 			IntergridTransferTimer.Start();
 
-			VectorOf<T> rc = level->Restrict(r);                                          result.AddWorkInFlops(level->RestrictCost());
+			VectorOf<T>& rc = vectors.CoarseResidual;
+			level->RestrictInto(r, rc);                                                   result.AddWorkInFlops(level->RestrictCost());
 			                                                                              this->IntergridTransferCost += level->RestrictCost()*1e-6;
 			IntergridTransferTimer.Pause();
 			auto flopRestrict = result.IterationComputationalWork() - flopBeforeRestrict;
@@ -647,18 +679,21 @@ private:
 
 			// In the precision of the coarser level: double under a level in single precision if the coarser level is
 			// set up in double (the coarsest level: its solve, in CycleIn())
-			VectorOf<T> ec;
+			VectorOf<T>& ec = vectors.CoarseCorrection;
 			if (single && !level->CoarserLevel->IsCoarsestLevel() && !level->CoarserLevel->InSinglePrecision())
 			{
-				Vector rcInDouble = rc.template cast<double>();
+				Vector& rcInDouble = vectors.CoarseResidualInDouble;
+				rcInDouble = rc.template cast<double>();
 				if (this->EnforceCompatibilityCondition)
 				{
 					level->CoarserLevel->EnforceCompatibilityCondition(rcInDouble);   result.AddWorkInFlops(level->CoarserLevel->EnforceCompatibilityConditionCost(rcInDouble));
 				}
-				ec = CoarseCorrection<double>(level, rcInDouble, result).template cast<T>();
+				Vector& ecInDouble = vectors.CoarseCorrectionInDouble;
+				CoarseCorrection<double>(level, rcInDouble, ecInDouble, result);
+				ec = ecInDouble.template cast<T>();
 			}
 			else
-				ec = CoarseCorrection<T>(level, rc, result);
+				CoarseCorrection<T>(level, rc, ec, result);
 
 			//------------------------//
 			// Coarse-grid correction //
@@ -678,7 +713,7 @@ private:
 			// Prolongation
 			IntergridTransferTimer.Start();
 
-			x += level->Prolong(ec);                                                  result.AddWorkInFlops(level->ProlongCost() + Cost::AddVec(x));
+			level->ProlongAndAdd(ec, x);                                              result.AddWorkInFlops(level->ProlongCost() + Cost::AddVec(x));
 			                                                                          this->IntergridTransferCost += (level->ProlongCost() + Cost::AddVec(x))*1e-6;
 			IntergridTransferTimer.Pause();
 
@@ -699,11 +734,7 @@ private:
 			if (level->PostSmoother->CanOptimizeResidualComputation() && (residual || Ax))
 			{
 				// Smooth and compute residual
-				level->PostSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, residual != nullptr, Ax != nullptr);    result.AddWorkInMFlops(level->PostSmoother->SolvingComputationalWork());
-				if (residual)
-					*residual = level->PostSmoother->template TakeResidual<T>();
-				if (Ax)
-					*Ax = level->PostSmoother->template TakeAx<T>();
+				level->PostSmoother->SmoothAndComputeResidualOrAx(x, b, xEquals0, residual, Ax); result.AddWorkInMFlops(level->PostSmoother->SolvingComputationalWork());
 			}
 			else
 			{
@@ -712,7 +743,7 @@ private:
 				if (Ax)
 				{
 					// Residual computation
-					*Ax = level->Apply(x);                                            result.AddWorkInFlops(Cost::SpMatVec(level->template LocalOperatorNonZeros<T>()));
+					level->ApplyInto(x, *Ax);                                         result.AddWorkInFlops(Cost::SpMatVec(level->template LocalOperatorNonZeros<T>()));
 					if (residual)
 					{
 						*residual = b - *Ax;                                          result.AddWorkInFlops(Cost::AddVec(b));
@@ -720,7 +751,7 @@ private:
 				}
 				else if (residual)
 				{
-					*residual = level->ResidualOf(b, x);                              result.AddWorkInFlops(Cost::DAXPY(level->template LocalOperatorNonZeros<T>()));
+					level->ResidualInto(b, x, *residual);                             result.AddWorkInFlops(Cost::DAXPY(level->template LocalOperatorNonZeros<T>()));
 				}
 			}
 
@@ -743,15 +774,14 @@ private:
 		}
 	}
 
-	// The correction of the coarser level for the restricted residual rc of level (V, W: cycles from zero; K: the
+	// The correction ec of the coarser level for the restricted residual rc of level (V, W: cycles from zero; K: the
 	// Krylov iterations of KrylovForKCycle()), in precision T, that of the coarser level
 	template <typename T>
-	VectorOf<T> CoarseCorrection(Level* level, VectorOf<T>& rc, IterationResult& result)
+	void CoarseCorrection(Level* level, VectorOf<T>& rc, VectorOf<T>& ec, IterationResult& result)
 	{
-		VectorOf<T> ec;
 		if (this->Cycle == CycleType::V || this->Cycle == CycleType::W)
 		{
-			ec = VectorOf<T>::Zero(rc.rows());
+			ec.setZero(rc.rows());
 			bool ecEquals0 = true;
 			for (int i = 0; i < this->WLoops; ++i)
 			{
@@ -773,10 +803,9 @@ private:
 			else
 			{
 				//level->CoarserLevel->FCG->Solve(rc, ecEqualZero, ec);                    result.AddWorkInMFlops(level->CoarserLevel->FCG->SolvingComputationalWork);
-				ec = KrylovForKCycle<T>(level->CoarserLevel, rc, coarseResult);                result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
+				KrylovForKCycle<T>(level->CoarserLevel, rc, ec, coarseResult);                 result.AddWorkInMFlops(coarseResult.SolvingComputationalWork());
 			}
 		}
-		return ec;
 	}
 
 	// 1 or 2 iterations of FCG or GCR (KCycleKrylov) preconditioned by the cycle on this level: Notay, "An
@@ -784,20 +813,21 @@ private:
 	// first does not reduce the residual by 4, and never on a level whose operator is not small enough beside the
 	// finer level's (Level::OneKCycleIteration). The two methods differ by
 	// their inner products only: FCG minimizes the A-norm of the error, GCR the residual norm. In precision T (the dot
-	// products in double).
+	// products in double). The solution in x.
 	template <typename T>
-	VectorOf<T> KrylovForKCycle(Level* level, VectorOf<T>& r, IterationResult& result)
+	void KrylovForKCycle(Level* level, VectorOf<T>& r, VectorOf<T>& x, IterationResult& result)
 	{
 		//const SparseMatrix& A = *level->OperatorMatrix;
 		double t = 0.25;
 		bool gcr = this->KCycleKrylov == KrylovMethod::GCR;
-		VectorOf<T> x;
+		Level::CycleVectors<T>& vectors = level->template CycleVectorsOf<T>();
 
 		// Apply multigrid preconditioner: c = Prec(r)
-		VectorOf<T> c = VectorOf<T>::Zero(r.rows());
+		VectorOf<T>& c = vectors.KrylovC;
+		c.setZero(r.rows());
 		bool cEquals0 = true;
 		IterationResult precResult1;
-		VectorOf<T> v; // v = A*c
+		VectorOf<T>& v = vectors.KrylovV; // v = A*c
 		CycleIn<T>(level, r, c, cEquals0, nullptr, &v, precResult1);             result.AddWorkInMFlops(precResult1.SolvingComputationalWork());
 
 		// 1st iteration
@@ -809,7 +839,7 @@ private:
 		if (level->OneKCycleIteration)
 		{
 			x = T(alpha1 / rho1) * c;                                             result.AddWorkInFlops(Cost::ConstantVec(x));
-			return x;
+			return;
 		}
 
 		double r_norm_old = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
@@ -822,10 +852,11 @@ private:
 		else
 		{
 			// Apply multigrid preconditioner: d = Prec(r)
-			VectorOf<T> d = VectorOf<T>::Zero(r.rows());
+			VectorOf<T>& d = vectors.KrylovD;
+			d.setZero(r.rows());
 			bool dEquals0 = true;
 			IterationResult precResult2;
-			VectorOf<T> w; // w = A*d
+			VectorOf<T>& w = vectors.KrylovW; // w = A*d
 			CycleIn<T>(level, r, d, dEquals0, nullptr, &w, precResult2);         result.AddWorkInMFlops(precResult2.SolvingComputationalWork());
 
 			// 2nd iteration
@@ -836,7 +867,6 @@ private:
 			double rho2 = beta - gamma * gamma / rho1;
 			x = T(alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + T(alpha2 / rho2) * d; result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
 		}
-		return x;
 	}
 
 protected:

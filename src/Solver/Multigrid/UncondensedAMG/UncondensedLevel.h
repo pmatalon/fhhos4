@@ -2007,41 +2007,76 @@ public:
 		}
 	}
 
-	// The transfers of the vectors of the precision of the level
-	Vector Prolong(Vector& vectorOnTheCoarserLevel) override
+	// The transfers of the vectors of the precision of the level: the restriction in a vector of the caller (its storage
+	// reused), x += P e in x directly, or in a new vector
+	void RestrictInto(Vector& vectorOnThisLevel, Vector& vectorOnTheCoarserLevel) override
 	{
 		if constexpr (std::is_same_v<T, double>)
-			return ProlongIn(vectorOnTheCoarserLevel);
+			RestrictIn(vectorOnThisLevel, vectorOnTheCoarserLevel);
 		else
 			Utils::FatalError("UncondensedAMG: a level in single precision transfers vectors in single precision.");
+	}
+
+	void RestrictInto(FloatVector& vectorOnThisLevel, FloatVector& vectorOnTheCoarserLevel) override
+	{
+		if constexpr (std::is_same_v<T, float>)
+			RestrictIn(vectorOnThisLevel, vectorOnTheCoarserLevel);
+		else
+			Utils::FatalError("UncondensedAMG: a level in double precision transfers vectors in double precision.");
+	}
+
+	void ProlongAndAdd(Vector& vectorOnTheCoarserLevel, Vector& x) override
+	{
+		if constexpr (std::is_same_v<T, double>)
+			ProlongAndAddIn(vectorOnTheCoarserLevel, x);
+		else
+			Utils::FatalError("UncondensedAMG: a level in single precision transfers vectors in single precision.");
+	}
+
+	void ProlongAndAdd(FloatVector& vectorOnTheCoarserLevel, FloatVector& x) override
+	{
+		if constexpr (std::is_same_v<T, float>)
+			ProlongAndAddIn(vectorOnTheCoarserLevel, x);
+		else
+			Utils::FatalError("UncondensedAMG: a level in double precision transfers vectors in double precision.");
+	}
+
+	Vector Prolong(Vector& vectorOnTheCoarserLevel) override
+	{
+		Vector vectorOnThisLevel;
+		if constexpr (std::is_same_v<T, double>)
+			ProlongIn(vectorOnTheCoarserLevel, vectorOnThisLevel);
+		else
+			Utils::FatalError("UncondensedAMG: a level in single precision transfers vectors in single precision.");
+		return vectorOnThisLevel;
 	}
 
 	FloatVector Prolong(FloatVector& vectorOnTheCoarserLevel) override
 	{
+		FloatVector vectorOnThisLevel;
 		if constexpr (std::is_same_v<T, float>)
-			return ProlongIn(vectorOnTheCoarserLevel);
+			ProlongIn(vectorOnTheCoarserLevel, vectorOnThisLevel);
 		else
 			Utils::FatalError("UncondensedAMG: a level in double precision transfers vectors in double precision.");
+		return vectorOnThisLevel;
 	}
 
 	Vector Restrict(Vector& vectorOnThisLevel) override
 	{
-		if constexpr (std::is_same_v<T, double>)
-			return RestrictIn(vectorOnThisLevel);
-		else
-			Utils::FatalError("UncondensedAMG: a level in single precision transfers vectors in single precision.");
+		Vector vectorOnTheCoarserLevel;
+		RestrictInto(vectorOnThisLevel, vectorOnTheCoarserLevel);
+		return vectorOnTheCoarserLevel;
 	}
 
 	FloatVector Restrict(FloatVector& vectorOnThisLevel) override
 	{
-		if constexpr (std::is_same_v<T, float>)
-			return RestrictIn(vectorOnThisLevel);
-		else
-			Utils::FatalError("UncondensedAMG: a level in double precision transfers vectors in double precision.");
+		FloatVector vectorOnTheCoarserLevel;
+		RestrictInto(vectorOnThisLevel, vectorOnTheCoarserLevel);
+		return vectorOnTheCoarserLevel;
 	}
 
 private:
-	VectorOf<T> ProlongIn(VectorOf<T>& vectorOnTheCoarserLevel)
+	void ProlongIn(VectorOf<T>& vectorOnTheCoarserLevel, VectorOf<T>& vectorOnThisLevel)
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 		{
@@ -2050,18 +2085,17 @@ private:
 			auto nHigherDegreeUnknowns = this->_faceBlockSize;
 			auto nLowerDegreeUnknowns = coarseLevel->FaceBlockSize();
 			auto nFaces = vectorOnTheCoarserLevel.rows() / nLowerDegreeUnknowns;
-			VectorOf<T> vectorOnThisLevel = VectorOf<T>::Zero(nFaces * nHigherDegreeUnknowns);
+			vectorOnThisLevel.setZero(nFaces * nHigherDegreeUnknowns);
 			if (const DenseMatrix* functions = coarseLevel->FaceNearNullSpace)
 			{
 				// The coarse coefficients are those of the near null space functions, on the first DoFs of each face
 				int nFunctionDoFs = coarseLevel->FaceNearNullSpaceDoFs;
 				for (BigNumber i = 0; i < nFaces; i++)
 					vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nFunctionDoFs) = functions->middleRows(i*nFunctionDoFs, nFunctionDoFs).template cast<T>() * vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
-				return vectorOnThisLevel;
+				return;
 			}
 			for (BigNumber i = 0; i < nFaces; i++)
 				vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
-			return vectorOnThisLevel;
 		}
 		else if (!_passP.empty())
 		{
@@ -2074,13 +2108,59 @@ private:
 				buffers[i].noalias() = passP[i] * *e;
 				e = &buffers[i];
 			}
-			return passP[0] * *e;
+			vectorOnThisLevel.noalias() = passP[0] * *e;
 		}
+		else if (this->IsDistributed())
+			DistributedProlongation().Multiply(vectorOnTheCoarserLevel, nullptr, vectorOnThisLevel);
 		else
-			return Level::Prolong(vectorOnTheCoarserLevel);
+			vectorOnThisLevel.noalias() = Prolongation() * vectorOnTheCoarserLevel; // as Level::Prolong()
 	}
 
-	VectorOf<T> RestrictIn(VectorOf<T>& vectorOnThisLevel)
+	// x += P e, the product added to x directly: the same sums as ProlongIn() then x += P e, but the sign of a zero (the
+	// P-levels face by face, through the product of the face with near null space functions); on several processes,
+	// Diag e then Offd e_ghosts added to x (another rounding)
+	void ProlongAndAddIn(VectorOf<T>& e, VectorOf<T>& x)
+	{
+		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
+		{
+			UncondensedLevel* coarseLevel = dynamic_cast<UncondensedLevel*>(CoarserLevel); // possibly in another precision
+			auto nHigherDegreeUnknowns = this->_faceBlockSize;
+			auto nLowerDegreeUnknowns = coarseLevel->FaceBlockSize();
+			auto nFaces = e.rows() / nLowerDegreeUnknowns;
+			if (const DenseMatrix* functions = coarseLevel->FaceNearNullSpace)
+			{
+				int nFunctionDoFs = coarseLevel->FaceNearNullSpaceDoFs;
+				VectorOf<T> faceValues(nFunctionDoFs);
+				for (BigNumber i = 0; i < nFaces; i++)
+				{
+					faceValues.noalias() = functions->middleRows(i*nFunctionDoFs, nFunctionDoFs).template cast<T>() * e.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
+					x.segment(i*nHigherDegreeUnknowns, nFunctionDoFs) += faceValues;
+				}
+				return;
+			}
+			for (BigNumber i = 0; i < nFaces; i++)
+				x.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns) += e.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns);
+		}
+		else if (!_passP.empty())
+		{
+			// P_1 (P_2 (... P_n e)): e_{i-1} = P_i e_i, from the coarse vector e_n
+			const vector<SparseMatrixOf<T>>& passP = _passP;
+			vector<VectorOf<T>>& buffers = _transferBuffers;
+			const VectorOf<T>* e_i = &e;
+			for (size_t i = passP.size() - 1; i > 0; i--)
+			{
+				buffers[i].noalias() = passP[i] * *e_i;
+				e_i = &buffers[i];
+			}
+			x.noalias() += passP[0] * *e_i;
+		}
+		else if (this->IsDistributed())
+			DistributedProlongation().MultiplyAdd(e, x);
+		else
+			x.noalias() += Prolongation() * e;
+	}
+
+	void RestrictIn(VectorOf<T>& vectorOnThisLevel, VectorOf<T>& vectorOnTheCoarserLevel)
 	{
 		if (this->CoarserLevel->ComesFrom == CoarseningType::P)
 		{
@@ -2089,18 +2169,17 @@ private:
 			auto nHigherDegreeUnknowns = this->_faceBlockSize;
 			auto nLowerDegreeUnknowns = coarseLevel->FaceBlockSize();
 			auto nFaces = vectorOnThisLevel.rows() / nHigherDegreeUnknowns;
-			VectorOf<T> vectorOnTheCoarserLevel(nFaces * nLowerDegreeUnknowns);
+			vectorOnTheCoarserLevel.resize(nFaces * nLowerDegreeUnknowns);
 			if (const DenseMatrix* functions = coarseLevel->FaceNearNullSpace)
 			{
 				// The transpose of the prolongation
 				int nFunctionDoFs = coarseLevel->FaceNearNullSpaceDoFs;
 				for (BigNumber i = 0; i < nFaces; i++)
 					vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns) = functions->middleRows(i*nFunctionDoFs, nFunctionDoFs).transpose().template cast<T>() * vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nFunctionDoFs);
-				return vectorOnTheCoarserLevel;
+				return;
 			}
 			for (BigNumber i = 0; i < nFaces; i++)
 				vectorOnTheCoarserLevel.segment(i*nLowerDegreeUnknowns, nLowerDegreeUnknowns) = vectorOnThisLevel.segment(i*nHigherDegreeUnknowns, nLowerDegreeUnknowns);
-			return vectorOnTheCoarserLevel;
 		}
 		else if (!_passR.empty())
 		{
@@ -2113,10 +2192,12 @@ private:
 				buffers[i + 1].noalias() = passR[i] * *r;
 				r = &buffers[i + 1];
 			}
-			return passR.back() * *r;
+			vectorOnTheCoarserLevel.noalias() = passR.back() * *r;
 		}
+		else if (this->IsDistributed())
+			DistributedProlongation().MultiplyTransposed(vectorOnThisLevel, vectorOnTheCoarserLevel);
 		else
-			return Level::Restrict(vectorOnThisLevel);
+			vectorOnTheCoarserLevel.noalias() = Restriction() * vectorOnThisLevel; // as Level::Restrict()
 	}
 
 public:

@@ -14,6 +14,12 @@ class GeneralizedConjugateResidual : public IterativeSolver
 public:
 	SolverPreconditioner Precond;
 	int Restart; // maximal number of iterations of a cycle
+private:
+	// The vectors of the iterations, allocated at the setup (AllocateIterationVectors()): the solve allocates nothing (see
+	// Level::CycleVectors). Z and C: those of a cycle (Restart each).
+	vector<Vector> _Z, _C;
+	Vector _cycleCorrection;
+public:
 	// Residual replacement: at the end of each cycle (restart, or stopping criteria met), the residual updated by the
 	// recurrence (r -= alpha*c) is replaced by the true residual b - Ax, on which the stopping criteria are then evaluated
 	// (the iterations continue if they are no longer met). See FlexibleConjugateGradient::ResidualRecomputation. Costs one
@@ -35,6 +41,7 @@ public:
 		IterativeSolver::Setup(A);
 		this->Precond.Setup(A);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.rows());
 	}
 
 	void Setup(const SparseMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, const SparseMatrix& A_F_F, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
@@ -42,6 +49,7 @@ public:
 		IterativeSolver::Setup(A);
 		this->Precond.Setup(A, A_T_T, A_T_F, A_F_T, A_F_F, cellInterpOfOne, faceInterpOfOne);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.rows());
 	}
 
 	void Setup(const DistributedMatrix& A) override
@@ -49,6 +57,7 @@ public:
 		SetDistributedMatrix(A);
 		this->Precond.Setup(A);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.Diag.rows());
 	}
 
 	void Setup(const DistributedMatrix& A, const SparseMatrix& A_T_T, const SparseMatrix& A_T_F, const SparseMatrix& A_F_T, shared_ptr<const IndexMap> faceMap, const Vector& cellInterpOfOne, const Vector& faceInterpOfOne) override
@@ -56,6 +65,7 @@ public:
 		SetDistributedMatrix(A);
 		this->Precond.Setup(A, A_T_T, A_T_F, A_F_T, faceMap, cellInterpOfOne, faceInterpOfOne);
 		this->SetupComputationalWork = this->Precond.SetupComputationalWork();
+		AllocateIterationVectors(A.Diag.rows());
 	}
 
 	void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx) override
@@ -88,7 +98,8 @@ public:
 
 		// The current cycle: the preconditioned residuals z_j, the orthonormalized c_j, and Gamma (upper triangular) and a
 		// such that A Z = C Gamma and r = r_0 - C a. x is the iterate at the start of the cycle.
-		vector<Vector> Z(Restart), C(Restart);
+		vector<Vector>& Z = _Z;
+		vector<Vector>& C = _C;
 		DenseMatrix Gamma = DenseMatrix::Zero(Restart, Restart);
 		Vector a = Vector::Zero(Restart);
 		int j = 0; // iterations done in the current cycle
@@ -100,12 +111,16 @@ public:
 			// Apply the preconditioner: z_j = Prec(r), c_j = A z_j
 			if (Precond.CanOptimizeResidualComputation())
 			{
-				std::tie(Z[j], C[j]) = Precond.ApplyAndComputeAe(r);  result.AddWorkInMFlops(Precond.SolvingComputationalWork());
+				Precond.ApplyAndComputeAe(r, Z[j], C[j]);             result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 			}
 			else
 			{
-				Z[j] = Precond.Apply(r);                              result.AddWorkInMFlops(Precond.SolvingComputationalWork());
-				C[j] = MatVec(Z[j]);                                  result.AddWorkInFlops(Cost::MatVec(A));
+				Precond.Apply(r, Z[j]);                               result.AddWorkInMFlops(Precond.SolvingComputationalWork());
+				if (this->Distributed)                                // C[j] = MatVec(Z[j]) in C[j]
+					this->Distributed->Multiply(Z[j], nullptr, C[j]);
+				else
+					C[j].noalias() = A * Z[j];
+				                                                      result.AddWorkInFlops(Cost::MatVec(A));
 			}
 
 			// Orthonormalization of c_j against the previous c_i (modified Gram-Schmidt)
@@ -131,7 +146,8 @@ public:
 			if (j == Restart || StoppingCriteriaMet(result))
 			{
 				// End of the cycle: the iterate, then the restart from it
-				x += CycleCorrection(Z, Gamma, a, j, result);
+				CycleCorrection(Z, Gamma, a, j, _cycleCorrection, result);
+				x += _cycleCorrection;
 				j = 0;
 
 				// Residual replacement (the loop condition then evaluates the stopping criteria on the true residual)
@@ -143,7 +159,10 @@ public:
 				result.SetX(x);
 			}
 			else if (result.NeedsX()) // error against the exact solution, callback: the iterate at each iteration
-				result.SetX(x + CycleCorrection(Z, Gamma, a, j, result));
+			{
+				CycleCorrection(Z, Gamma, a, j, _cycleCorrection, result);
+				result.SetX(x + _cycleCorrection);
+			}
 			else
 				result.StopTimers();
 
@@ -159,15 +178,24 @@ public:
 	}
 
 private:
-	// Z Gamma^{-1} a, from the first j iterations of the cycle: the correction of the iterate of the start of the cycle
-	Vector CycleCorrection(const vector<Vector>& Z, const DenseMatrix& Gamma, const Vector& a, int j, IterationResult& result) const
+	// Z Gamma^{-1} a, from the first j iterations of the cycle, in correction: the correction of the iterate of the start of
+	// the cycle
+	void CycleCorrection(const vector<Vector>& Z, const DenseMatrix& Gamma, const Vector& a, int j, Vector& correction, IterationResult& result) const
 	{
 		Vector y = Gamma.topLeftCorner(j, j).triangularView<Eigen::Upper>().solve(a.head(j));
-		Vector correction = y[0] * Z[0];                              result.AddWorkInFlops(Cost::ConstantVec(Z[0]));
+		correction = y[0] * Z[0];                                     result.AddWorkInFlops(Cost::ConstantVec(Z[0]));
 		for (int i = 1; i < j; i++)
 		{
 			correction += y[i] * Z[i];                                result.AddWorkInFlops(Cost::VectorDAXPY(Z[i]));
 		}
-		return correction;
+	}
+
+	// r (Residual), the Restart vectors z_j and c_j of a cycle, and its correction: n rows
+	void AllocateIterationVectors(BigNumber n)
+	{
+		this->Residual.resize(n);
+		_Z.assign(Restart, Vector(n));
+		_C.assign(Restart, Vector(n));
+		_cycleCorrection.resize(n);
 	}
 };

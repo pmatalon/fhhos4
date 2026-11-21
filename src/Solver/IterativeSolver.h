@@ -353,6 +353,20 @@ public:
 		Solve(b, x, xEquals0, computeResidual, computeAx);
 	}
 
+	// The same, the residual and A x of the last iteration in residual and Ax if not null: vectors of the caller, which
+	// allocates them at its setup (a smoother of a level, the multigrid preconditioning FCG): the solve then allocates
+	// nothing (a large vector would be fresh memory at each allocation, its page faults paid together by the threads of
+	// the process). Here through the members Residual and Ax; the Chebyshev and Gauss-Seidel smoothers and the multigrid
+	// write in the caller's vectors directly.
+	virtual void SolveInto(const Vector& b, Vector& x, bool xEquals0, Vector* residual, Vector* Ax)
+	{
+		Solve(b, x, xEquals0, residual != nullptr, Ax != nullptr);
+		if (residual)
+			residual->swap(this->Residual);
+		if (Ax)
+			Ax->swap(this->Ax);
+	}
+
 	virtual void Solve(const Vector& b, Vector& x, bool xEquals0, bool computeResidual, bool computeAx)
 	{
 		DoBeforeSolving();

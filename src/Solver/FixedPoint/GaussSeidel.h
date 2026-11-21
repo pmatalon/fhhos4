@@ -16,6 +16,30 @@ protected:
 	HybridChunks _chunks; // of the hybrid sweeps (see Chunks())
 	// The l1 term of each row (see _l1Theta), added to its diagonal coefficient; empty: none
 	Vector _l1Terms;
+	// The products by the strictly triangular part that a sweep computes for the residual (ForwardSweepAndComputeResidualOrAx(),
+	// BackwardSweepAndComputeResidualOrAx()), in the precision of the setup: allocated by it, shared with the smoother
+	// that copies it (the post-smoother of the level: they never sweep at the same time)
+	shared_ptr<Vector> _sweepProducts;
+	shared_ptr<FloatVector> _singleSweepProducts;
+
+	template <typename T>
+	shared_ptr<VectorOf<T>>& SweepProductsOf()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleSweepProducts;
+		else
+			return _sweepProducts;
+	}
+
+	// The work vector of the sweeps in precision T (allocated at the setup; for a solver not set up this way, here)
+	template <typename T>
+	VectorOf<T>& SweepProducts()
+	{
+		shared_ptr<VectorOf<T>>& products = SweepProductsOf<T>();
+		if (!products)
+			products = make_shared<VectorOf<T>>(MatrixOf<T>().rows());
+		return *products;
+	}
 public:
 	// If set, every sweep (forward or backward, pre- or post-smoothing) processes the rows in this order: the downwind
 	// order of a convection-dominated matrix (DownwindOrder()), which all the sweeps then follow
@@ -100,6 +124,7 @@ private:
 				Utils::FatalError("Gauss-Seidel: no diagonal coefficient in row " + to_string(i) + ".");
 		}
 		_diagPos = std::move(diagonal.Begin);
+		SweepProductsOf<T>() = make_shared<VectorOf<T>>(A.rows());
 		_l1Terms = Vector();
 		_chunks.Clear();
 		if (_hybrid)
@@ -151,6 +176,8 @@ private:
 	void CopySetup(const GaussSeidel* o)
 	{
 		_diagPos = o->_diagPos;
+		_sweepProducts = o->_sweepProducts;
+		_singleSweepProducts = o->_singleSweepProducts;
 		_chunks.Clear();
 		if (_hybrid && o->_hybrid && o->SweepOrder == SweepOrder)
 			_chunks = o->_chunks;
@@ -206,21 +233,40 @@ public:
 	void SolveInSinglePrecision(const FloatVector& b, FloatVector& x, bool xEquals0, FloatVector* residual, FloatVector* Ax) override
 	{
 		assert(this->MaxIterations > 0 && InSinglePrecision() && (CanOptimizeResidualComputation() || (!residual && !Ax)));
+		SmootherIterations(b, x, xEquals0, residual, Ax);
+	}
+
+	// A smoother (a fixed number of iterations): the residual and A x in the caller's vectors. The stand-alone solver (its
+	// stopping criteria, the residual norms) iterates in IterativeSolver::Solve().
+	void SolveInto(const Vector& b, Vector& x, bool xEquals0, Vector* residual, Vector* Ax) override
+	{
+		if (this->StoppingCrit != StoppingCriteria::MaxIterations || this->MaxIterations == 0 || this->ComputeExactSolution)
+		{
+			IterativeSolver::SolveInto(b, x, xEquals0, residual, Ax);
+			return;
+		}
+		assert(CanOptimizeResidualComputation() || (!residual && !Ax));
+		SmootherIterations(b, x, xEquals0, residual, Ax);
+	}
+
+private:
+	// The iterations of a smoother in precision T: the residual and A x of the last one in residual and Ax if not null
+	// (the one not requested deduced in the storage of the other: no other vector)
+	template <typename T>
+	void SmootherIterations(const VectorOf<T>& b, VectorOf<T>& x, bool xEquals0, VectorOf<T>* residual, VectorOf<T>* Ax)
+	{
 		IterationResult work; // counts the flops
-		FloatVector r, ax;
+		VectorOf<T> none;     // neither requested: not used
+		VectorOf<T>& r = residual ? *residual : (Ax ? *Ax : none);
+		VectorOf<T>& ax = Ax ? *Ax : r;
 		for (this->IterationCount = 0; this->IterationCount < this->MaxIterations; this->IterationCount++)
 		{
 			bool last = this->IterationCount == this->MaxIterations - 1;
 			Iterate(b, x, xEquals0, last && residual, last && Ax, r, ax, work);
 		}
-		if (residual)
-			*residual = std::move(r);
-		if (Ax)
-			*Ax = std::move(ax);
 		this->SolvingComputationalWork = work.SolvingComputationalWork();
 	}
 
-private:
 	IterationResult ExecuteOneIteration(const Vector& b, Vector& x, bool& xEquals0, bool computeResidual, bool computeAx, const IterationResult& oldResult) override
 	{
 		IterationResult result(oldResult);
@@ -318,7 +364,8 @@ private:
 		xEquals0 = false;
 	}
 
-	// The residual is always computed (it is cheaper than Ax), and Ax is deduced from it if requested.
+	// The residual is always computed (it is cheaper than Ax), and Ax is deduced from it if requested. residual and Ax
+	// may be the same vector (A x alone: computed in place). Their storage is reused if they have the size.
 	template <typename T>
 	void ForwardSweepAndComputeResidualOrAx(const VectorOf<T>& b, VectorOf<T>& x, bool& xEquals0, bool computeAx, VectorOf<T>& residual, VectorOf<T>& Ax, IterationResult& result)
 	{
@@ -327,13 +374,13 @@ private:
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (L+D)^{-1} * (b-Ux)
-			VectorOf<T> Ux(A.rows());
+			VectorOf<T>& Ux = SweepProducts<T>();
 			ForwardSweepKernel(b, x, false, &Ux);                 result.AddWorkInFlops(Cost::SpMatVec(NNZ::StrictTriPart(A)));
 			                                                      result.AddWorkInFlops(Cost::AddVec(b) + Cost::SpFWElimination(A));
 			xEquals0 = false;
 
 			// Residual: Ux(old) - Ux(new)
-			residual = VectorOf<T>(A.rows());
+			residual.resize(A.rows());
 			StrictUpperProduct(x, &Ux, residual);                 result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 		}
 		else
@@ -343,7 +390,7 @@ private:
 			xEquals0 = false;
 
 			// Residual: r = -Ux
-			residual = VectorOf<T>(A.rows());
+			residual.resize(A.rows());
 			StrictUpperProduct(x, (VectorOf<T>*)nullptr, residual); result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 		}
 
@@ -353,6 +400,7 @@ private:
 		}
 	}
 
+	// residual and Ax may be the same vector (the residual alone: deduced in place from A x)
 	template <typename T>
 	void BackwardSweepAndComputeResidualOrAx(const VectorOf<T>& b, VectorOf<T>& x, bool& xEquals0, bool computeResidual, bool computeAx, VectorOf<T>& residual, VectorOf<T>& Ax, IterationResult& result)
 	{
@@ -361,14 +409,14 @@ private:
 		if (!xEquals0)
 		{
 			// Sweep: x(new) = (D+U)^{-1} * (b-Lx)
-			VectorOf<T> b_Lx(A.rows());
+			VectorOf<T>& b_Lx = SweepProducts<T>();
 			BackwardSweepKernel(b, x, false, &b_Lx);              result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 			                                                      result.AddWorkInFlops(Cost::SpBWSubstitution(A));
 			xEquals0 = false;
 
 			if (computeAx || computeResidual)
 			{
-				Ax = VectorOf<T>(A.rows());
+				Ax.resize(A.rows());
 				StrictLowerProduct(x, &b_Lx, Ax);                 result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 				if (computeResidual)
 				{
@@ -385,7 +433,7 @@ private:
 			if (computeAx)
 			{
 				// Ax = b + Lx
-				Ax = VectorOf<T>(A.rows());
+				Ax.resize(A.rows());
 				StrictLowerProduct(x, &b, Ax);                    result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 				if (computeResidual)
 				{
@@ -395,7 +443,7 @@ private:
 			else if (computeResidual)
 			{
 				// Residual: Lx(old) - Lx(new) = -Lx
-				residual = VectorOf<T>(A.rows());
+				residual.resize(A.rows());
 				StrictLowerProduct(x, (VectorOf<T>*)nullptr, residual); result.AddWorkInFlops(Cost::DAXPY_StrictTri(A));
 			}
 		}

@@ -169,6 +169,116 @@ public:
 		return *this->SingleOperatorMatrix * x;
 	}
 
+	// The same in a vector of the caller, its storage reused if it has the size (the vectors of the cycle, see
+	// CycleVectors), in precision T; the arithmetic of ResidualOf() and Apply()
+	template <typename T>
+	void ResidualInto(const VectorOf<T>& b, const VectorOf<T>& x, VectorOf<T>& r)
+	{
+		if (DistributedOperatorOf<T>() || BlockOperatorOf<T>())
+		{
+			ApplyInto(x, r);
+			r = b - r;
+		}
+		else
+		{
+			r = b;
+			r.noalias() -= *OperatorOf<T>() * x; // as Eigen evaluates b - A x
+		}
+	}
+
+	template <typename T>
+	void ApplyInto(const VectorOf<T>& x, VectorOf<T>& Ax)
+	{
+		if (const DistributedMatrixOf<T>* distributed = DistributedOperatorOf<T>())
+			distributed->Multiply(x, BlockOperatorOf<T>(), Ax);
+		else if (const BlockSparseMatrix<T>* blocks = BlockOperatorOf<T>())
+		{
+			Ax.resize(blocks->Rows());
+			blocks->Multiply(x.data(), Ax.data());
+		}
+		else
+			Ax.noalias() = *OperatorOf<T>() * x;
+	}
+
+	// The vectors of the cycle on this level (Multigrid::CycleIn()), in precision T, allocated at the setup
+	// (AllocateCycleVectors()): the solve allocates nothing. A large vector (more than 32 MB, glibc's largest reused block)
+	// would otherwise be fresh memory at each allocation, its page faults paid together by the threads of the process.
+	template <typename T>
+	struct CycleVectors
+	{
+		VectorOf<T> Residual;             // after the pre-smoothing
+		VectorOf<T> CoarseResidual;       // its restriction
+		VectorOf<T> CoarseCorrection;     // the correction of the coarser level
+		VectorOf<T> KrylovC, KrylovV, KrylovD, KrylovW; // the K-cycle's iterations on this level (Multigrid::KrylovForKCycle())
+		Vector CoarseResidualInDouble, CoarseCorrectionInDouble; // a level in single precision above one in double
+	};
+
+	template <typename T>
+	CycleVectors<T>& CycleVectorsOf()
+	{
+		if constexpr (std::is_same_v<T, float>)
+			return _singleCycleVectors;
+		else
+			return _cycleVectors;
+	}
+
+	// The rows of the operator on this process, in precision T, and in that of the level
+	template <typename T>
+	BigNumber LocalRowsOf()
+	{
+		if (const BlockSparseMatrix<T>* blocks = BlockOperatorOf<T>())
+			return blocks->Rows();
+		if (const DistributedMatrixOf<T>* distributed = DistributedOperatorOf<T>())
+			return distributed->Diag.rows();
+		return OperatorOf<T>()->rows();
+	}
+
+	BigNumber LocalRows()
+	{
+		return InSinglePrecision() ? LocalRowsOf<float>() : LocalRowsOf<double>();
+	}
+
+	// At the end of the setup of the multigrid (all the levels set up), in the precision of the level; krylov: the vectors
+	// of the K-cycle's iterations on this level
+	void AllocateCycleVectors(bool krylov)
+	{
+		if (InSinglePrecision())
+			AllocateCycleVectors<float>(krylov);
+		else
+			AllocateCycleVectors<double>(krylov);
+	}
+
+private:
+	template <typename T>
+	void AllocateCycleVectors(bool krylov)
+	{
+		CycleVectors<T>& vectors = CycleVectorsOf<T>();
+		BigNumber n = LocalRowsOf<T>();
+		if (krylov)
+		{
+			vectors.KrylovC.resize(n);
+			vectors.KrylovV.resize(n);
+			vectors.KrylovD.resize(n);
+			vectors.KrylovW.resize(n);
+		}
+		if (IsCoarsestLevel())
+			return;
+		BigNumber nCoarse = CoarserLevel->LocalRows();
+		vectors.Residual.resize(n);
+		vectors.CoarseResidual.resize(nCoarse);
+		vectors.CoarseCorrection.resize(nCoarse);
+		if (std::is_same_v<T, float> && !CoarserLevel->IsCoarsestLevel() && !CoarserLevel->InSinglePrecision())
+		{
+			vectors.CoarseResidualInDouble.resize(nCoarse);
+			vectors.CoarseCorrectionInDouble.resize(nCoarse);
+		}
+	}
+
+	CycleVectors<double> _cycleVectors;
+	CycleVectors<float> _singleCycleVectors;
+
+public:
+
 	// The number of non-zeros of the operator of the products in precision T, on this process (the cost of the products)
 	template <typename T>
 	BigNumber LocalOperatorNonZeros()
@@ -375,6 +485,29 @@ public:
 		if (this->IsDistributed())
 			return this->SingleDistributedP.MultiplyTransposed(vectorOnThisLevel);
 		return SingleR * vectorOnThisLevel;
+	}
+
+	// The transfers in a vector of the caller, its storage reused if it has the size (the vectors of the cycle); here
+	// through Restrict() and Prolong(), whose result is allocated: UncondensedLevel writes in place
+	virtual void RestrictInto(Vector& vectorOnThisLevel, Vector& vectorOnTheCoarserLevel)
+	{
+		vectorOnTheCoarserLevel = Restrict(vectorOnThisLevel);
+	}
+
+	virtual void RestrictInto(FloatVector& vectorOnThisLevel, FloatVector& vectorOnTheCoarserLevel)
+	{
+		vectorOnTheCoarserLevel = Restrict(vectorOnThisLevel);
+	}
+
+	// x += P e: here through Prolong(), whose result is allocated; UncondensedLevel adds the product to x directly
+	virtual void ProlongAndAdd(Vector& vectorOnTheCoarserLevel, Vector& x)
+	{
+		x += Prolong(vectorOnTheCoarserLevel);
+	}
+
+	virtual void ProlongAndAdd(FloatVector& vectorOnTheCoarserLevel, FloatVector& x)
+	{
+		x += Prolong(vectorOnTheCoarserLevel);
 	}
 
 	virtual Flops RestrictCost()
