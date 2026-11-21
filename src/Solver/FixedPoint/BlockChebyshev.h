@@ -205,8 +205,8 @@ private:
 		}
 		else
 			_diagBlockSolver.Setup(A, _blockSize, DiagBlockSolveMethod::Inverse);
-		EstimateLambdaMaxAndCost<T>();
 		AllocateWorkVectors<T>();
+		EstimateLambdaMaxAndCost<T>(); // in the work vectors
 	}
 
 	template <typename T>
@@ -218,8 +218,8 @@ private:
 		if (wrongBlockSize != numeric_limits<int>::max())
 			Utils::FatalError("The block CSR storage of a Chebyshev smoother requires blocks of its block size (" + to_string(_blockSize) + ", > 1), got " + to_string(wrongBlockSize) + ".");
 		_diagBlockSolver.Setup(A, _blockSize, DiagBlockSolveMethod::Inverse);
-		EstimateLambdaMaxAndCost<T>();
 		AllocateWorkVectors<T>();
+		EstimateLambdaMaxAndCost<T>(); // in the work vectors
 	}
 
 	// The work vectors of the iterations in precision T, allocated once (the solve allocates nothing)
@@ -650,15 +650,20 @@ private:
 	// tridiagonal matrix is given by the coefficients of the conjugate gradient preconditioned by D (Saad, Iterative
 	// Methods for Sparse Linear Systems, 2nd ed., 2003, §6.7.3). Its largest eigenvalue approaches lambdaMax from below.
 	// Pseudo-random start vector, a function of the index only: the estimate is the same in every run, whatever the
-	// number of threads. In precision T (the dot products in double).
+	// number of threads. In precision T (the dot products in double). r, z and p: the work vectors of the iterations
+	// (AllocateWorkVectors()).
 	template <typename T>
-	double EstimateLambdaMax() const
+	double EstimateLambdaMax()
 	{
 		BigNumber n = Rows<T>();
 		// On several processes: the global numbers of the rows, the products with the distributed matrix
 		const DistributedMatrixOf<T>* distributed = DistributedOf<T>();
 		BigNumber firstRow = distributed ? distributed->RowMap->Begin * distributed->RowBlockSize : 0;
-		VectorOf<T> r(n), z(n), p, Ap(n);
+		Precision<T>& W = In<T>();
+		VectorOf<T>& r = W.r;
+		VectorOf<T>& z = W.d;
+		VectorOf<T>& p = W.dNext;
+		VectorOf<T> Ap(n);
 		for (BigNumber i = 0; i < n; i++)
 			r[i] = PseudoRandom(firstRow + i);
 		ApplyInverseDiagonal(r, z);
@@ -671,7 +676,7 @@ private:
 		for (int j = 0; j < EigenvalueEstimateIterations; j++)
 		{
 			if (distributed)
-				Ap = distributed->Multiply(p, BlockMatrixOf<T>());
+				distributed->Multiply(p, BlockMatrixOf<T>(), Ap);
 			else if (const BlockSparseMatrix<T>* blocks = BlockMatrixOf<T>())
 				blocks->Multiply(p.data(), Ap.data());
 			else

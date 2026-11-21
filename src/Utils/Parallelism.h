@@ -219,14 +219,20 @@ class ThreadLocal
 private:
 	vector<T> _values;
 public:
-	// Each value is constructed with the arguments args
+	// Each value is constructed with the arguments args, by its thread, in parallel: the threads' values (e.g. arrays of
+	// the size of a matrix) are written together, not one after the other by the calling thread, and first by the thread
+	// that uses them (their pages on its NUMA node)
 	template <class... Args>
 	explicit ThreadLocal(const Args&... args)
 	{
 		int nThreads = Parallelism::NThreads();
-		_values.reserve(nThreads);
-		for (int i = 0; i < nThreads; i++)
-			_values.emplace_back(args...);
+		_values.resize(nThreads);
+		if constexpr (sizeof...(Args) > 0)
+		{
+			#pragma omp parallel for schedule(static, 1) num_threads(nThreads)
+			for (int i = 0; i < nThreads; i++)
+				_values[i] = T(args...);
+		}
 	}
 
 	ThreadLocal(const ThreadLocal&) = delete;

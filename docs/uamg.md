@@ -91,7 +91,9 @@ the given bases.
   blocks of at least 2 DoFs (`UncondensedLevel::PassProlongationsMinFaceBlockSize`), the prolongations of the passes are
   kept and applied one after the other (and their transposes), without their product P. At degree 0 (all the h-levels
   by default) the factors make the transfers slower (many one-non-zero rows): P. `KeepPassProlongations = false`: P
-  everywhere (the reference of `CoarseningPassTest`).
+  everywhere (the reference of `CoarseningPassTest`). P is chained from the coarse side, P_1 (P_2 (... P_n))
+  (`UncondensedLevel::ChainFromCoarseSide()`, on several processes and in the mesh passes too): one product with the rows of the level's
+  faces, the others with those of the coarser passes.
 
 ## Vector-valued unknowns
 

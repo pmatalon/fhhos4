@@ -1224,8 +1224,73 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   A first version allocated the vectors at their first use and passed them between owners by Eigen's swaps (the
   smoother's residual to the level, the multigrid's A x to FCG...): more distinct vectors, hence +36 ms of first writes
   in the first 5 iterations (+3.6% of the solve as it is, the same 18.0 ms per iteration after). The setup's own
-  allocations remain (-37% of the setup with every vector fresh: 0.813 -> 0.511 s with glibc keeping the memory,
-  2026-11-21 in Current profile).
+  allocations: see "The setup's arrays" below (the -37% of the setup measured here with every block above 128 KB fresh
+  overstated it: +26% on a problem 30x larger, half of it the setup's results).
+
+- **The setup's arrays** (2026-11-21, the user's request: "Do the setup's own arrays. Which ones can you reuse?").
+  The allocations of the library's setup logged by an `LD_PRELOAD` wrapper of malloc (blocks >= 128 KB, their stacks
+  resolved on a copy of the library built with `-g`), Cube-tet k=0 n=32, `-s fcglibuamg`, 8 threads. In blocks of at
+  least 1 MB (those above glibc's 32 MB, fresh at each allocation, on a problem 30x larger), the setup allocates
+  465 MB: 168 MB kept (P, R = P^T, the operators, the condensed matrix, the solve's vectors, the smoothers' data) and
+  297 MB of temporaries: the arrays of the coarsening passes (~110 MB: neighbours and couplings, cells of the faces,
+  traces, aggregation, coarse faces, removed rows of P, the per-thread positions of `ComputeProlongation()`), the
+  local matrices (50 MB, already allocated once for the setup), the chained products of the passes' prolongations
+  (33 MB), the passes' P and coarse blocks (29 MB), per-thread position arrays (~40 MB), the Lanczos vectors (10 MB).
+  Below 1 MB, ~140 MB of chunks of `SparseMatrixOps::BuildByRows()` (vectors grown by doubling, then copied into the
+  matrix). The chained products cannot reuse an earlier storage: they grow at each pass (8.5, 12.5, 16.9 MB of values
+  on the first level).
+
+  The cost of fresh memory on a problem 30x larger, emulated by glibc's thresholds scaled by 1/30
+  (`MALLOC_MMAP_THRESHOLD_=1048576 MALLOC_TRIM_THRESHOLD_=2097152`: 32 MB -> 1 MB, its trim 64 MB -> 2 MB), medians of
+  5 interleaved runs, 8 threads, plugged in: setup 0.756 s against 0.598 s with glibc keeping its memory (+26%), 372k
+  against 225k page faults; about half the extra faults are the first writes of the kept results (unavoidable).
+
+  Tried, not kept: one `CoarseningPass` for all the passes, the work arrays of its steps as members (`Restart()`),
+  first for the whole setup, then per level: on a large problem 372k -> 359k faults (-3.6%), setup 0.756 -> 0.751 s
+  (noise); peak memory +4.5% as is (950 -> 992 MB) and +7% on a large problem (907 -> 974 MB). On a problem really
+  3.4x larger (n=48, the thresholds scaled to the same size, 3 interleaved runs): setup 2.254 -> 2.216 s (-1.7%),
+  faults 1.17M -> 1.14M, peak memory 2.85 -> 3.04 GB (+6.6%); fresh memory costs the setup +18% there (1.912 s with
+  glibc keeping its memory). Why the peak: the resident memory at each large allocation (`/proc/self/statm` in the
+  wrapper) shows the setup's peak at its end without the reuse (941 MB, when the local matrices are freed), but ~50 MB
+  more during the fine level's passes 2-4 with it: each pass writes in the arrays of the first one, whose pages stay
+  resident although it uses a part of them (before, each pass freed its arrays and the next allocated smaller ones);
+  the fine level's last pass, where the chained products are the largest, became the peak (1001 MB). Again with the
+  chaining from the coarse side (below, which removes those products from the passes): peak memory still +3% at n=48
+  (2787 -> 2871 MB), setup -1.5% (2.196 -> 2.163 s). Giving back the pages beyond the arrays' sizes (`madvise`) was
+  ruled out by the user: low-level code for that gain. Not tried:
+  reusing the storage of P and of the coarse blocks of the passes (~10% of the temporaries, and the levels keep the
+  last ones: a larger reused storage would hold its memory for the solver's lifetime).
+
+  Kept: (1) `ThreadLocal`'s values constructed by their threads, in parallel (`Parallelism.h`). The per-thread
+  position arrays of the size of a matrix (`SparseMatrixOps::Multiply()`, `LocalMatrices::Decompose()`,
+  `StaticCondensation`), filled with -1, were written by the calling thread for all the threads (nThreads x n): their
+  10 constructions of the setup take 19.8 -> 1.3 ms on 8 threads (19.1 -> 4.1 ms on a large problem), 3.6 -> 0.7 ms on
+  4 threads, 0.2 ms on 1 (a timer around the constructor, removed). The cost grew with the threads, and the pages now
+  land on the NUMA node of the thread that uses them. (2) The Chebyshev smoothers estimate lambda_max in their work
+  vectors (3 vectors fewer per smoother). Bit-identical results. The whole setup on 8 threads, before / after (medians
+  of 5 interleaved runs): 0.600 / 0.614 s as is, 0.723 / 0.697 s on a large problem, 0.583 / 0.556 s with glibc
+  keeping its memory: the noise (~30 ms) hides the 15-18 ms, which grow with the threads (the cluster's 32 cores: not
+  measured). Peak memory +0.4% as is (949 -> 953 MB), +0.7% on a large problem (907 -> 914 MB): the threads' arrays
+  in their own malloc arenas.
+
+- **The prolongations of the passes chained from the coarse side** (2026-11-21, `UncondensedLevel::
+  ChainFromCoarseSide()`): at degree 0 the level's P was chained from the fine side, ((P_1 P_2) P_3) P_4, each product
+  with the rows of the fine faces and growing (8.5, 12.5, 16.9 MB of values on the first level of k=0 n=32); now
+  P_1 (P_2 (P_3 P_4)): one product with the fine rows, the others with those of the coarser passes. Also on several
+  processes and in the mesh passes (the reference of `CoarseningPassTest`, bit-identical to the flat passes again).
+  Cube-tet k=0, `-s fcglibuamg`, plugged in, medians of interleaved runs, the chaining timed alone (a timer around it,
+  removed):
+
+  | | chaining, before / after | setup, before / after |
+  |---|---|---|
+  | n=32, 8 threads (5 runs) | 85.7 / 42.0 ms (x0.49) | 0.623 / 0.550 s |
+  | n=32, 8 threads, large problem (glibc's thresholds / 30) | 88.6 / 59.9 ms (x0.68) | 0.688 / 0.704 s |
+  | n=32, 1 thread (3 runs) | 136.5 / 103.1 ms (x0.76) | 1.281 / 1.254 s |
+  | n=48, 8 threads, large problem (3 runs) | 305.6 / 168.9 ms (x0.55) | 2.251 / 2.196 s |
+
+  The setups' differences are within their noise, except the chaining's share (-7% of the setup at n=32 on 8 threads,
+  -6% at n=48). The same iterations (24 at n=32, 25 at n=48), peak memory unchanged; `solutions.sh` 50 `DIFF` (the
+  rounding), 28 `OK`, no `ITERATIONS-DIFF`; `ctest` 402/402.
 
 ## Distributed memory (MPI)
 
@@ -1592,7 +1657,8 @@ threads gain less than processes on the cluster?). Cube-tet k=0 n=32 (318k faces
   prolongation 3.4k, decomposition 2.9k, `Build()` 2.5k...), the solve's cycle 6.7k -> 0 (~1 MB per iteration: glibc
   already reuses most of the freed vectors), FCG 0: allocating the solve's vectors once gains nothing at this size;
   with every vector fresh (a large problem), -35% of the solve (Done, "The vectors of the solve allocated at the
-  setup"). On 1 thread, too noisy that day to conclude (1.1-2.6 s for the same solve: an indexer running).
+  setup"). On 1 thread, too noisy that day to conclude (1.1-2.6 s for the same solve: an indexer running). The setup
+  on a problem 30x larger: +26% (Done, "The setup's arrays").
 
 On 8 threads, no step left dominates the setup: the steps that gain only ~2x may be the laptop's bandwidth (one thread
 reads half of it); the cluster's 32 cores need their own profile by step.

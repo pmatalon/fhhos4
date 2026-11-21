@@ -545,7 +545,7 @@ public:
 		const SparseMatrix* passA_F_T = this->A_F_T; // non-symmetric matrix: the rows of the local faces, the cells of the process
 		shared_ptr<const IndexMap> passFaceMap = this->FaceMap;
 		SparseMatrix A_T_Tc, A_T_Fc, A_F_Tc;
-		SparseMatrix P; // the chained prolongations, rows of all the local faces of the level
+		vector<SparseMatrix> chainedPassP; // the prolongations of the passes, rows of all their local faces (ChainFromCoarseSide())
 		double actualCoarseningFactor = 0;
 		int nCoarsenings = 0;
 		bool allNeighbours = coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours;
@@ -604,10 +604,7 @@ public:
 			if (!Symmetric)
 				nextA_F_Tc = SparseMatrixOps::Multiply(SparseMatrixOps::Multiply(SparseMatrixOps::Transpose(passP), *passA_F_T), pass.Q_T());
 
-			if (nCoarsenings == 0)
-				P = std::move(passP);
-			else
-				P = SparseMatrixOps::Multiply(P, passP);
+			chainedPassP.push_back(std::move(passP));
 
 			actualCoarseningFactor = (double)this->FaceMap->GlobalSize / (double)distributed.CoarseFaceMap->GlobalSize;
 			Utils::Log() << "\t\tCoarsening factor = " << actualCoarseningFactor << endl;
@@ -636,6 +633,7 @@ public:
 		}
 		LocalOp->AssembledDistributed = &_distributedAc;
 		// The prolongation: the rows of the faces of the process
+		SparseMatrix P = ChainFromCoarseSide(chainedPassP);
 		auto rows = make_shared<const IndexMap>(this->FaceMap->WithoutGhosts());
 		DistributedProlongation() = InPrecision(DistributedMatrix::FromLocalColumns(rows, _coarseFaceMap, SparseMatrix(P.topRows(rows->NOwned * fbs)), fbs, fbs));
 	}
@@ -662,26 +660,30 @@ public:
 		initialFineMesh.A_F_T = A_F_T;
 		initialFineMesh.Symmetric = Symmetric;
 		mesh = &initialFineMesh;
+		bool chained = _multigridProlong == UAMGProlongation::ChainedCoarseningProlongations;
+		vector<SparseMatrix> chainedPassP; // chained at the end, as in the flat passes (ChainFromCoarseSide())
 
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
 		{
 			// Coarsening
 			std::tie(coarseMesh, auxP, auxQ_F, auxSchur, coarsestPossibleMeshReached) = Coarsen(*mesh, schur, coarseningStgy, faceCoarseningStgy);
 			if (coarsestPossibleMeshReached)
+			{
+				if (chained)
+					this->P = ChainFromCoarseSide(chainedPassP); // those of the passes done
 				return;
+			}
 
 			// Global prolongation operator
+			if (chained)
+				chainedPassP.push_back(*auxP);
 			if (nCoarsenings == 0)
 			{
-				if (_multigridProlong == UAMGProlongation::ChainedCoarseningProlongations)
-					this->P = *auxP;
 				if (ComputeQ_F)
 					this->Q_F = *auxQ_F;
 			}
 			else
 			{
-				if (_multigridProlong == UAMGProlongation::ChainedCoarseningProlongations)
-					this->P = SparseMatrixOps::Multiply(this->P, *auxP);
 				if (ComputeQ_F)
 					this->Q_F = SparseMatrixOps::Multiply(this->Q_F, *auxQ_F);
 			}
@@ -733,8 +735,9 @@ public:
 		}
 
 		// Ending...
-		if (_multigridProlong == UAMGProlongation::ChainedCoarseningProlongations)
+		if (chained)
 		{
+			this->P = ChainFromCoarseSide(chainedPassP);
 			this->A_T_Tc = std::move(*coarseMesh->A_T_T);
 			this->A_T_Fc = std::move(*coarseMesh->A_T_F);
 			if (coarseMesh->A_F_F)
@@ -784,7 +787,7 @@ public:
 		const SparseMatrix* passA_F_T = this->A_F_T;
 		const SparseMatrix* passA_F_F = this->A_F_F;
 		SparseMatrix A_T_Tc, A_T_Fc, A_F_Tc, A_F_Fc;
-		SparseMatrix chainedP; // the product of the prolongations of the passes (in double: that of the setup)
+		vector<SparseMatrix> chainedPassP; // the prolongations of the passes, chained at the end (ChainFromCoarseSide())
 		double actualCoarseningFactor = 0;
 		int nCoarsenings = 0;
 
@@ -851,10 +854,8 @@ public:
 			{
 				if (KeepPassProlongations && _faceBlockSize >= PassProlongationsMinFaceBlockSize)
 					_passP.push_back(InPrecision(std::move(passP))); // not chained: see KeepPassProlongations
-				else if (nCoarsenings == 0)
-					chainedP = std::move(passP);
 				else
-					chainedP = SparseMatrixOps::Multiply(chainedP, passP);
+					chainedPassP.push_back(std::move(passP));
 			}
 			else
 			{
@@ -947,7 +948,7 @@ public:
 		}
 
 		if (_passP.empty())
-			Prolongation() = InPrecision(std::move(chainedP));
+			Prolongation() = InPrecision(ChainFromCoarseSide(chainedPassP)); // in double: that of the setup
 		this->A_T_Tc = std::move(A_T_Tc);
 		this->A_T_Fc = std::move(A_T_Fc);
 		if (!Symmetric)
@@ -957,6 +958,24 @@ public:
 		// The operator of the level is only assembled here (for the smoothers and the coarse solver), in precision T
 		this->Ac = LocalOp->Current.template Assemble<T>(this->A_T_Fc.cols() / _faceBlockSize);
 		LocalOp->Assembled = &this->Ac;
+	}
+
+	// The product P_1 P_2 ... P_n of the prolongations of the passes, from the coarse side: P_1 (P_2 (... P_n)). Only the
+	// last product has the rows of the level's faces, the others those of the coarser passes: fewer operations and
+	// smaller temporaries than from the fine side, ((P_1 P_2) ...) P_n, whose products all have the fine rows and grow
+	// with the passes (PERFORMANCE.md). The rounding differs from the fine side's. The P_i freed once used.
+	static SparseMatrix ChainFromCoarseSide(vector<SparseMatrix>& passP)
+	{
+		if (passP.empty())
+			return SparseMatrix();
+		SparseMatrix P = std::move(passP.back());
+		for (int i = (int)passP.size() - 2; i >= 0; i--)
+		{
+			P = SparseMatrixOps::Multiply(passP[i], P);
+			passP[i] = SparseMatrix();
+		}
+		passP.clear();
+		return P;
 	}
 
 	// The multigrid prolongation of the level, from BuildProlongation(), which returns the face prolongation Q_F itself
