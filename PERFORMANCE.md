@@ -89,6 +89,9 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   the validation above. Compile it against a `git archive` of HEAD for the "before" times.
 - **On several processes (MPI)**: `scripts/perf/scaling_mpi.sh <output dir> <arguments>` (from `build-mpi/`), see
   "Distributed memory (MPI)" below.
+- **On a cluster without internet (PBS)**: `scripts/cluster/pack.sh` makes the conda env (conda-pack, for the cluster's
+  glibc) and the sources to copy there; `scripts/cluster/run.pbs`, submitted from the sources, builds, runs `ctest`
+  and the scaling runs on one node, and writes the tarball of the logs to bring back (the comments of both scripts).
 - **Memory per process**: `scripts/perf/Mem.h` (`MemPoint("label")` at the steps to measure: the resident memory and its
   peak since the previous point, per process, on stderr; temporary instrumentation, never committed). Run the cases
   sequentially, under a watchdog on the sum of the processes' resident memory.
@@ -1483,6 +1486,46 @@ best of the 4 runs, elapsed setup / solve (s), before -> after (`build/bench_glo
 - The same iterations and L2 errors. Within the noise: the two rounds of the same binary differ as much (k=2 n=12,
   2 x 1, before: setup 0.221 and 0.289 s); the solve's code is unchanged (local 32-bit indices).
 
+2026-11-20, one node of a cluster (`scripts/cluster/`, PBS job 3108878; `~/code/fhhos4-cluster/results/3108878`):
+2x AMD EPYC 9454 (48 cores per socket, no SMT, AVX-512, 8 NUMA nodes of 12 cores, 4 per socket), 1.5 TB, RHEL 9.6. The
+job's 32 cores (the cgroup of PBS): CPUs 48-79, NUMA nodes 4, 5 and 6 (12 + 12 + 8, all on the second socket), the node
+shared with another job (~33 busy cores, other CPUs). The env of `pack.sh` (gcc 14.3, MPICH 5.0.1, MUMPS 5.8.2), commit
+64ba4431; Cube-tet, `-s fcglibuamg` (the defaults), each process bound to its cores (`-bind-to user:`), best of 2,
+elapsed setup / solve (s). Laptop: the same code (`build-mpi`), plugged in, 2026-11-21.
+
+| Case (unknowns), iterations | Laptop 1 x 1 | Laptop 1 x 8 | 1 x 1 | 1 x 8 | 8 x 1 | 1 x 32 | 32 x 1 | Best on 32 |
+|---|---|---|---|---|---|---|---|---|
+| k=0 n=32 (481k), 24 | 1.30 / 1.13 | 0.50 / 0.48 | 0.87 / 0.73 | 0.28 / 0.25 | 0.17 / 0.21 | 0.25 / 0.20 | 0.09 / 0.19 | 16 x 2: 0.08 / 0.12 |
+| k=2 n=12 (209k), 31-32 | 0.31 / 0.78 | 0.12 / 0.39 | 0.20 / 0.62 | 0.06 / 0.16 | 0.07 / 0.20 | 0.06 / 0.11 | 0.06 / 0.21 | 4 x 8: 0.05 / 0.11 |
+| k=0 n=64 (3.64M), 26 | - | - | 9.43 / 10.24 | 2.50 / 2.36 | 1.53 / 2.00 | 1.67 / 1.41 | 0.41 / 0.67 | 32 x 1 |
+| k=2 n=32 (3.54M), 33 | - | - | 2 x 1: 2.85 / 8.23 | 1.05 / 3.91 | 0.93 / 3.56 | 0.69 / 1.87 | 0.29 / 1.22 | 32 x 1 |
+
+- The same iterations as the laptop; `ctest` 432 / 432 (540 s). The iterations vary by at most one with the number of
+  processes.
+- One core: 1.3-1.5 times faster than the laptop's (k=0 n=32: 1.60 against 2.44 s of setup + solve). 8 cores: 2.3-2.6
+  times faster than the laptop's 8 (k=0 n=32 8 x 1: 0.38 against 0.98 s): a NUMA node's 3 DDR5 channels against 2.
+- OpenMP stops gaining beyond 4-8 threads (k=0 n=64, solve on 1 / 2 / 4 / 8 / 16 / 32 threads: 10.24 / 5.32 / 3.10 /
+  2.36 / 1.53 / 1.41 s; the setup 5.6 times faster on 32 threads), MPI keeps scaling (the setup 23 times faster on 32
+  processes, the solve 15): at 3.6M unknowns, 32 x 1 takes 0.35 of the time of 1 x 32, 0.59 of 4 x 8 (about one process
+  per NUMA node: not only NUMA). The sequential parts of the setup in a process (Next ideas 2 and 5 below the profile),
+  and the OpenMP efficiency of the solve. A client calling the library from one process with threads gets ~6x on 32
+  cores.
+- Below ~10k unknowns per process, no gain from more processes (k=0 n=32 solve on 8 / 16 / 32 processes: 0.21 / 0.18 /
+  0.19 s; k=2 n=12, 32 x 1 slower than 16 x 1): threads per process help there (16 x 2, 4 x 8); see Next ideas 3 below.
+- Weak scaling, k=1, n = 16 P^(1/3) (~4.1k cells per process), one thread per process, setup / solve (s), iterations:
+  P = 1: 0.21 / 0.51, 26; 2: 0.26 / 0.54, 26; 4: 0.28 / 0.67, 26; 8: 0.35 / 0.99, 26; 16: 0.40 / 1.17, 27; 32: 0.45 /
+  1.35, 27. The iterations stay flat; the time grows 2.5x, much of it the bandwidth per core within the node (up to 12
+  processes share a NUMA node's: on node 4 alone, 1 -> 8 processes already 1.9x for the solve). Telling it from the
+  communications needs several nodes.
+- `-march=native` (AVX-512, a second build, against conda's default `-march=nocona`): within 5%, either way, but one
+  run 9% slower (k=0 n=64 32 x 1: 0.41 / 0.67 -> 0.41 / 0.66 s; k=2 n=12 1 x 1, solve 0.62 -> 0.68 s): no gain, even on
+  one core: the kernels are bound by the memory accesses, not the arithmetic.
+- Memory (GNU time): at most 0.9 GB per process; in total 18.8 GB (weak, k=1 n=51 on 32 processes), 17.1 GB (k=2 n=32,
+  32 x 1), 14.6 GB (k=0 n=64, 32 x 1).
+- The job (3 h 57 of its 4 h): the program's assembly 1.9 h (k=2: ~8 ms of CPU per cell, as on the laptop: n=32, 163k
+  cells, 11 min on 2 threads), 4 timeouts of 20 min (k=2 n=32 on 1 x 1: the assembly alone takes longer), the setups
+  and solves of U-AMG a few minutes.
+
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:
    - `A`, `Acons` and `Astab` of the cells: done (2026-10-29 above). What stays of the local matrices: `P` (1.25 KB per
@@ -1494,7 +1537,7 @@ Next ideas:
    - On several processes, the copies of `SolveDistributed()` (+624 MB per process at k=1 n=32 on 2 processes, its
      peak): the full copies of `FullFromLower()`, the distributed blocks kept beside the program's.
    - The mesh (~2.5 KB per cell; ~800 B per face, ~820 B per cell in the heap).
-   Then the scaling on more processes (another machine).
+   Then the scaling on several nodes (one node of 32 cores: 2026-11-20 above).
 2. **The halo exchanges**: persistent buffers and requests, and the product of `Diag` while the ghosts are exchanged
    (overlap): not measured, probably small on one node.
 3. **The coarse levels on fewer processes**: on many processes the reductions of the K-cycle on the coarse levels, and the

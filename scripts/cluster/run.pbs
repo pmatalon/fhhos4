@@ -1,0 +1,175 @@
+#!/bin/bash
+#PBS -N fhhos4
+#PBS -l select=1:ncpus=32:mpiprocs=32:mem=64gb
+#PBS -l place=excl
+#PBS -l walltime=04:00:00
+#PBS -j oe
+# fhhos4 on one node of a cluster without internet: unpacks the env, builds, runs ctest, then measures U-AMG through the
+# library: strong and weak scaling, the cores on one socket or two, -march=native. Writes
+# <base>/results/<name>-<job>.tar.gz (the logs, a few MB, updated after each step: bring it back). Deletes nothing: the
+# env, the builds and the meshes stay in <base> for the next jobs (each step reuses what is there).
+#
+# <base>: a directory visible from the compute nodes, holding the two files of scripts/cluster/pack.sh:
+#   cd <base> && tar xzf fhhos4-src-<name>.tar.gz && cd src/<name> && qsub scripts/cluster/run.pbs
+# <base> then holds envs/fhhos4-<hash> (by hand: source <base>/envs/fhhos4-<hash>/bin/activate), src/<name>,
+# build/<name> (bin/fhhos4), cache/ (the meshes and their partitions) and results/.
+# STEPS: the steps after env (default: all, below). QUICK=1: small cases on at most 4 cores (a test without PBS:
+# QUICK=1 bash scripts/cluster/run.pbs). One node only: mpiexec launches by fork.
+set -u
+cd "${PBS_O_WORKDIR:-.}" || exit 1
+SRC=$(pwd -P)
+BASE=$(cd ../.. && pwd -P)
+NAME=$(basename "$SRC")
+JOB=${PBS_JOBID:-local-$(date +%Y%m%d-%H%M%S)}
+JOB=${JOB%%.*}
+HASH=$(cat scripts/cluster/env-hash) || exit 1
+ENV_DIR=$BASE/envs/fhhos4-$HASH
+BUILD_TREE=$BASE/build/$NAME
+OUT=$BASE/results/$NAME-$JOB
+mkdir -p "$OUT"
+export XDG_CACHE_HOME=$BASE/cache
+export BLIS_NUM_THREADS=1
+export HYDRA_LAUNCHER=fork
+
+QUICK=${QUICK:-0}
+SOLVER="-s fcglibuamg"
+CUBE="-geo cube -mesh tetra"
+if [ "$QUICK" = 1 ]; then
+	MAX=4; BUILD_JOBS=${BUILD_JOBS:-1}; CTEST_ARGS=${CTEST_ARGS:--R MPI_np}
+	STRONG=("-k 0 -n 8" "-k 2 -n 4"); LARGE=("-k 0 -n 12"); WEAK_N0=6
+else
+	MAX=32; BUILD_JOBS=${BUILD_JOBS:-16}; CTEST_ARGS=${CTEST_ARGS:-}
+	# The laptop's (PERFORMANCE.md, "Distributed memory"), then 2-3M unknowns: 60-80k per core on 32.
+	STRONG=("-k 0 -n 32" "-k 2 -n 12"); LARGE=("-k 0 -n 64" "-k 2 -n 32"); WEAK_N0=16
+fi
+
+# The first CPU of each physical core of the job (its affinity), as "<NUMA node> <CPU>", by node then CPU.
+cores() {
+	local seen=" " range cpu siblings node
+	for range in $(sed -n 's/^Cpus_allowed_list:\s*//p' /proc/self/status | tr , ' '); do
+		for cpu in $(seq ${range%-*} ${range#*-}); do
+			siblings=$(cat /sys/devices/system/cpu/cpu$cpu/topology/thread_siblings_list)
+			[[ $seen == *" $siblings "* ]] && continue
+			seen+="$siblings "
+			node=$(ls -d /sys/devices/system/cpu/cpu$cpu/node* 2>/dev/null | head -1 | sed 's/.*node//')
+			echo "${node:-0} $cpu"
+		done
+	done | sort -n -k1,1 -k2,2
+}
+# The CPUs of <half> cores on each of two NUMA nodes (empty if there are no such nodes), from the lines of cores().
+spread() {
+	awk -v half=$1 '{ if (!($1 in count)) order[++nodes] = $1; if (++count[$1] <= half) list[$1] = list[$1] " " $2 }
+		END { for (i = 1; i <= nodes && found < 2; i++) if (count[order[i]] >= half) { cpus = cpus list[order[i]]; found++ }
+		      if (found == 2) print cpus }'
+}
+CORE_LINES=$(cores)
+NCORES=$(echo "$CORE_LINES" | wc -l)
+while [ $MAX -gt $NCORES ]; do MAX=$((MAX / 2)); done
+COMPACT=$(echo "$CORE_LINES" | head -$MAX | cut -d' ' -f2 | xargs)
+SPREAD=$(echo "$CORE_LINES" | spread $((MAX / 2)) | xargs)
+
+# processes,threads on 1 to $1 cores: threads alone, processes alone, then both on all the cores.
+configs() {
+	local list=() p
+	for ((p = 1; p <= $1; p *= 2)); do list+=(1,$p); done
+	for ((p = 2; p <= $1; p *= 2)); do list+=($p,1); done
+	for ((p = 2; p < $1; p *= 2)); do list+=($p,$(($1 / p))); done
+	echo "${list[@]}"
+}
+# scale <directory in the results> <CPUs> <configs> <fhhos4 arguments...>, in $BIN_DIR (default: the build).
+scale() {
+	local dir=$OUT/$1 cpus=$2 list=$3
+	shift 3
+	(cd "${BIN_DIR:-$BUILD_TREE}" && CORES="$cpus" CONFIGS="$list" WRAPPER="time -f maxrss_kB=%M" TIMEOUT=1200 \
+		"$SRC/scripts/perf/scaling_mpi.sh" "$dir" "$@" $SOLVER)
+}
+tag() { echo "$*" | sed 's/.*-k \([0-9]*\) -n \([0-9]*\).*/k\1n\2/'; }
+
+step_env() {
+	[ -f "$ENV_DIR/.unpacked" ] && { echo "$ENV_DIR: unpacked by an earlier job"; return 0; }
+	local tarball=$BASE/fhhos4-env-$HASH.tar.gz
+	[ -f "$tarball" ] || { echo "$tarball not found: copy it there (pack.sh made it)"; return 1; }
+	rm -rf "$ENV_DIR" && mkdir -p "$ENV_DIR" && tar xzf "$tarball" -C "$ENV_DIR" &&
+		"$ENV_DIR/bin/python" "$ENV_DIR/bin/conda-unpack" && touch "$ENV_DIR/.unpacked"
+}
+step_machine() {
+	echo "== job"; date; hostname; echo "sources $NAME, env $HASH, job $JOB, base $BASE"; cat "$SRC/COMMIT"
+	env | grep -E '^(PBS_|NCPUS|OMP_|MPIR_|FI_|UCX_)' | sort
+	echo "== affinity"; grep -E '^(Cpus|Mems)_allowed_list' /proc/self/status; nproc
+	echo "== the cores used, up to $MAX: NUMA node, CPU (compact: $COMPACT; spread: ${SPREAD:-none})"; echo "$CORE_LINES"
+	echo "== lscpu"; lscpu
+	echo "== memory"; free -g; grep -E 'MemTotal|Huge' /proc/meminfo; cat /sys/kernel/mm/transparent_hugepage/enabled
+	echo "== os"; uname -a; cat /etc/os-release; ldd --version | head -1; ulimit -a
+	echo "== load (other jobs on the node are noise)"; uptime; top -bn1 | head -25
+	echo "== env"; gcc --version | head -1; cmake --version | head -1; mpichversion | head -4
+}
+step_build() {
+	cmake -S "$SRC" -B "$BUILD_TREE" -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON -DENABLE_MPI=ON \
+		-DMAX_COMPILE_JOBS=$BUILD_JOBS && cmake --build "$BUILD_TREE" && "$BUILD_TREE/bin/fhhos4" -h | grep "^Version:"
+}
+# An MPI run on all the cores; if it fails, MPICH's OFI over TCP (MPICH uses shared memory within the node anyway).
+step_mpi() {
+	local args="$CUBE -k 0 -n 8 $SOLVER" bind
+	bind=user:$(echo $COMPACT | tr ' ' ,)
+	echo "== the bindings of -bind-to $bind"
+	mpiexec -n $MAX -bind-to $bind bash -c 'echo rank $PMI_RANK: $(grep Cpus_allowed_list /proc/self/status)'
+	(cd "$BUILD_TREE" && timeout 600 mpiexec -n $MAX ./bin/fhhos4 $args) && return 0
+	echo "== again with OFI over TCP"
+	(cd "$BUILD_TREE" && MPIR_CVAR_CH4_NETMOD=ofi FI_PROVIDER=tcp timeout 600 mpiexec -n $MAX ./bin/fhhos4 $args) || return 1
+	echo "export MPIR_CVAR_CH4_NETMOD=ofi FI_PROVIDER=tcp" > "$OUT/mpi.env"
+}
+step_ctest() { ctest --test-dir "$BUILD_TREE" --output-on-failure $CTEST_ARGS; }
+step_strong() {
+	local case
+	for case in "${STRONG[@]}"; do scale strong/$(tag $case) "$COMPACT" "$(configs $MAX)" $CUBE $case; done
+}
+# Cube-tet k=1 with about the same cells per process (n ~ P^(1/3)), one thread each.
+step_weak() {
+	local p n
+	for ((p = 1; p <= MAX; p *= 2)); do
+		n=$(awk -v n0=$WEAK_N0 -v p=$p 'BEGIN { printf "%d", n0 * p^(1/3) + 0.5 }')
+		scale weak/p${p}_n$n "$COMPACT" "$p,1" $CUBE -k 1 -n $n
+	done
+}
+step_large() {
+	local case
+	for case in "${LARGE[@]}"; do scale large/$(tag $case) "$COMPACT" "$(configs $MAX)" $CUBE $case; done
+}
+# The same cores on two sockets (half each) instead of one: memory bandwidth and NUMA.
+step_sockets() {
+	[ -n "$SPREAD" ] || { echo "skipped: the job's cores are not on two NUMA nodes with $((MAX / 2)) each"; return 0; }
+	local case
+	for case in "${STRONG[@]}" "${LARGE[@]}"; do
+		scale sockets/$(tag $case) "$SPREAD" "1,$MAX 2,$((MAX / 2)) $MAX,1" $CUBE $case
+	done
+}
+step_native() {
+	cmake -S "$SRC" -B "$BUILD_TREE-native" -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON -DENABLE_MPI=ON \
+		-DENABLE_TESTS=OFF -DENABLE_NATIVE_ARCH=ON -DMAX_COMPILE_JOBS=$BUILD_JOBS && cmake --build "$BUILD_TREE-native" || return 1
+	local case
+	for case in "${STRONG[@]}" "${LARGE[@]}"; do
+		BIN_DIR=$BUILD_TREE-native scale native/$(tag $case) "$COMPACT" "1,1 1,$MAX $MAX,1" $CUBE $case
+	done
+}
+
+run() {
+	local start=$SECONDS status
+	"step_$1" > "$OUT/$1.log" 2>&1
+	status=$?
+	echo "$(date +%H:%M:%S) $1: exit $status, $((SECONDS - start)) s" | tee -a "$OUT/steps.txt"
+	tar czf "$OUT.tar.gz" -C "$BASE/results" "$NAME-$JOB"
+	return $status
+}
+run env || exit 1
+set +u  # the activation scripts of the env read unset variables
+source "$ENV_DIR/bin/activate"
+set -u
+for step in ${STEPS:-machine build mpi ctest strong weak large sockets native}; do
+	run $step
+	status=$?
+	[ $step = build ] && [ $status -ne 0 ] && break
+	[ -f "$OUT/mpi.env" ] && source "$OUT/mpi.env"
+done
+du -sh "$BASE"/envs "$BASE"/build "$BASE"/cache "$BASE"/results 2>/dev/null | tee -a "$OUT/steps.txt"
+tar czf "$OUT.tar.gz" -C "$BASE/results" "$NAME-$JOB"
+echo "Bring back $OUT.tar.gz"
