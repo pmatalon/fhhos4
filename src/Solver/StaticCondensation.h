@@ -28,8 +28,8 @@ private:
 	bool _symmetric;
 	// The factorizations of the blocks of A_TT, column-major, one after the other: Cholesky (the factor L in the lower
 	// triangular part) for a symmetric system, LU with partial pivoting otherwise (with the row permutation of each block)
-	vector<double> _factors;
-	vector<int> _permutations;
+	UninitializedVector<double> _factors; // written by the cells, in parallel
+	UninitializedVector<int> _permutations;
 	SparseMatrix _W;               // A_TT^{-1} A_TF
 	SparseMatrix _transposedA_TF;  // A_FT of a symmetric system; empty otherwise
 	const SparseMatrix& _A_FT;     // the caller's, or _transposedA_TF

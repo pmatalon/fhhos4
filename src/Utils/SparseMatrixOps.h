@@ -133,7 +133,8 @@ namespace SparseMatrixOps
 	}
 
 	// The transpose of the coefficients (i, j) of A for which keep(i, j), in the order of Transpose(). In parallel: each
-	// thread counts, then copies, the coefficients of a contiguous range of rows of A.
+	// thread counts, then copies, the coefficients of a contiguous range of rows of A; the positions of the columns'
+	// coefficients by chunk are computed in parallel over the columns (sequential: a sum over the columns only).
 	template <class RowMajorSparseMatrix, class Keep>
 	SparseMatrixOf<typename RowMajorSparseMatrix::Scalar> TransposeIf(const RowMajorSparseMatrix& A, Keep keep)
 	{
@@ -155,10 +156,12 @@ namespace SparseMatrixOps
 		}
 		Result T(nCols, nRows);
 		SparseMatrixIndex* outer = T.outerIndexPtr();
-		outer[0] = 0;
+		// The position of the first coefficient of each chunk in its column, from the start of the column, and the size of
+		// the column; then the columns' starts, and the positions from them
+		#pragma omp parallel for
 		for (BigNumber j = 0; j < nCols; ++j)
 		{
-			SparseMatrixIndex position = outer[j];
+			SparseMatrixIndex position = 0;
 			for (int c = 0; c < nChunks; ++c)
 			{
 				SparseMatrixIndex n = count[c][j];
@@ -167,6 +170,13 @@ namespace SparseMatrixOps
 			}
 			outer[j + 1] = position;
 		}
+		outer[0] = 0;
+		for (BigNumber j = 0; j < nCols; ++j)
+			outer[j + 1] += outer[j];
+		#pragma omp parallel for
+		for (BigNumber j = 0; j < nCols; ++j)
+			for (int c = 0; c < nChunks; ++c)
+				count[c][j] += outer[j];
 		T.resizeNonZeros(outer[nCols]);
 		#pragma omp parallel for schedule(static, 1)
 		for (int c = 0; c < nChunks; ++c)

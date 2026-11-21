@@ -30,9 +30,9 @@ public:
 	int BlockSize = 1;
 	// Symmetric operator: only the lower triangular parts are read and computed, then mirrored
 	bool Symmetric = true;
-	vector<size_t> FacesStart;  // the faces of cell t are Faces[FacesStart[t]], ..., Faces[FacesStart[t+1] - 1]
-	vector<BigNumber> Faces;    // global numbers
-	vector<size_t> ValuesStart; // the matrix of cell t is stored column-major from ValuesStart[t]
+	UninitializedVector<size_t> FacesStart;  // the faces of cell t are Faces[FacesStart[t]], ..., Faces[FacesStart[t+1] - 1]
+	UninitializedVector<BigNumber> Faces;    // global numbers
+	UninitializedVector<size_t> ValuesStart; // the matrix of cell t is stored column-major from ValuesStart[t]
 
 	LocalMatrices() {}
 	LocalMatrices(const LocalMatrices&) = delete;
@@ -96,7 +96,8 @@ public:
 		int bs = blockSize;
 		Symmetric = symmetric;
 		BigNumber nCells = cellFaces.Size();
-		vector<int> nFaces(nCells);
+		UninitializedVector<int> nFaces(nCells); // written by the parallel loop below
+		#pragma omp parallel for if (nCells > 20000)
 		for (BigNumber t = 0; t < nCells; ++t)
 			nFaces[t] = cellFaces.Size(t);
 		Allocate(bs, nCells, nFaces, [&](BigNumber t, BigNumber* faces)
@@ -163,8 +164,8 @@ public:
 			for (int B = 0; B < aggregateCoarseFaces.Size(k); ++B)
 				aggregateCoarseFaces[k][B] = mesh.CoarseElements[k].CoarseFaces[B]->Number;
 		}
-		vector<char> faceRemoved(mesh.Faces.size());
-		vector<BigNumber> faceCoarseFace(mesh.Faces.size());
+		UninitializedVector<char> faceRemoved(mesh.Faces.size()); // written by the parallel loop below
+		UninitializedVector<BigNumber> faceCoarseFace(mesh.Faces.size());
 		#pragma omp parallel for
 		for (BigNumber f = 0; f < (BigNumber)mesh.Faces.size(); ++f)
 		{
@@ -177,19 +178,21 @@ public:
 	// Same, the aggregation given by the cells of each aggregate, the coarse faces of each aggregate, and for each face of
 	// the cells, whether it is removed (interior to its aggregate) and its coarse face (if it is not removed)
 	void GalerkinProduct(const LocalMatrices& cellMatrices, const IndexLists& aggregateCells, const IndexLists& aggregateCoarseFaces, BigNumber nAllCoarseFaces,
-	                     const vector<char>& faceRemoved, const vector<BigNumber>& faceCoarseFace, const SparseMatrix& P)
+	                     const UninitializedVector<char>& faceRemoved, const UninitializedVector<BigNumber>& faceCoarseFace, const SparseMatrix& P)
 	{
 		int bs = cellMatrices.BlockSize;
 		bool symmetric = cellMatrices.Symmetric;
 		BigNumber nAggregs = aggregateCells.Size();
-		vector<int> nCoarseFaces(nAggregs);
+		UninitializedVector<int> nCoarseFaces(nAggregs); // written by the parallel loop below
 		int maxM = 0;
+		#pragma omp parallel for reduction(max: maxM) if (nAggregs > 20000)
 		for (BigNumber k = 0; k < nAggregs; ++k)
 		{
 			nCoarseFaces[k] = aggregateCoarseFaces.Size(k);
 			maxM = max(maxM, nCoarseFaces[k]);
 		}
 		int maxN = 0;
+		#pragma omp parallel for reduction(max: maxN) if (cellMatrices.NCells() > 20000)
 		for (BigNumber t = 0; t < cellMatrices.NCells(); ++t)
 			maxN = max(maxN, cellMatrices.NFaces(t));
 		Allocate(bs, nAggregs, nCoarseFaces, [&](BigNumber k, BigNumber* faces)
@@ -502,17 +505,26 @@ public:
 private:
 	// Allocates the matrices (not initialized); the faces of cell t are set by setFaces(t, faces) (called in parallel)
 	template <class SetFaces>
-	void Allocate(int blockSize, BigNumber nCells, const vector<int>& nFaces, SetFaces setFaces)
+	void Allocate(int blockSize, BigNumber nCells, const UninitializedVector<int>& nFaces, SetFaces setFaces)
 	{
 		BlockSize = blockSize;
-		FacesStart.assign(nCells + 1, 0);
-		ValuesStart.assign(nCells + 1, 0);
+		// The sizes first written in parallel (fresh memory), then summed in order
+		FacesStart.resize(nCells + 1);
+		ValuesStart.resize(nCells + 1);
+		#pragma omp parallel for if (nCells > 20000)
 		for (BigNumber t = 0; t < nCells; ++t)
 		{
-			FacesStart[t + 1] = FacesStart[t] + nFaces[t];
-			ValuesStart[t + 1] = ValuesStart[t] + (size_t)nFaces[t] * nFaces[t] * blockSize * blockSize;
+			FacesStart[t + 1] = nFaces[t];
+			ValuesStart[t + 1] = (size_t)nFaces[t] * nFaces[t] * blockSize * blockSize;
 		}
-		Faces.resize(FacesStart[nCells]);
+		FacesStart[0] = 0;
+		ValuesStart[0] = 0;
+		for (BigNumber t = 0; t < nCells; ++t)
+		{
+			FacesStart[t + 1] += FacesStart[t];
+			ValuesStart[t + 1] += ValuesStart[t];
+		}
+		Faces.resize(FacesStart[nCells]); // written by setFaces below
 		size_t size = ValuesStart[nCells];
 		if (size > _capacity)
 		{

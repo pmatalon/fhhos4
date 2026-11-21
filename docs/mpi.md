@@ -19,8 +19,9 @@ program too: `-DENABLE_PROGRAM=ON`).
   (reductions, `AllToAll` for the setups, `Neighbours` for the halos, `FortranHandle()` for MUMPS),
   `Communicator::Current()` (the communicator of
   the reductions of the solvers: `MPI_COMM_WORLD` in the program, the solver's in a library call, `CallScope`),
-  `Parallel::Dot/Norm/SquaredNorm` (on one process: Eigen's, bit for bit), `MPIEnvironment` (main(); `MPI_Finalize()`
-  at exit only in the initializing process, not in GTest's death-test forks).
+  `Parallel::Dot/Norm/SquaredNorm` (the sum of the processes' sums; on a process, by blocks of rows: `docs/uamg.md`,
+  "Krylov methods"), `MPIEnvironment` (main(); `MPI_Finalize()` at exit only in the initializing process, not in GTest's
+  death-test forks).
 - `Parallelism::SharingProcesses()`: the processes of a node with the same affinity (mpiexec without binding) divide
   the default threads (OpenMP and solvers; the library: per `Comm`).
 - On one process, nothing distributed is built: the sequential code runs (same results). On several:

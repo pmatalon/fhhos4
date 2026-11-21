@@ -73,7 +73,7 @@ From `build/`:
 ctest --output-on-failure
 ```
 
-410 tests, ~9 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
+413 tests, ~9 min (`ctest -E HPConfig` skips the 8 slowest). Most check the
 iteration counts of the papers in `reproducibility/` — see `tests/README.md`. Covers
 `Program_Diffusion_HHO` and `Program_BiHarmonic_HHO` (HHO, static condensation), 2D/3D,
 in-house, GMSH and polygonal meshes, the full Neumann problem (`FullNeumann*`, 2D), and the library (`UAMGLibrary*`,
@@ -133,8 +133,9 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
   prints it and exits with EXIT_FAILURE): never call it inside a parallel loop. The solvers print through `Utils::Log()`
   (cout, redirected by the library according to its verbosity). Parallel loops are plain OpenMP
   (`#pragma omp parallel for`); `Parallelism.h` has the thread count (default: all logical cores, but one per
-  physical core in the solvers: `SolverThreads`, around the solver section of each program) and `ThreadLocal`/
-  `ThreadLocalCoeffs` for per-thread results (e.g. the non-zeros of a matrix being assembled).
+  physical core in the solvers: `SolverThreads`, around the solver section of each program), `ThreadLocal`/
+  `ThreadLocalCoeffs` for per-thread results (e.g. the non-zeros of a matrix being assembled), and `UninitializedVector`
+  for the large arrays a parallel loop writes first (fresh memory: `docs/uamg.md`, "Vectors of the solve").
 
 ## Library (`library/`)
 

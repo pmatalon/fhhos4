@@ -60,7 +60,11 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   - The variants of Fig. 4.5 / Table 4.4: `-coarsening-prolong 6` (P_F, default), `4` (Q_F^smooth), `5` (P_F^(0)), `3` (Q_F).
 - **Profiling**: no sampling profiler, so temporary wall-clock timers around the steps, per multigrid level:
   `scripts/perf/Prof.h` (`PROF_START`/`PROF_STOP`, printed at exit). Include it in the files to instrument, never
-  commit the instrumentation.
+  commit the instrumentation. It also counts each region's page faults, the process's and the calling thread's: a
+  region whose faults are all the calling thread's writes its fresh memory sequentially (Done, "OpenMP scaling of the
+  library's setup and solve": the instrumentation scripts and the A/B of library variants by `LD_PRELOAD` in
+  `build/prof_omp2/`). Profile on a problem that doesn't fit in the caches (Cube-tet n=48 rather than n=32, with
+  glibc's thresholds of a large problem), or the vector operations look cheap.
 - **Validation of a change**: the `validate` skill (`.claude/skills/validate/SKILL.md`): the version before saved,
   `scripts/perf/solutions.sh` (the solutions of ~40 cases bit for bit against it), `ctest` (the papers' iteration
   counts), the other build trees. Also:
@@ -1288,6 +1292,90 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   -6% at n=48). The same iterations (24 at n=32, 25 at n=48), peak memory unchanged; `solutions.sh` 50 `DIFF` (the
   rounding), 28 `OK`, no `ITERATIONS-DIFF`; `ctest` 402/402.
 
+- **OpenMP scaling of the library's setup and solve** (2026-11-21, the user's request: "make the setup and the solve of
+  the library's path scale with threads"; why: on the cluster, 1 process x 32 threads 6.4 times faster than 1 x 1
+  against 18 for 32 x 1, see "Distributed memory"). Measured on Cube-tet k=0 n=48 (1.07M faces, 527k cells, 25
+  iterations), `-s fcglibuamg`, glibc's thresholds of a problem ~30x n=32 (`MALLOC_MMAP_THRESHOLD_=3774873
+  MALLOC_TRIM_THRESHOLD_=7549747`: every block above 3.6 MB fresh memory, as the blocks above 32 MB of a large
+  problem), plugged in: at n=32 a vector is 2.5 MB and FCG's fit in the 16 MB L3, which hides the cost of the vector
+  operations. Timers of `Prof.h` in a copy of the sources (`build/prof_omp2/`, the variants by `LD_PRELOAD` of their
+  library, `runs/ab.sh`, `runs/summary.py`), with the page faults of the calling thread beside the process's
+  (`getrusage(RUSAGE_THREAD)`): a step whose faults are all the calling thread's writes its fresh memory sequentially.
+  The laptop's limits (`build/prof_omp2/micro/`, 1 / 8 threads): first writes of fresh memory 1.68 / 7.53 GB/s (x4.5
+  faster on 8 threads), then 9.6 / 18.8 GB/s; streaming read 10.1 / 36.9 GB/s (x3.65); random gather over 512 MB
+  95 / 333 M/s (x3.5): a step bound by the memory gains at most ~3.5x on 8 threads here.
+
+  Changed (the results: the dot products reordered, nothing else; independent of the number of threads, as before):
+  1. **The setup's large arrays first written by the threads together** (`UninitializedVector`, `ParallelAssign()`,
+     `Parallelism.h`): `vector<T>(n)`, `assign()` and `resize()` zero-fill on the calling thread, i.e. take all the
+     page faults of a fresh array there. Converted: the arrays of `CoarseningPass` (`Build()`, `Aggregate()`,
+     `CollapseInterfaces()`, `ComputeProlongation()`), `IndexLists` (the sizes computed in parallel too),
+     `LocalMatrices::Allocate()`, the condensation's factors. The calling thread's faults in the setup, 8 threads
+     (medians): 133k (521 MB) -> 42k (166 MB), of which those beyond its share of the parallel loops (its faults minus
+     1/8 of the process's: the sequential first writes) 361 -> 18 MB; the process's 329k -> 304k (item 2).
+  2. **The prolongations of the passes in deques** (`chainedPassP`, `_passP`): Eigen's `SparseMatrix` move constructor
+     is not `noexcept`, so `vector<SparseMatrix>::push_back()` copied the earlier passes' P at each reallocation
+     (sequentially, into fresh memory): ~75 ms of the setup on 8 threads (the passes' untimed rest, 99 -> 23 ms).
+  3. **`TransposeIf()`'s positions in parallel over the columns** (`SparseMatrixOps.h`): the loop columns x chunks was
+     sequential, O(nCols x threads) (8.5M steps for R = P^T at n=48 on 8 threads, 4 times more on 32). Bit-identical;
+     no measurable gain on 8 threads (`R = P^T` 60 / 63 ms), for the larger thread counts.
+  4. **The vector operations of FCG, GCR, the K-cycle and the Lanczos of the Chebyshev smoothers by blocks of rows in
+     parallel, fused into passes** (`Parallel::RowBlocks`, `SumsOverRowBlocks()`, `ForEachRowBlock()`; `docs/uamg.md`,
+     "Krylov methods"): blocks of 4096 rows, each block's dot products summed in the order of the blocks (the results
+     depend on the number of rows, not of threads; one block: Eigen's whole-vector dot, bit for bit); each block
+     updated then reduced while in cache. FCG 9 vector operations per iteration -> 3 passes, GCR 2j + 4 -> j + 3.
+     Checked: the fused passes bit for bit the separate operations with the same blocked dots (a variant with the old
+     FCG, GCR, K-cycle and Chebyshev, `build/omp_check/`), 1 thread = 8 threads bit for bit, on 9 library cases
+     (`fcglibuamg`, `gcrlibuamg`, `-uamg-mixed`: CSR and block CSR in single precision; k = 0-2, 2D and 3D).
+
+  By step, instrumented builds, medians of 5 interleaved runs, 1 / 8 threads (s), before -> after (time ratio: x0.70 =
+  30% less time):
+
+  | Step | 1 thread | 8 threads |
+  |---|---|---|
+  | setup (the program's table) | 6.324 -> 6.320 (x1.00) | 2.275 -> 1.978 (x0.87) |
+  | the passes, whole | 4.298 -> 4.262 | 1.491 -> 1.247 (x0.84) |
+  | `Build()` | 0.753 -> 0.780 | 0.278 -> 0.193 (x0.69) |
+  | `CollapseInterfaces()` | 0.559 -> 0.560 | 0.206 -> 0.133 (x0.65) |
+  | `Aggregate()` | 0.166 -> 0.165 | 0.199 -> 0.186 |
+  | the smoothers' setup (Lanczos) | 0.383 -> 0.400 | 0.164 -> 0.140 (x0.85) |
+  | the condensation | 0.145 -> 0.143 | 0.097 -> 0.084 (x0.87) |
+  | `ComputeProlongation()`, `GalerkinProduct()`, decomposition, chaining, condensed matrix, `R = P^T` | unchanged | unchanged |
+  | solve (the program's table) | 6.417 -> 6.546 (noise: 6.13-7.46 / 6.21-6.73) | 2.151 -> 2.149 (noise: 2.06-2.25 / 1.99-2.40) |
+  | FCG's vector operations | 0.198 -> 0.166 (x0.84) | 0.217 -> 0.095 (x0.44) |
+  | the K-cycle's vector operations | 0.022 -> 0.023 | 0.029 -> 0.014 (x0.48) |
+
+  The setup gains on 8 threads only (the first writes, the copies of item 2 are ~2% of it on 1 thread). In these
+  instrumented runs the solve's 0.14 s on 8 threads is within the noise of its cycle (+-10% from run to run in both
+  versions); the uninstrumented runs below separate it (every run after faster than every run before). The
+  uninstrumented builds (`build/before-omp` against `build/bin`, `runs/final.sh`), medians
+  of 5 interleaved runs, before -> after:
+
+  | | 1 thread | 8 threads | speedup 1 -> 8 threads, before / after |
+  |---|---|---|---|
+  | setup | 6.265 -> 6.247 s (x1.00) | 2.306 -> 1.920 s (x0.83; runs 2.25-2.32 / 1.90-1.94) | 2.72 / 3.25 |
+  | solve | 6.740 -> 6.759 s (x1.00) | 2.216 -> 2.071 s (x0.93; runs 2.17-2.32 / 2.05-2.11) | 3.04 / 3.26 |
+
+  The same 25 iterations, peak memory unchanged (2.85 / 2.84 GB). Validation: `solutions.sh` 44 `DIFF` (the
+  rounding of the reordered dot products), 34 `OK`, no `ITERATIONS-DIFF`; `ctest -E HPConfig` 405/405 (with 3 new
+  tests, `ParallelReductionsTest`); `build-mpi-lib` 5/5, `build-mpi` `ProgramMPI` 18/18. The clients (`clients` skill):
+  the same iterations on every run; HArDCore3D (50 runs) and Disk++'s vector Laplacian (17) the same errors, Disk++'s
+  Poisson (34) too but 3 errors in their 11th digit; the final residuals moved by the rounding (`DIFF` against the
+  references, not updated: the user's decision); NGSolve 33/33 and 9-10/10 on 1-4 processes, PETSc 7/7.
+
+  Tried and dropped:
+  - **The greedy pairwise aggregation in parallel, with the same aggregates**: its read-after-write dependencies are
+    short (critical path 589 steps for the 265k aggregates of the first pass, 651-1082 for the next ones), but an
+    exact parallel execution can't see them in advance: deterministic reservations (Blelloch, Fineman, Gibbons, Shun,
+    PPoPP 2012), simulated on the real passes from the sequential results, need 3373-11244 rounds per pass (3-11 times
+    the critical path) and redo each step 4-30 times (windows of 256: 3.9, 10.8, 17.2, 29.4 attempts per step on the
+    4 passes of level 0; windows of 4096: 25-418): the aggregation order (a breadth-first order) puts neighbouring
+    cells at neighbouring positions, and a window's steps conflict. ~36k rounds on level 0 with 2 barriers each,
+    ~0.2 s of synchronization alone, against 0.11 s for the whole sequential greedy. The random orders that make it
+    parallel (the same paper) change the aggregates.
+  - The ordering (its breadth-first order, 0.065 s on 8 threads) can be parallel with the same order (below, Next
+    ideas): not done, ~0.02 s.
+
 ## Distributed memory (MPI)
 
 U-AMG on several processes (`ENABLE_MPI`, see CLAUDE.md "MPI"). Measure with `scripts/perf/scaling_mpi.sh` (from
@@ -1591,11 +1679,12 @@ elapsed setup / solve (s). Laptop: the same code (`build-mpi`), plugged in, 2026
 - OpenMP stops gaining beyond 4-8 threads (k=0 n=64, solve on 1 / 2 / 4 / 8 / 16 / 32 threads: 10.24 / 5.32 / 3.10 /
   2.36 / 1.53 / 1.41 s; the setup 5.6 times faster on 32 threads), MPI keeps scaling (the setup 23 times faster on 32
   processes, the solve 15): at 3.6M unknowns, 32 x 1 takes 0.35 of the time of 1 x 32, 0.59 of 4 x 8 (about one process
-  per NUMA node: not only NUMA). Why, not known yet: the laptop's profile by step on 1 and 8 threads (2026-11-21 in
-  Current profile) leaves one sequential step (the aggregation, 10% of the setup on 8 threads), steps that gain ~2x
-  (bandwidth on the laptop, unknown on the cluster) and the fresh memory (page faults: 9% of the setup on 8 threads,
-  nothing in the solve). A client
-  calling the library from one process with threads gets ~6x on 32 cores.
+  per NUMA node: not only NUMA). Why, in part (the laptop, 2026-11-21, Done "OpenMP scaling of the library's setup and
+  solve"): sequential parts that processes don't have, fixed since (the first writes of the setup's fresh arrays by
+  the calling thread, copies of the passes' P, a transpose's loop O(columns x threads), FCG's and the K-cycle's vector
+  operations); left, the aggregation (9% of the setup on 8 threads); the other steps bound by the laptop's memory
+  (~3.5x on 8 threads at most). On the cluster: not measured since (Next ideas, "The profile by step on 32 cores"). A
+  client calling the library from one process with threads got ~6x on 32 cores before these changes.
 - Below ~10k unknowns per process, no gain from more processes (k=0 n=32 solve on 8 / 16 / 32 processes: 0.21 / 0.18 /
   0.19 s; k=2 n=12, 32 x 1 slower than 16 x 1): threads per process help there (16 x 2, 4 x 8); see Next ideas 3 below.
 - Weak scaling, k=1, n = 16 P^(1/3) (~4.1k cells per process), one thread per process, setup / solve (s), iterations:
@@ -1634,8 +1723,29 @@ Next ideas:
 
 ## Current profile (U-AMG; parallel: 16 threads, the default before 2026-10-08)
 
-**Setup and solve by step through the library, 1 / 8 threads** (2026-11-21, `3b42f153`, the question: why do
-threads gain less than processes on the cluster?). Cube-tet k=0 n=32 (318k faces, 24 iterations), `-s fcglibuamg`,
+**OpenMP scaling, what stays sequential** (2026-11-21, after Done "OpenMP scaling of the library's setup and solve",
+whose conditions: Cube-tet k=0 n=48, `-s fcglibuamg`, glibc's thresholds of a large problem, instrumented build,
+medians of 5 interleaved runs). By step, 1 / 8 threads (s), and the speedup on 8 threads (the laptop's memory-bound
+limit: ~3.5x, Done):
+- Setup 6.32 / 1.98 (3.2x): the passes 4.26 / 1.25 (3.4x): `ComputeProlongation()` 1.70 / 0.40 (4.2x), `Build()`
+  0.78 / 0.19 (4.0x), local Galerkin products 0.67 / 0.17 (3.9x), interface collapsing 0.56 / 0.13 (4.2x),
+  decomposition 0.40 / 0.14 (2.9x), the aggregation 0.165 / 0.186 (sequential: its order 0.046 / 0.065, its greedy
+  0.096 / 0.113). Outside the passes: the condensed matrix 0.59 / 0.18 (3.2x), the chaining of P 0.51 / 0.17 (3.0x),
+  the smoothers (Lanczos) 0.40 / 0.14 (2.9x), the assembly of the coarse operators 0.17 / 0.045 (3.8x), `R = P^T`
+  0.15 / 0.06 (2.4x), the condensation 0.14 / 0.08 (1.7x: not explained).
+- Solve 6.55 / 2.15 (3.0x): the cycle 6.24 / 1.91 (3.3x; post-smoothing 3.4x, pre-smoothing 3.2x, restriction 3.6x,
+  prolongation 2.9x), FCG's vector operations 0.17 / 0.095 (1.75x), the K-cycle's 0.023 / 0.014.
+- The sequential first writes of fresh memory: 18 MB in the setup (361 MB before), 8 MB in the solve (the first
+  iterations).
+
+So on 8 threads the setup's only sequential step left is the aggregation (9% of it; Done: an exact parallel greedy
+costs more than it saves), and the others gain 2.4-4.2x against a memory limit of ~3.5x here: bound by the laptop's
+memory (2 channels), not by sequential parts. The steps at 2.4-3x (decomposition, chaining, smoothers, `R = P^T`) do
+scattered writes or grow their chunks by `push_back()` (`BuildByRows()`). On the cluster's node (8 NUMA nodes, 12
+channels), what bounds them on 32 cores: the job of Next ideas ("The profile by step on 32 cores").
+
+**Setup and solve by step through the library, 1 / 8 threads** (2026-11-21, `3b42f153`, before the OpenMP changes
+above; the question: why do threads gain less than processes on the cluster?). Cube-tet k=0 n=32 (318k faces, 24 iterations), `-s fcglibuamg`,
 `OMP_NUM_THREADS`, plugged in, the second of 2 runs (within 2% of the first); timers of `Prof.h` in a copy of the sources (`build/prof_omp/`). Setup 1.37
 / 0.53 s (2.6x), solve 1.15 / 0.53 s (2.2x). By step, 1 / 8 threads (s):
 - The passes 1.13 / 0.41: prolongation 0.41 / 0.08, Galerkin products 0.17 / 0.05, `Build()` 0.16 / 0.06,
@@ -1784,6 +1894,27 @@ Galerkin products (see Done).
   remaining gains are in fewer bytes per non-zero (block CSR), locality, and fused passes.
 
 ## Next ideas, by expected gain
+
+OpenMP scaling (2026-11-21, after Done "OpenMP scaling of the library's setup and solve"; Current profile):
+- **The profile by step on 32 cores** — to measure (the cluster), no code. The laptop's 8 threads are bound by its
+  memory (~3.5x at most); the cluster's 32 cores showed 6.4x with threads against 18x with processes. The job,
+  prepared (2026-11-21): the sources before and after the change, `fhhos4-src-v1.5.0-30-g88cd276a-before.tar.gz` and
+  `-omp.tar.gz` (`NAME=... scripts/cluster/pack.sh`, the env be8198ce already on the cluster), each run with
+  `qsub -v "STEPS=machine build strong large" scripts/cluster/run.pbs` (`ctest` too for `-omp`); compare `1 x p`
+  with `p x 1`, before and after. Then, if threads still lag, a copy of the sources with the timers of
+  `build/prof_omp2/` (`scripts/README.txt` there) on 1, 8, 16, 32 threads.
+- **The aggregation's order in parallel, with the same order** — estimated, medium effort, bit-identical. Its
+  breadth-first order level by level: each new cell claimed by the first cell of the frontier that has it as a
+  neighbour (a minimum by compare-and-swap: the neighbour lists are not guaranteed symmetric), the claimed cells of
+  each frontier cell sorted by count as now, their positions by a prefix sum. About 2-2.5 times the memory accesses of
+  the sequential order, against the laptop's ~3.5x: 0.065 -> ~0.04 s on 8 threads at n=48 (1% of the setup); more on
+  32 cores, where the aggregation's share grows (Amdahl).
+- **The condensation, 1.7x on 8 threads** (0.14 / 0.08 s at n=48) — to profile: its sequential part is not known (its
+  loops are parallel; the per-cell heap allocations of Eigen's dense blocks, `_W`'s outer index zero-filled by Eigen?).
+- **`BuildByRows()`'s chunks** (the products, the chaining of P, 3.0x on 8 threads): each chunk's vectors grow by
+  `push_back()` (reallocations: about twice the final bytes written, and fresh memory), then are copied into the
+  matrix. A symbolic pass (the sizes of the rows) would write the matrix once, at the cost of a second pass over the
+  products' rows: to measure.
 
 0. **Faster transfers by the prolongations of the passes at degree 0** — estimated, medium effort. Since 2026-10-22 the
    levels with blocks keep the prolongations of their passes (see "Transfers by the prolongations of the passes" in

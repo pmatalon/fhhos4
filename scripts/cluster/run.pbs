@@ -131,9 +131,11 @@ step_weak() {
 		scale weak/p${p}_n$n "$COMPACT" "$p,1" $CUBE -k 1 -n $n
 	done
 }
+# Not on 1-2 cores: the program's assembly alone exceeds the timeout there (k=2 n=32 on 1 x 1, job 3108878).
 step_large() {
-	local case
-	for case in "${LARGE[@]}"; do scale large/$(tag $case) "$COMPACT" "$(configs $MAX)" $CUBE $case; done
+	local case list
+	list=$(configs $MAX | tr ' ' '\n' | grep -v -x -E '1,1|1,2|2,1' | xargs)
+	for case in "${LARGE[@]}"; do scale large/$(tag $case) "$COMPACT" "$list" $CUBE $case; done
 }
 # The same cores on two sockets (half each) instead of one: memory bandwidth and NUMA.
 step_sockets() {

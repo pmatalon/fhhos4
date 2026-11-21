@@ -36,26 +36,26 @@ public:
 	// to none of the cells of the pass (couplings of the operator); -1: all the faces are owned (one process)
 	BigNumber NOwnedFaces = -1;
 	IndexLists CellFaces;            // faces of each cell, in the order of their first non-zero in the rows of A_T_F
-	vector<double> FaceTraces;       // for each item of CellFaces, the trace of the block A_T_F(cell, face)
-	vector<double> FaceToCellTraces; // non-symmetric matrix: for each item of CellFaces, the trace of A_F_T(face, cell)
+	UninitializedVector<double> FaceTraces;       // for each item of CellFaces, the trace of the block A_T_F(cell, face)
+	UninitializedVector<double> FaceToCellTraces; // non-symmetric matrix: for each item of CellFaces, the trace of A_F_T(face, cell)
 	IndexLists FaceCells;            // cells of each face, increasing
 
 	// Neighbours of each cell through its faces, by increasing coupling (the strongest first), and their couplings.
 	// Only the first NNeighbours[e] items of the list of e are used. The strong neighbours of e are its first
 	// NStrongNeighbours[e] neighbours.
 	IndexLists Neighbours;
-	vector<double> Couplings;
-	vector<int> NNeighbours;
-	vector<int> NStrongNeighbours;
-	vector<int> NStrongNeighbourOf;  // number of cells of which the cell is a strong neighbour
+	UninitializedVector<double> Couplings;
+	UninitializedVector<int> NNeighbours;
+	UninitializedVector<int> NStrongNeighbours;
+	UninitializedVector<int> NStrongNeighbourOf;  // number of cells of which the cell is a strong neighbour
 
 	// Aggregation
 	BigNumber NAggregates = 0;
 	IndexLists AggregateCells;        // in the order of their aggregation
-	vector<BigNumber> CellAggregate;
-	vector<char> FaceRemoved;         // face interior to an aggregate
+	UninitializedVector<BigNumber> CellAggregate;
+	UninitializedVector<char> FaceRemoved;         // face interior to an aggregate
 	BigNumber NCoarseFaces = 0;
-	vector<BigNumber> FaceCoarseFace; // coarse face of each kept face (-1 for the removed faces)
+	UninitializedVector<BigNumber> FaceCoarseFace; // coarse face of each kept face (-1 for the removed faces)
 	IndexLists AggregateCoarseFaces;  // coarse faces of each aggregate, increasing
 	// The two aggregates of each coarse face (CollapseInterfaces()): the first one, then the second one, greater (an
 	// aggregate of another process on several processes, see DistributedPass), or -1 for the boundary of the first one
@@ -85,7 +85,7 @@ public:
 		NFaces = A_T_F.cols() / fbs;
 
 		// Faces of the cells (HybridAlgebraicMesh::BuildElementFaces())
-		vector<int> nCellFaces(NCells);
+		UninitializedVector<int> nCellFaces(NCells); // written by the parallel loop below
 		#pragma omp parallel
 		{
 			vector<BigNumber> faces;
@@ -106,9 +106,9 @@ public:
 			}
 		}
 		CellFaces.Allocate(NCells, [&](BigNumber e) { return nCellFaces[e]; });
-		FaceTraces.assign(CellFaces.Items.size(), 0);
+		ParallelAssign(FaceTraces, CellFaces.Items.size(), 0.0);
 		if (A_F_T)
-			FaceToCellTraces.assign(CellFaces.Items.size(), 0);
+			ParallelAssign(FaceToCellTraces, CellFaces.Items.size(), 0.0);
 		#pragma omp parallel for
 		for (BigNumber e = 0; e < NCells; ++e)
 		{
@@ -159,7 +159,8 @@ public:
 					if (it.col() % fbs == 0 && (cbs == 1 || find(faces.begin(), faces.end(), it.col() / fbs) == faces.end()))
 						faces.push_back(it.col() / fbs);
 		};
-		vector<int> nFaceCells(NFaces, 0);
+		UninitializedVector<int> nFaceCells;
+		ParallelAssign(nFaceCells, NFaces, 0);
 		#pragma omp parallel
 		{
 			vector<BigNumber> faces;
@@ -175,7 +176,7 @@ public:
 			}
 		}
 		FaceCells.Allocate(NFaces, [&](BigNumber f) { return nFaceCells[f]; });
-		fill(nFaceCells.begin(), nFaceCells.end(), 0);
+		ParallelAssign(nFaceCells, NFaces, 0);
 		#pragma omp parallel
 		{
 			vector<BigNumber> faces;
@@ -213,10 +214,10 @@ public:
 				bound += FaceCells.Size(CellFaces[e][a]);
 			return bound;
 		});
-		Couplings.resize(Neighbours.Items.size());
-		NNeighbours.assign(NCells, 0);
-		NStrongNeighbours.assign(NCells, 0);
-		NStrongNeighbourOf.assign(NCells, 0);
+		ParallelAssign(Couplings, Neighbours.Items.size(), 0.0);
+		ParallelAssign(NNeighbours, NCells, 0);
+		ParallelAssign(NStrongNeighbours, NCells, 0);
+		ParallelAssign(NStrongNeighbourOf, NCells, 0);
 		#pragma omp parallel
 		{
 			vector<pair<BigNumber, double>> nb;
@@ -295,14 +296,14 @@ public:
 			CellAggregate.clear();
 			return CoarsestMeshReached(comm);
 		}
-		vector<CellData> cells(NCells);
+		UninitializedVector<CellData> cells(NCells); // written by the parallel loop below
 		#pragma omp parallel for
 		for (BigNumber e = 0; e < NCells; ++e)
 			cells[e] = { Neighbours.Start[e], NNeighbours[e], NStrongNeighbours[e], NStrongNeighbourOf[e], -1, false };
 		const BigNumber* neighbours = Neighbours.Items.data();
 		const int ahead = 8;
 		// The cell order[i + 3*ahead], the neighbours of order[i + 2*ahead], their data for order[i + ahead]
-		auto prefetch = [&](const vector<BigNumber>& order, BigNumber i, BigNumber n, bool strongOnly)
+		auto prefetch = [&](const UninitializedVector<BigNumber>& order, BigNumber i, BigNumber n, bool strongOnly)
 		{
 			if (i + 3 * ahead < n)
 				Prefetch(&cells[order[i + 3 * ahead]]);
@@ -318,7 +319,8 @@ public:
 
 		// Aggregation order: from a cell that is the strong neighbour of the fewest cells, the neighbours of the cells
 		// already ordered, each time by increasing number of cells of which they are a strong neighbour
-		vector<BigNumber> order(NCells);
+		UninitializedVector<BigNumber> order; // first written in parallel (fresh memory), then in the order of the cells
+		ParallelAssign(order, NCells, (BigNumber)0);
 		BigNumber start = 0;
 		for (BigNumber e = 0; e < NCells; ++e)
 		{
@@ -361,13 +363,12 @@ public:
 
 		// Aggregation
 		NAggregates = 0;
-		AggregateCells.Start.assign(1, 0);
-		AggregateCells.Start.reserve(NCells + 1);
-		AggregateCells.Items.clear();
-		AggregateCells.Items.reserve(NCells);
+		ParallelAssign(AggregateCells.Start, NCells + 1, (BigNumber)0); // first written in parallel, as order
+		ParallelAssign(AggregateCells.Items, NCells, (BigNumber)0);
+		BigNumber nItems = 0;
 		auto addToAggregate = [&](BigNumber e)
 		{
-			AggregateCells.Items.push_back(e);
+			AggregateCells.Items[nItems++] = e;
 			CellData& c = cells[e];
 			c.Aggregate = NAggregates;
 			for (int k = 0; k < c.NStrong; ++k)
@@ -420,10 +421,12 @@ public:
 				}
 			}
 			NAggregates++;
-			AggregateCells.Start.push_back(AggregateCells.Items.size());
+			AggregateCells.Start[NAggregates] = nItems;
 			if (remaining == 0)
 				break;
 		}
+		assert(nItems == NCells);
+		AggregateCells.Start.resize(NAggregates + 1);
 		CellAggregate.resize(NCells);
 		#pragma omp parallel for
 		for (BigNumber e = 0; e < NCells; ++e)
@@ -452,7 +455,7 @@ public:
 	{
 		// A face is removed if two cells of an aggregate share it, or if it belongs to a single cell (without
 		// CollapseBoundaryFaces)
-		FaceRemoved.assign(NFaces, 0);
+		ParallelAssign(FaceRemoved, NFaces, (char)0);
 		#pragma omp parallel for
 		for (BigNumber f = 0; f < NFaces; ++f)
 		{
@@ -480,7 +483,10 @@ public:
 			}
 			return bound;
 		});
-		vector<int> nNeighbours(NAggregates), nUpper(NAggregates), nBoundary(NAggregates, 0);
+		UninitializedVector<int> nNeighbours(NAggregates); // written by the parallel loop below
+		UninitializedVector<int> nUpper(NAggregates);
+		UninitializedVector<int> nBoundary;
+		ParallelAssign(nBoundary, NAggregates, 0);
 		#pragma omp parallel for
 		for (BigNumber k = 0; k < NAggregates; ++k)
 		{
@@ -538,7 +544,7 @@ public:
 				CoarseFaceAggregates[boundaryCoarseFace(k)] = { k, -1 };
 			}
 		}
-		FaceCoarseFace.assign(NFaces, -1);
+		ParallelAssign(FaceCoarseFace, NFaces, (BigNumber)-1);
 		bool faceOfNoCell = false, faceOfMoreCells = false;
 		#pragma omp parallel for reduction(||: faceOfNoCell, faceOfMoreCells)
 		for (BigNumber f = 0; f < NFaces; ++f)
@@ -601,7 +607,7 @@ public:
 		const double zero = NonZeroCoefficients::ZeroThreshold;
 		DenseMatrix oneMinusOmegaIdentity = (1 - omega) * DenseMatrix::Identity(fbs, fbs);
 
-		vector<double> blocksTT(harmonic ? 0 : (size_t)NAggregates * cbs * cbs); // the blocks of A_T_Tc, row-major
+		UninitializedVector<double> blocksTT(harmonic ? 0 : (size_t)NAggregates * cbs * cbs); // the blocks of A_T_Tc, row-major (written by each aggregate)
 		// Rows of P on the removed faces, stored by the thread that computes them
 		struct RemovedRows
 		{
@@ -609,9 +615,12 @@ public:
 			vector<double> Values;
 		};
 		ThreadLocal<RemovedRows> removedRowsTL;
-		vector<int> removedRowsThread(NFaces, -1);
-		vector<size_t> removedRowStart((size_t)NFaces * fbs + 1, 0); // and its end at removedRowEnd
-		vector<size_t> removedRowEnd((size_t)NFaces * fbs, 0);
+		UninitializedVector<int> removedRowsThread;
+		ParallelAssign(removedRowsThread, NFaces, -1);
+		UninitializedVector<size_t> removedRowStart; // and its end at removedRowEnd
+		ParallelAssign(removedRowStart, (size_t)NFaces * fbs + 1, (size_t)0);
+		UninitializedVector<size_t> removedRowEnd;
+		ParallelAssign(removedRowEnd, (size_t)NFaces * fbs, (size_t)0);
 
 		struct Work
 		{

@@ -420,7 +420,9 @@ private:
 
 		if (Ax)
 		{
-			*Ax = b - lastResidual;                                                                               flops += n;
+			Ax->resize(n);
+			Parallel::ForEachRowBlock(n, [&](BigNumber i, BigNumber m) { Ax->segment(i, m) = b.segment(i, m) - lastResidual.segment(i, m); });
+			                                                                                                      flops += n;
 		}
 		return flops;
 	}
@@ -629,7 +631,9 @@ private:
 	{
 		if (_blockSize == 1)
 		{
-			z = In<T>().InvDiag.cwiseProduct(r);
+			const VectorOf<T>& invDiag = In<T>().InvDiag;
+			z.resize(r.rows());
+			Parallel::ForEachRowBlock(r.rows(), [&](BigNumber i, BigNumber m) { z.segment(i, m) = invDiag.segment(i, m).cwiseProduct(r.segment(i, m)); });
 			return;
 		}
 		BigNumber nb = Rows<T>() / _blockSize;
@@ -664,14 +668,18 @@ private:
 		VectorOf<T>& z = W.d;
 		VectorOf<T>& p = W.dNext;
 		VectorOf<T> Ap(n);
-		for (BigNumber i = 0; i < n; i++)
-			r[i] = PseudoRandom(firstRow + i);
+		// The vector operations by blocks of rows, in parallel (the same operations on each coefficient)
+		Parallel::ForEachRowBlock(n, [&](BigNumber first, BigNumber m)
+		{
+			for (BigNumber i = first; i < first + m; i++)
+				r[i] = PseudoRandom(firstRow + i);
+		});
 		ApplyInverseDiagonal(r, z);
 		double rz = Parallel::Dot(r, z);
 		if (!(rz > 0))
 			Utils::FatalError("The Chebyshev smoothers require a symmetric positive definite matrix: its diagonal blocks are not positive definite.");
 		double rz0 = rz;
-		p = z;
+		Parallel::ForEachRowBlock(n, [&](BigNumber i, BigNumber m) { p.segment(i, m) = z.segment(i, m); });
 		vector<double> alpha, beta;
 		for (int j = 0; j < EigenvalueEstimateIterations; j++)
 		{
@@ -687,13 +695,15 @@ private:
 			alpha.push_back(rz / pAp);
 			if (j == EigenvalueEstimateIterations - 1)
 				break;
-			r -= T(alpha.back()) * Ap;
+			T a = T(alpha.back());
+			Parallel::ForEachRowBlock(n, [&](BigNumber i, BigNumber m) { r.segment(i, m) -= a * Ap.segment(i, m); });
 			ApplyInverseDiagonal(r, z);
 			double rzNext = Parallel::Dot(r, z);
 			if (!(rzNext > 1e-28 * rz0)) // invariant Krylov subspace: the eigenvalues of the tridiagonal matrix are exact
 				break;
 			beta.push_back(rzNext / rz);
-			p = z + T(beta.back()) * p;
+			T b = T(beta.back());
+			Parallel::ForEachRowBlock(n, [&](BigNumber i, BigNumber m) { p.segment(i, m) = z.segment(i, m) + b * p.segment(i, m); });
 			rz = rzNext;
 		}
 

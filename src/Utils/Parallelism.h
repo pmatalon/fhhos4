@@ -200,6 +200,41 @@ namespace Parallelism
 	}
 }
 
+// The allocator of UninitializedVector: the elements that resize() adds are default-initialized, i.e. not written for
+// a trivial type (std::allocator writes zeros), the other constructions as std::allocator's
+template <class T>
+struct UninitializedAllocator : std::allocator<T>
+{
+	template <class U>
+	struct rebind { using other = UninitializedAllocator<U>; };
+
+	UninitializedAllocator() = default;
+	template <class U>
+	UninitializedAllocator(const UninitializedAllocator<U>&) noexcept {}
+
+	template <class U>
+	void construct(U* p) noexcept(std::is_nothrow_default_constructible_v<U>) { ::new ((void*)p) U; }
+	template <class U, class... Args>
+	void construct(U* p, Args&&... args) { ::new ((void*)p) U(std::forward<Args>(args)...); }
+};
+
+// A vector whose resize() leaves the new elements (of a trivial type) unwritten, for the large arrays computed by a
+// parallel loop: their memory is first written by the threads together. A large allocation is fresh memory (glibc maps
+// the blocks above 32 MB afresh each time), whose first write costs a page fault per 4 KB: ~4.5 times faster on 8
+// threads than on the calling thread alone, as a vector<T>(n) or assign(n, value) does it (PERFORMANCE.md).
+template <class T>
+using UninitializedVector = vector<T, UninitializedAllocator<T>>;
+
+// v: n values value, written in parallel
+template <class T>
+void ParallelAssign(UninitializedVector<T>& v, size_t n, T value)
+{
+	v.resize(n);
+	#pragma omp parallel for if (n > 20000)
+	for (size_t i = 0; i < n; i++)
+		v[i] = value;
+}
+
 // One value of T per thread, to accumulate results in a parallel loop without synchronization:
 //
 //     ThreadLocal<vector<Element<Dim>*>> selected;

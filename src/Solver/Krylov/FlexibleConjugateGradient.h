@@ -13,6 +13,7 @@ private:
 		Vector* d;
 		Vector* Ad;
 		double d_dot_Ad;
+		double Coefficient = 0; // in the orthogonalization of the current iteration: z.Ad / d.Ad
 	};
 	// The vectors of the iterations, allocated at the setup (AllocateIterationVectors()): the solve allocates nothing (a
 	// large vector would be fresh memory at each allocation, see Level::CycleVectors). The spare vectors: those of the
@@ -128,50 +129,79 @@ public:
 				Precond.Apply(r, z);                               result.AddWorkInMFlops(Precond.SolvingComputationalWork());
 			}
 
-			// The final direction of research, d, is found by 
-			// A-orthogonalizing z with the previous directions of research, 
-			// according to the truncation / restart method chosen.
-
-			Vector* d = SpareVector();
-			*d = z;
-
-			for (Direction const& directionk : previousDirections)
+			// The final direction of research, d, is found by A-orthogonalizing z with the previous directions of research,
+			// according to the truncation / restart method chosen: d = z - sum_k (z.Ad_k / d_k.Ad_k) d_k, and A d from A z
+			// alike. The vector operations are fused into passes over the blocks of rows of the vectors, in parallel, each
+			// block updated then reduced while in cache (Parallel::SumsOverRowBlocks()): the same operations on each
+			// coefficient as one operation after the other, and the dot products of Parallel::Dot().
+			const Communicator& comm = Communicator::Current();
+			BigNumber n = r.rows();
+			assert(x.rows() == n);
+			bool AdOfPreconditioner = Ad != nullptr;
+			for (Direction& directionk : previousDirections)
 			{
-				Vector& dk  = *directionk.d;
-				Vector& Adk = *directionk.Ad;
-				double dk_dot_Adk = directionk.d_dot_Ad;
-
-				// A-orthogonalization
-				double z_dot_Adk = Parallel::Dot(z, Adk);             result.AddWorkInFlops(Cost::Dot(z));
-				*d -= (z_dot_Adk / dk_dot_Adk) * dk;                  result.AddWorkInFlops(Cost::VectorDAXPY(*d));
-
-				if (Precond.CanOptimizeResidualComputation())
+				double z_dot_Adk = Parallel::Dot(z, *directionk.Ad);      result.AddWorkInFlops(Cost::Dot(z));
+				directionk.Coefficient = z_dot_Adk / directionk.d_dot_Ad; result.AddWorkInFlops(Cost::VectorDAXPY(z));
+				if (AdOfPreconditioner)
 				{
-					*Ad -= (z_dot_Adk / dk_dot_Adk) * Adk;            result.AddWorkInFlops(Cost::VectorDAXPY(*d));
+					                                                      result.AddWorkInFlops(Cost::VectorDAXPY(z));
 				}
 			}
-			if (!Ad)
+			Vector* d = SpareVector();
+			d->resize(n);
+			auto orthogonalize = [&](BigNumber i, BigNumber m)
 			{
+				d->segment(i, m) = z.segment(i, m);
+				for (const Direction& directionk : previousDirections)
+				{
+					d->segment(i, m) -= directionk.Coefficient * directionk.d->segment(i, m);
+					if (AdOfPreconditioner)
+						Ad->segment(i, m) -= directionk.Coefficient * directionk.Ad->segment(i, m);
+				}
+			};
+			double d_dot_Ad;
+			double r_dot_d;
+			if (AdOfPreconditioner)
+			{
+				array<double, 2> dots = Parallel::SumsOverRowBlocks<2>(n, [&](BigNumber i, BigNumber m)
+				{
+					orthogonalize(i, m);
+					return array<double, 2>{ Parallel::DotOfRows(*d, *Ad, i, m), Parallel::DotOfRows(r, *d, i, m) };
+				});
+				d_dot_Ad = comm.Sum(dots[0]);
+				r_dot_d = comm.Sum(dots[1]);
+			}
+			else
+			{
+				r_dot_d = comm.Sum(Parallel::SumsOverRowBlocks<1>(n, [&](BigNumber i, BigNumber m)
+				{
+					orthogonalize(i, m);
+					return array<double, 1>{ Parallel::DotOfRows(r, *d, i, m) };
+				})[0]);
 				Ad = SpareVector();
 				if (this->Distributed)
 					this->Distributed->Multiply(*d, nullptr, *Ad);
 				else
 					Ad->noalias() = A.selfadjointView<Eigen::Lower>() * (*d);
 				                                                      result.AddWorkInFlops(Cost::MatVec(A));
+				d_dot_Ad = Parallel::Dot(*d, *Ad);
 			}
-
-			double d_dot_Ad = Parallel::Dot(*d, *Ad);                 result.AddWorkInFlops(Cost::Dot(*d));
+			                                                          result.AddWorkInFlops(Cost::Dot(*d));
 			assert(d_dot_Ad != 0);
 
 			// Step length in the direction of research
-			double alpha = Parallel::Dot(r, *d) / d_dot_Ad;           result.AddWorkInFlops(Cost::Dot(r));
+			double alpha = r_dot_d / d_dot_Ad;                        result.AddWorkInFlops(Cost::Dot(r));
 
-			// Moving from the current solution to the next
-			// by taking the step in the direction of research
-			x += alpha * (*d);                                        result.AddWorkInFlops(Cost::VectorDAXPY(x));
-
-			// New residual
-			r -= alpha * (*Ad);                                       result.AddWorkInFlops(Cost::VectorDAXPY(r));
+			// Moving from the current solution to the next by taking the step in the direction of research, the new
+			// residual and its norm: one pass
+			double r_squaredNorm = comm.Sum(Parallel::SumsOverRowBlocks<1>(n, [&](BigNumber i, BigNumber m)
+			{
+				x.segment(i, m) += alpha * d->segment(i, m);
+				r.segment(i, m) -= alpha * Ad->segment(i, m);
+				return array<double, 1>{ Parallel::SquaredNormOfRows(r, i, m) };
+			})[0]);
+			                                                          result.AddWorkInFlops(Cost::VectorDAXPY(x));
+			                                                          result.AddWorkInFlops(Cost::VectorDAXPY(r));
 
 			// Restart?
 			if (previousDirections.size() == this->Truncation)
@@ -191,7 +221,7 @@ public:
 			this->IterationCount++;
 
 			result.SetX(x);
-			result.SetResidualNorm(Parallel::Norm(r));                result.AddWorkInFlops(Cost::Norm(r));
+			result.SetResidualNorm(std::sqrt(r_squaredNorm));         result.AddWorkInFlops(Cost::Norm(r));
 
 			// Residual replacement (the loop condition then evaluates the stopping criteria on the true residual)
 			if (this->ResidualRecomputation > 0 && (this->IterationCount % this->ResidualRecomputation == 0 || StoppingCriteriaMet(result)))

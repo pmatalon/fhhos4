@@ -123,31 +123,56 @@ public:
 				                                                      result.AddWorkInFlops(Cost::MatVec(A));
 			}
 
-			// Orthonormalization of c_j against the previous c_i (modified Gram-Schmidt)
-			for (int i = 0; i < j; i++)
+			// Orthonormalization of c_j against the previous c_i (modified Gram-Schmidt). The vector operations are fused into
+			// passes over the blocks of rows of the vectors, in parallel, each block updated then reduced while in cache
+			// (Parallel::SumsOverRowBlocks()): the same operations on each coefficient as one operation after the other, and
+			// the dot products of Parallel::Dot(). The pass i subtracts the projection on c_{i-1}, then computes c_i.c_j
+			// (i < j) or |c_j|^2 (i = j).
+			const Communicator& comm = Communicator::Current();
+			BigNumber n = r.rows();
+			Vector& c_j = C[j];
+			for (int i = 0; i <= j; i++)
 			{
-				Gamma(i, j) = Parallel::Dot(C[i], C[j]);              result.AddWorkInFlops(Cost::Dot(C[j]));
-				C[j] -= Gamma(i, j) * C[i];                           result.AddWorkInFlops(Cost::VectorDAXPY(C[j]));
+				double sum = comm.Sum(Parallel::SumsOverRowBlocks<1>(n, [&](BigNumber first, BigNumber m)
+				{
+					if (i > 0)
+						c_j.segment(first, m) -= Gamma(i - 1, j) * C[i - 1].segment(first, m);
+					return array<double, 1>{ i < j ? Parallel::DotOfRows(C[i], c_j, first, m) : Parallel::SquaredNormOfRows(c_j, first, m) };
+				})[0]);
+				if (i < j)
+				{
+					Gamma(i, j) = sum;                                    result.AddWorkInFlops(Cost::Dot(c_j) + Cost::VectorDAXPY(c_j));
+				}
+				else
+				{
+					Gamma(j, j) = std::sqrt(sum);                         result.AddWorkInFlops(Cost::Norm(c_j));
+				}
 			}
-			Gamma(j, j) = Parallel::Norm(C[j]);                       result.AddWorkInFlops(Cost::Norm(C[j]));
 			assert(Gamma(j, j) > 0);
-			C[j] /= Gamma(j, j);                                      result.AddWorkInFlops(Cost::ConstantVec(C[j]));
 
-			// Minimization of the residual norm along c_j
-			a[j] = Parallel::Dot(C[j], r);                            result.AddWorkInFlops(Cost::Dot(r));
-			r -= a[j] * C[j];                                         result.AddWorkInFlops(Cost::VectorDAXPY(r));
+			// Minimization of the residual norm along c_j: c_j normalized and a_j = c_j.r in one pass, then r and its norm
+			a[j] = comm.Sum(Parallel::SumsOverRowBlocks<1>(n, [&](BigNumber first, BigNumber m)
+			{
+				c_j.segment(first, m) /= Gamma(j, j);
+				return array<double, 1>{ Parallel::DotOfRows(c_j, r, first, m) };
+			})[0]);                                                   result.AddWorkInFlops(Cost::ConstantVec(c_j) + Cost::Dot(r));
+			double r_squaredNorm = comm.Sum(Parallel::SumsOverRowBlocks<1>(n, [&](BigNumber first, BigNumber m)
+			{
+				r.segment(first, m) -= a[j] * c_j.segment(first, m);
+				return array<double, 1>{ Parallel::SquaredNormOfRows(r, first, m) };
+			})[0]);                                                   result.AddWorkInFlops(Cost::VectorDAXPY(r));
 			j++;
 
 			//---------- End of iteration ----------//
 			this->IterationCount++;
 
-			result.SetResidualNorm(Parallel::Norm(r));                result.AddWorkInFlops(Cost::Norm(r));
+			result.SetResidualNorm(std::sqrt(r_squaredNorm));         result.AddWorkInFlops(Cost::Norm(r));
 
 			if (j == Restart || StoppingCriteriaMet(result))
 			{
 				// End of the cycle: the iterate, then the restart from it
 				CycleCorrection(Z, Gamma, a, j, _cycleCorrection, result);
-				x += _cycleCorrection;
+				Parallel::ForEachRowBlock(x.rows(), [&](BigNumber first, BigNumber m) { x.segment(first, m) += _cycleCorrection.segment(first, m); });
 				j = 0;
 
 				// Residual replacement (the loop condition then evaluates the stopping criteria on the true residual)
@@ -183,10 +208,16 @@ private:
 	void CycleCorrection(const vector<Vector>& Z, const DenseMatrix& Gamma, const Vector& a, int j, Vector& correction, IterationResult& result) const
 	{
 		Vector y = Gamma.topLeftCorner(j, j).triangularView<Eigen::Upper>().solve(a.head(j));
-		correction = y[0] * Z[0];                                     result.AddWorkInFlops(Cost::ConstantVec(Z[0]));
+		correction.resize(Z[0].rows());
+		Parallel::ForEachRowBlock(Z[0].rows(), [&](BigNumber first, BigNumber m) // one pass (the same operations on each coefficient)
+		{
+			correction.segment(first, m) = y[0] * Z[0].segment(first, m);
+			for (int i = 1; i < j; i++)
+				correction.segment(first, m) += y[i] * Z[i].segment(first, m);
+		});                                                           result.AddWorkInFlops(Cost::ConstantVec(Z[0]));
 		for (int i = 1; i < j; i++)
 		{
-			correction += y[i] * Z[i];                                result.AddWorkInFlops(Cost::VectorDAXPY(Z[i]));
+			                                                          result.AddWorkInFlops(Cost::VectorDAXPY(Z[i]));
 		}
 	}
 

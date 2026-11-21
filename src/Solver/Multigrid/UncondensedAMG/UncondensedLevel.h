@@ -1,4 +1,5 @@
 #pragma once
+#include <deque>
 #include <mutex>
 #include <unsupported/Eigen/SparseExtra>
 #include "HybridAlgebraicMesh.h"
@@ -345,8 +346,8 @@ private:
 	// The prolongations of the coarsening passes of this level, P_1 (the faces of this level) to P_n (KeepPassProlongations),
 	// their transposes, and the intermediate vectors of the transfers (_transferBuffers[i]: the faces of the pass i,
 	// i = 1..n-1). Empty if the transfers use P (the product).
-	vector<SparseMatrixOf<T>> _passP;
-	vector<SparseMatrixOf<T>> _passR;
+	deque<SparseMatrixOf<T>> _passP; // deque: see ChainFromCoarseSide()
+	deque<SparseMatrixOf<T>> _passR;
 	vector<VectorOf<T>> _transferBuffers;
 
 	// The operator (its pointer), the prolongation and the restriction of this level in precision T
@@ -545,7 +546,7 @@ public:
 		const SparseMatrix* passA_F_T = this->A_F_T; // non-symmetric matrix: the rows of the local faces, the cells of the process
 		shared_ptr<const IndexMap> passFaceMap = this->FaceMap;
 		SparseMatrix A_T_Tc, A_T_Fc, A_F_Tc;
-		vector<SparseMatrix> chainedPassP; // the prolongations of the passes, rows of all their local faces (ChainFromCoarseSide())
+		deque<SparseMatrix> chainedPassP; // the prolongations of the passes, rows of all their local faces (ChainFromCoarseSide())
 		double actualCoarseningFactor = 0;
 		int nCoarsenings = 0;
 		bool allNeighbours = coarseningStgy == H_CoarsStgy::AgglomerationCoarseningByFaceNeighbours || coarseningStgy == H_CoarsStgy::MultipleAgglomerationCoarseningByFaceNeighbours;
@@ -661,7 +662,7 @@ public:
 		initialFineMesh.Symmetric = Symmetric;
 		mesh = &initialFineMesh;
 		bool chained = _multigridProlong == UAMGProlongation::ChainedCoarseningProlongations;
-		vector<SparseMatrix> chainedPassP; // chained at the end, as in the flat passes (ChainFromCoarseSide())
+		deque<SparseMatrix> chainedPassP; // chained at the end, as in the flat passes (ChainFromCoarseSide())
 
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
 		{
@@ -787,7 +788,7 @@ public:
 		const SparseMatrix* passA_F_T = this->A_F_T;
 		const SparseMatrix* passA_F_F = this->A_F_F;
 		SparseMatrix A_T_Tc, A_T_Fc, A_F_Tc, A_F_Fc;
-		vector<SparseMatrix> chainedPassP; // the prolongations of the passes, chained at the end (ChainFromCoarseSide())
+		deque<SparseMatrix> chainedPassP; // the prolongations of the passes, chained at the end (ChainFromCoarseSide())
 		double actualCoarseningFactor = 0;
 		int nCoarsenings = 0;
 
@@ -795,7 +796,8 @@ public:
 		// the aggregation composed over the passes. Composition: the current aggregate of each fine cell; for each fine
 		// face, its current face if it is kept (>= 0), -1 - its aggregate if it is removed. The cells of the fine faces.
 		bool chained = _multigridProlong == UAMGProlongation::ChainedCoarseningProlongations;
-		vector<BigNumber> fineCellAggregate, fineFaceState;
+		UninitializedVector<BigNumber> fineCellAggregate; // the types of CoarseningPass's
+		vector<BigNumber> fineFaceState;
 		IndexLists fineFaceCells;
 
 		while (!CoarseningCriteriaReached(coarseningStgy, requestedCoarseningFactor, nCoarsenings, actualCoarseningFactor))
@@ -963,8 +965,10 @@ public:
 	// The product P_1 P_2 ... P_n of the prolongations of the passes, from the coarse side: P_1 (P_2 (... P_n)). Only the
 	// last product has the rows of the level's faces, the others those of the coarser passes: fewer operations and
 	// smaller temporaries than from the fine side, ((P_1 P_2) ...) P_n, whose products all have the fine rows and grow
-	// with the passes (PERFORMANCE.md). The rounding differs from the fine side's. The P_i freed once used.
-	static SparseMatrix ChainFromCoarseSide(vector<SparseMatrix>& passP)
+	// with the passes (PERFORMANCE.md). The rounding differs from the fine side's. The P_i freed once used. The lists of
+	// matrices that grow by push_back() are deques: Eigen's SparseMatrix move constructor is not noexcept, so a vector
+	// would copy its matrices at each reallocation.
+	static SparseMatrix ChainFromCoarseSide(deque<SparseMatrix>& passP)
 	{
 		if (passP.empty())
 			return SparseMatrix();
@@ -2119,7 +2123,7 @@ private:
 		else if (!_passP.empty())
 		{
 			// P_1 (P_2 (... P_n e)): e_{i-1} = P_i e_i, from the coarse vector e_n
-			const vector<SparseMatrixOf<T>>& passP = _passP;
+			const deque<SparseMatrixOf<T>>& passP = _passP;
 			vector<VectorOf<T>>& buffers = _transferBuffers;
 			const VectorOf<T>* e = &vectorOnTheCoarserLevel;
 			for (size_t i = passP.size() - 1; i > 0; i--)
@@ -2163,7 +2167,7 @@ private:
 		else if (!_passP.empty())
 		{
 			// P_1 (P_2 (... P_n e)): e_{i-1} = P_i e_i, from the coarse vector e_n
-			const vector<SparseMatrixOf<T>>& passP = _passP;
+			const deque<SparseMatrixOf<T>>& passP = _passP;
 			vector<VectorOf<T>>& buffers = _transferBuffers;
 			const VectorOf<T>* e_i = &e;
 			for (size_t i = passP.size() - 1; i > 0; i--)
@@ -2203,7 +2207,7 @@ private:
 		else if (!_passR.empty())
 		{
 			// R_n (... (R_1 r)): r_i = R_i r_{i-1}, from the vector r_0 of this level
-			const vector<SparseMatrixOf<T>>& passR = _passR;
+			const deque<SparseMatrixOf<T>>& passR = _passR;
 			vector<VectorOf<T>>& buffers = _transferBuffers;
 			const VectorOf<T>* r = &vectorOnThisLevel;
 			for (size_t i = 0; i + 1 < passR.size(); i++)
@@ -2240,7 +2244,7 @@ public:
 			return Level::RestrictCost();
 	}
 
-	static Flops PassesCost(const vector<SparseMatrixOf<T>>& factors)
+	static Flops PassesCost(const deque<SparseMatrixOf<T>>& factors)
 	{
 		Flops cost = 0;
 		for (const SparseMatrixOf<T>& M : factors)

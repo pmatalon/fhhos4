@@ -234,6 +234,15 @@ program `-uamg-bcsr`.
   meets the tolerance (GCR: at each restart and at the tolerance), then continues if the true one does not: the
   tolerance applies to the true residual. Near the attainable accuracy the recurrence drifts; a tolerance below it runs
   `MaxIterations`, not converged.
+- Vector operations (FCG, GCR, the K-cycle, the Lanczos estimate of the Chebyshev smoothers): by blocks of 4096 rows
+  in parallel (`Parallel::RowBlocks`, more rows per block above 4M rows), each block's dot products summed with the
+  others' in the order of the blocks (`Parallel::Dot()` too): the results depend on the number of rows, not of threads;
+  on one block, Eigen's dot product of the whole vectors, bit for bit. The operations of an iteration are fused into
+  passes, each block updated then reduced while in the cache (`Parallel::SumsOverRowBlocks()`): FCG three passes (the
+  z.Ad_k; d, A d, d.Ad and r.d; x, r and |r|^2), GCR j + 3 (one per Gram-Schmidt step, each subtracting the previous
+  projection and computing the next dot product; c_j normalized with c_j.r; r and |r|^2), the K-cycle one for the
+  dot products of an iteration, one for r and |r|^2. Each coefficient goes through the same operations as one
+  operation after the other: the fused passes give the results of the separate ones bit for bit.
 
 ## Vectors of the solve
 
@@ -250,6 +259,13 @@ Each vector the solve uses is allocated at the setup by the component that uses 
 - the multigrid as the preconditioner of the Krylov method writes its A e in the caller's vector (`SolveInto()`,
   `SolverPreconditioner::ApplyAndComputeAe()`): FCG's new direction (its vectors, those of its `Truncation` + 1
   directions, and GCR's `Restart` vectors z_j and c_j, at their setup).
+
+The setup's large arrays (those of the flat passes, `CoarseningPass`, `IndexLists`, `LocalMatrices`, and the
+condensation's factors) are `UninitializedVector`s (`Parallelism.h`): `resize()` writes nothing, and a parallel loop
+writes them first (`ParallelAssign()` for those that need a value), not `vector<T>(n)`'s zero-fill by the calling
+thread. On a large problem each is fresh memory, whose page faults cost ~4.5 times more on one thread than on 8
+(`PERFORMANCE.md`). The lists of matrices that grow by `push_back()` (the prolongations of the passes) are deques:
+Eigen's `SparseMatrix` move constructor is not `noexcept`, so a vector would copy them at each reallocation.
 
 Exceptions: the coarse solver's solution (the coarsest level: small); the stand-alone solvers (`-s gs`, `-s uamg`...),
 whose stopping criteria read the residual of each iteration, keep `IterativeSolver::Solve()`'s loop (a vector per

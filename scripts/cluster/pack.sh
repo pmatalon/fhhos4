@@ -4,6 +4,7 @@
 #                             of conda/environment.yml, the versions of the local env fhhos4, GLIBC)
 #   fhhos4-src-<name>.tar.gz  the working tree (<name>: git describe), ~1 MB
 # Usage (from the repository): scripts/cluster/pack.sh [output directory, default ~/code/fhhos4-cluster]
+# NAME=<name>: instead of git describe (two variants of the same commit, e.g. before / after a change of the working tree).
 # GLIBC: the cluster's (ldd --version, default 2.34): no package of the env, nor the compiler's sysroot, needs a newer
 # one. The env is also kept here (fhhos4-cluster, the cluster's packages): reproduce a failure of the cluster in it.
 set -eu
@@ -31,7 +32,7 @@ mkdir -p "$out"
 	"$prefix/bin/conda-pack" -p "$prefix" -o "$out/fhhos4-env-$hash.tar.gz" --n-threads -1
 
 # The tracked and the new files of the working tree, under src/<name>/, with the commit and the env's hash.
-name=$(git describe --always --dirty)
+name=${NAME:-$(git describe --always --dirty)}
 tmp=$(mktemp -d)
 mkdir -p "$tmp/scripts/cluster"
 echo "$hash" > "$tmp/scripts/cluster/env-hash"

@@ -1,4 +1,6 @@
 #pragma once
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -431,49 +433,103 @@ public:
 };
 
 // The reductions of the solvers on vectors distributed by rows (each process holds the rows it owns), over the
-// processes of Communicator::Current(). On one process, those of Eigen, bit for bit (x.norm() is sqrt(x.squaredNorm())).
+// processes of Communicator::Current(). On a process, by blocks of rows in parallel (RowBlocks): the results depend on
+// the number of rows, not on the number of threads.
 namespace Parallel
 {
-	inline double Dot(const Vector& x, const Vector& y)
+	// The blocks of rows of the vector operations of the solvers: each block computed by one thread (from 20000 rows, the
+	// threshold of the other vector loops), its sums added to the others' in the order of the blocks. 4096 rows: the rows
+	// of a few vectors stay in the cache of a core, so a pass can update a block then reduce it (SumsOverRowBlocks()); more
+	// above 4M rows (at most MaxCount blocks, whose sums are on the stack). One block (at most 4096 rows): the sum of the
+	// whole rows, e.g. Eigen's x.dot(y), bit for bit.
+	struct RowBlocks
 	{
-		return Communicator::Current().Sum(x.dot(y));
+		static constexpr BigNumber MaxCount = 1024;
+		BigNumber Size;  // the rows of a block (the last one: the rest)
+		BigNumber Count;
+
+		explicit RowBlocks(BigNumber n)
+			: Size(4096 * std::max<BigNumber>(1, (n + 4096 * MaxCount - 1) / (4096 * MaxCount))), Count((n + Size - 1) / Size)
+		{}
+	};
+
+	// f(first, size) on the blocks of rows of a vector of n rows (RowBlocks), in parallel
+	template <class F>
+	void ForEachRowBlock(BigNumber n, F f)
+	{
+		RowBlocks blocks(n);
+		#pragma omp parallel for schedule(static) if (n > 20000)
+		for (BigNumber b = 0; b < blocks.Count; ++b)
+			f(b * blocks.Size, std::min(blocks.Size, n - b * blocks.Size));
 	}
 
-	inline double SquaredNorm(const Vector& x)
+	// The K sums of blockSums(first, size) (an std::array<double, K>: those of the rows [first, first + size), which it may
+	// also update) over the blocks of rows of a vector of n rows, in the order of the blocks (RowBlocks); on this process
+	template <int K, class BlockSums>
+	std::array<double, K> SumsOverRowBlocks(BigNumber n, BlockSums blockSums)
 	{
-		return Communicator::Current().Sum(x.squaredNorm());
+		RowBlocks blocks(n);
+		std::array<double, K> partial[RowBlocks::MaxCount];
+		ForEachRowBlock(n, [&](BigNumber first, BigNumber size) { partial[first / blocks.Size] = blockSums(first, size); });
+		std::array<double, K> sums{};
+		for (BigNumber b = 0; b < blocks.Count; ++b)
+			for (int k = 0; k < K; ++k)
+				sums[k] += partial[b][k];
+		return sums;
 	}
 
-	inline double Norm(const Vector& x)
+	// The parts of Dot() and SquaredNorm() on a block of rows [first, first + size): Eigen's; in single precision (the
+	// cycle of U-AMG in single precision), Eigen's products of sub-blocks of 1024 coefficients, summed in double
+	inline double DotOfRows(const Vector& x, const Vector& y, BigNumber first, BigNumber size)
 	{
-		const Communicator& comm = Communicator::Current();
-		if (!comm.IsDistributed())
-			return x.norm();
-		return std::sqrt(comm.Sum(x.squaredNorm()));
+		return x.segment(first, size).dot(y.segment(first, size));
 	}
 
-	// The same for vectors in single precision (the cycle of U-AMG in single precision): Eigen's products of blocks of
-	// 1024 coefficients, summed in double
-	inline double Dot(const FloatVector& x, const FloatVector& y)
+	inline double DotOfRows(const FloatVector& x, const FloatVector& y, BigNumber first, BigNumber size)
 	{
 		double dot = 0;
-		for (BigNumber i = 0; i < x.rows(); i += 1024)
+		for (BigNumber i = first; i < first + size; i += 1024)
 		{
-			BigNumber m = std::min<BigNumber>(1024, x.rows() - i);
+			BigNumber m = std::min<BigNumber>(1024, first + size - i);
 			dot += x.segment(i, m).dot(y.segment(i, m));
 		}
-		return Communicator::Current().Sum(dot);
+		return dot;
 	}
 
-	inline double SquaredNorm(const FloatVector& x)
+	inline double SquaredNormOfRows(const Vector& x, BigNumber first, BigNumber size)
 	{
-		return Dot(x, x);
+		return x.segment(first, size).squaredNorm();
 	}
 
-	inline double Norm(const FloatVector& x)
+	inline double SquaredNormOfRows(const FloatVector& x, BigNumber first, BigNumber size)
 	{
-		return std::sqrt(SquaredNorm(x));
+		return DotOfRows(x, x, first, size);
 	}
+
+	template <class V>
+	double DotOf(const V& x, const V& y)
+	{
+		return Communicator::Current().Sum(SumsOverRowBlocks<1>(x.rows(), [&](BigNumber i, BigNumber m)
+		{
+			return std::array<double, 1>{ DotOfRows(x, y, i, m) };
+		})[0]);
+	}
+
+	template <class V>
+	double SquaredNormOf(const V& x)
+	{
+		return Communicator::Current().Sum(SumsOverRowBlocks<1>(x.rows(), [&](BigNumber i, BigNumber m)
+		{
+			return std::array<double, 1>{ SquaredNormOfRows(x, i, m) };
+		})[0]);
+	}
+
+	inline double Dot(const Vector& x, const Vector& y)       { return DotOf(x, y); }
+	inline double Dot(const FloatVector& x, const FloatVector& y) { return DotOf(x, y); }
+	inline double SquaredNorm(const Vector& x)                { return SquaredNormOf(x); }
+	inline double SquaredNorm(const FloatVector& x)           { return SquaredNormOf(x); }
+	inline double Norm(const Vector& x)                       { return std::sqrt(SquaredNormOf(x)); }
+	inline double Norm(const FloatVector& x)                  { return std::sqrt(SquaredNormOf(x)); }
 
 	// The global number of rows of a vector distributed by rows
 	inline GlobalNumber Rows(const Vector& x)

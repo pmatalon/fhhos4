@@ -821,39 +821,60 @@ private:
 		double t = 0.25;
 		bool gcr = this->KCycleKrylov == KrylovMethod::GCR;
 		Level::CycleVectors<T>& vectors = level->template CycleVectorsOf<T>();
+		// The vector operations by blocks of rows in parallel, the reductions of a pass fused (see FlexibleConjugateGradient)
+		const Communicator& comm = Communicator::Current();
+		BigNumber n = r.rows();
+		auto setZero = [](VectorOf<T>& y, BigNumber rows)
+		{
+			y.resize(rows);
+			Parallel::ForEachRowBlock(rows, [&](BigNumber i, BigNumber m) { y.segment(i, m).setZero(); });
+		};
 
 		// Apply multigrid preconditioner: c = Prec(r)
 		VectorOf<T>& c = vectors.KrylovC;
-		c.setZero(r.rows());
+		setZero(c, n);
 		bool cEquals0 = true;
 		IterationResult precResult1;
 		VectorOf<T>& v = vectors.KrylovV; // v = A*c
 		CycleIn<T>(level, r, c, cEquals0, nullptr, &v, precResult1);             result.AddWorkInMFlops(precResult1.SolvingComputationalWork());
 
-		// 1st iteration
+		// 1st iteration (and the norm of r, not needed with one iteration)
 		//Vector v = A * c;                                                         result.AddWorkInFlops(Cost::MatVec(A));
-		double rho1 = gcr ? Parallel::SquaredNorm(v) : Parallel::Dot(c, v);       result.AddWorkInFlops(Cost::Dot(c));
-		double alpha1 = gcr ? Parallel::Dot(v, r) : Parallel::Dot(c, r);          result.AddWorkInFlops(Cost::Dot(c));
-
-		// One iteration decided at the setup (KCycleMinimumOperatorReduction): no residual to compare
-		if (level->OneKCycleIteration)
+		bool one = level->OneKCycleIteration; // decided at the setup (KCycleMinimumOperatorReduction): no residual to compare
+		array<double, 3> sums1 = Parallel::SumsOverRowBlocks<3>(n, [&](BigNumber i, BigNumber m)
 		{
-			x = T(alpha1 / rho1) * c;                                             result.AddWorkInFlops(Cost::ConstantVec(x));
+			return array<double, 3>{ gcr ? Parallel::SquaredNormOfRows(v, i, m) : Parallel::DotOfRows(c, v, i, m),
+			                         gcr ? Parallel::DotOfRows(v, r, i, m) : Parallel::DotOfRows(c, r, i, m),
+			                         one ? 0.0 : Parallel::SquaredNormOfRows(r, i, m) };
+		});
+		double rho1 = comm.Sum(sums1[0]);                                         result.AddWorkInFlops(Cost::Dot(c));
+		double alpha1 = comm.Sum(sums1[1]);                                       result.AddWorkInFlops(Cost::Dot(c));
+		auto scaledC = [&](T a) { Parallel::ForEachRowBlock(n, [&](BigNumber i, BigNumber m) { x.segment(i, m) = a * c.segment(i, m); }); };
+
+		if (one)
+		{
+			x.resize(n);
+			scaledC(T(alpha1 / rho1));                                            result.AddWorkInFlops(Cost::ConstantVec(x));
 			return;
 		}
 
-		double r_norm_old = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
-		r -= T(alpha1 / rho1) * v;                                                result.AddWorkInFlops(Cost::VectorDAXPY(r));
-		double r_norm_new = Parallel::Norm(r);                                    result.AddWorkInFlops(Cost::Norm(r));
+		double r_norm_old = std::sqrt(comm.Sum(sums1[2]));                        result.AddWorkInFlops(Cost::Norm(r));
+		T a1 = T(alpha1 / rho1);
+		double r_norm_new = std::sqrt(comm.Sum(Parallel::SumsOverRowBlocks<1>(n, [&](BigNumber i, BigNumber m)
+		{
+			r.segment(i, m) -= a1 * v.segment(i, m);
+			return array<double, 1>{ Parallel::SquaredNormOfRows(r, i, m) };
+		})[0]));                                                                  result.AddWorkInFlops(Cost::VectorDAXPY(r) + Cost::Norm(r));
+		x.resize(n);
 		if (r_norm_new <= t * r_norm_old)
 		{
-			x = T(alpha1 / rho1) * c;                                             result.AddWorkInFlops(Cost::ConstantVec(x));
+			scaledC(T(alpha1 / rho1));                                            result.AddWorkInFlops(Cost::ConstantVec(x));
 		}
 		else
 		{
 			// Apply multigrid preconditioner: d = Prec(r)
 			VectorOf<T>& d = vectors.KrylovD;
-			d.setZero(r.rows());
+			setZero(d, n);
 			bool dEquals0 = true;
 			IterationResult precResult2;
 			VectorOf<T>& w = vectors.KrylovW; // w = A*d
@@ -861,11 +882,20 @@ private:
 
 			// 2nd iteration
 			//Vector w = A * d;                                                     result.AddWorkInFlops(Cost::MatVec(A));
-			double gamma = gcr ? Parallel::Dot(w, v) : Parallel::Dot(d, v);       result.AddWorkInFlops(Cost::Dot(d));
-			double beta = gcr ? Parallel::SquaredNorm(w) : Parallel::Dot(d, w);   result.AddWorkInFlops(Cost::Dot(d));
-			double alpha2 = gcr ? Parallel::Dot(w, r) : Parallel::Dot(d, r);      result.AddWorkInFlops(Cost::Dot(d));
+			array<double, 3> sums2 = Parallel::SumsOverRowBlocks<3>(n, [&](BigNumber i, BigNumber m)
+			{
+				return array<double, 3>{ gcr ? Parallel::DotOfRows(w, v, i, m) : Parallel::DotOfRows(d, v, i, m),
+				                         gcr ? Parallel::SquaredNormOfRows(w, i, m) : Parallel::DotOfRows(d, w, i, m),
+				                         gcr ? Parallel::DotOfRows(w, r, i, m) : Parallel::DotOfRows(d, r, i, m) };
+			});
+			double gamma = comm.Sum(sums2[0]);                                    result.AddWorkInFlops(Cost::Dot(d));
+			double beta = comm.Sum(sums2[1]);                                     result.AddWorkInFlops(Cost::Dot(d));
+			double alpha2 = comm.Sum(sums2[2]);                                   result.AddWorkInFlops(Cost::Dot(d));
 			double rho2 = beta - gamma * gamma / rho1;
-			x = T(alpha1/rho1 - gamma*alpha2/(rho1*rho2))*c + T(alpha2 / rho2) * d; result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
+			T coeffC = T(alpha1/rho1 - gamma*alpha2/(rho1*rho2));
+			T coeffD = T(alpha2 / rho2);
+			Parallel::ForEachRowBlock(n, [&](BigNumber i, BigNumber m) { x.segment(i, m) = coeffC * c.segment(i, m) + coeffD * d.segment(i, m); });
+			                                                                      result.AddWorkInFlops(2*Cost::ConstantVec(x) + Cost::AddVec(x));
 		}
 	}
 
