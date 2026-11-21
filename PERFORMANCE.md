@@ -92,6 +92,8 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
 - **On a cluster without internet (PBS)**: `scripts/cluster/pack.sh` makes the conda env (conda-pack, for the cluster's
   glibc) and the sources to copy there; `scripts/cluster/run.pbs`, submitted from the sources, builds, runs `ctest`
   and the scaling runs on one node, and writes the tarball of the logs to bring back (the comments of both scripts).
+  Plots: `scripts/perf/plot_scaling.py <output dir> [<label>=]<results dir>...` (matplotlib): strong scaling per case
+  and weak scaling, setup and solve apart, several runs overlaid (the last in solid lines).
 - **Memory per process**: `scripts/perf/Mem.h` (`MemPoint("label")` at the steps to measure: the resident memory and its
   peak since the previous point, per process, on stderr; temporary instrumentation, never committed). Run the cases
   sequentially, under a watchdog on the sum of the processes' resident memory.
