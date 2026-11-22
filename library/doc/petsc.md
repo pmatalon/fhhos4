@@ -29,7 +29,7 @@ The preconditioner for PETSc comes with version 1.6, not released yet: until the
 git clone --depth 1 https://github.com/pmatalon/fhhos4.git
 cd fhhos4
 export PKG_CONFIG_PATH=$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH   # where PETSc.pc is
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PETSC_PC=ON -DENABLE_MPI=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_PETSC_PC=ON -DENABLE_MPI=ON
 cmake --build build
 cmake --install build --prefix <prefix>    # lib/libfhhos4_petsc.so, lib/libfhhos4.so, include/fhhos4_petsc.h
 ```

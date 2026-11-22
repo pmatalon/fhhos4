@@ -24,7 +24,7 @@ The module is built with the library, and used from the build tree (it is not in
 git clone https://github.com/pmatalon/fhhos4.git
 cd fhhos4
 git checkout $(git describe --tags --abbrev=0)    # the latest release
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PYTHON=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_PYTHON=ON
 cmake --build build
 ctest --test-dir build                 # its tests (they need SciPy)
 export PYTHONPATH=$PWD/build/python    # the module fhhos4

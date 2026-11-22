@@ -31,7 +31,7 @@ For distributed memory, you'll also need
 git clone https://github.com/pmatalon/fhhos4.git
 cd fhhos4
 git checkout $(git describe --tags --abbrev=0)    # the latest release
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 cmake --install build --prefix <prefix>    # lib/, include/ and the CMake package
 ```
