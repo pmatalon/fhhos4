@@ -19,8 +19,23 @@ uncondensed system.
 
 ## Installation
 
-Build it with `-DENABLE_PETSC_PC=ON`, against the PETSc of your code (real scalars in double
-precision; with MPI, `-DENABLE_MPI=ON` and the same MPI).
+You'll need what the [C++ library](cpp.md#install-from-source) needs for distributed memory (MPI and MUMPS), and the
+PETSc of your code (real scalars in double precision), built with the same MPI and found by `pkg-config` (its
+`PETSc.pc`).
+
+The preconditioner for PETSc comes with version 1.6, not released yet: until then, build it from `master`:
+
+```bash
+git clone --depth 1 https://github.com/pmatalon/fhhos4.git
+cd fhhos4
+export PKG_CONFIG_PATH=$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH   # where PETSc.pc is
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PETSC_PC=ON -DENABLE_MPI=ON
+cmake --build build
+cmake --install build --prefix <prefix>    # lib/libfhhos4_petsc.so, lib/libfhhos4.so, include/fhhos4_petsc.h
+```
+
+Without installing, the preconditioner is `build/lib/libfhhos4_petsc.so`. With a PETSc built without MPI: no
+`-DENABLE_MPI=ON` (nor MUMPS). The other build options: see [C++](cpp.md#install-from-source).
 
 ### Loading it
 

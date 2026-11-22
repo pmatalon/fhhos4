@@ -28,16 +28,19 @@ For distributed memory, you'll also need
 - [MUMPS](https://mumps-solver.org)  (e.g. conda-forge's `mumps-mpi`)
 
 ```bash
-git clone --branch v1.5.0 --depth 1 https://github.com/pmatalon/fhhos4.git
+git clone https://github.com/pmatalon/fhhos4.git
 cd fhhos4
+git checkout $(git describe --tags --abbrev=0)    # the latest release
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 cmake --install build --prefix <prefix>    # lib/, include/ and the CMake package
 ```
 
-`v1.5.0` is the latest release. Between releases, these pages on `master` describe the development version; the release's is [README_library.md at v1.5.0](https://github.com/pmatalon/fhhos4/blob/v1.5.0/README_library.md).
+Between releases, these pages describe the development version (`master`); those of the release are in its clone, or
+on GitHub from [the latest release](https://github.com/pmatalon/fhhos4/releases/latest).
 
-To update to a later release `vX.Y.Z`, run `git fetch --tags && git checkout vX.Y.Z` in the clone, then build and install again. `git pull` does nothing in this clone: it follows the tag only.
+To update to a later release: `git fetch && git checkout $(git describe --tags --abbrev=0 origin/master)` in the clone,
+then build and install again.
 
 Without installing, the library is `build/lib/libfhhos4.so`.
 
@@ -46,7 +49,7 @@ Build options (`cmake -D<OPTION>=<value>`):
 | Option | Default | Effect |
 |---|---|---|
 | `ENABLE_OPENMP` | `ON` | Parallel (OpenMP) |
-| `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](mpi.md). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py |
+| `ENABLE_MPI` | `OFF` | The solver on several processes, see [Several processes](mpi.md). Needs MPI and the MPI version of [MUMPS](https://mumps-solver.org); your code is then compiled and linked with MPI too, and the Python module needs mpi4py. In 1.5.0 and before, also `-DENABLE_TESTS=OFF`, unless GoogleTest is installed |
 | `ENABLE_PYTHON` | `OFF` | The Python module, see [Python](python.md) |
 | `ENABLE_PETSC_PC` | `OFF` | The preconditioner for PETSc, `libfhhos4_petsc`, see [With PETSc](petsc.md). Needs PETSc (found by `pkg-config`) |
 | `ENABLE_MUMPS` | `OFF` | The coarse solver `CoarseSolver::MUMPS` on one process; always on with `ENABLE_MPI`. Without MPI, needs MUMPS's sequential version, e.g. conda-forge's `mumps-seq` |

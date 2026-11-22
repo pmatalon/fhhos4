@@ -191,8 +191,8 @@ compiled into it: moving into PETSc, `src/ksp/pc/impls`, means installing this h
   with the mesh and its distribution, shared with `examples/fhhos4_solver.cpp`) equals the Python one to rounding.
 - Environment: conda env `fhhos4-petsc` (the stack of `fhhos4-python`, `docs/python.md`, with PETSc and petsc4py,
   pkg-config and GTest), build directory `build-python-petsc` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON -DENABLE_MPI=ON
-  -DENABLE_PETSC_PC=ON`). On WSL, a Windows `pkg-config` on the PATH may be cached before the env's is installed:
-  `cmake -UPKG_CONFIG_EXECUTABLE .`
+  -DENABLE_PETSC_PC=ON -DENABLE_TESTS=ON`). On WSL, a Windows `pkg-config` on the PATH may be cached before the env's is
+  installed: `cmake -UPKG_CONFIG_EXECUTABLE .`
 
 ## Threads, architecture, Eigen
 

@@ -111,7 +111,7 @@ step_machine() {
 }
 step_build() {
 	cmake -S "$SRC" -B "$BUILD_TREE" -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON -DENABLE_MPI=ON \
-		-DMAX_COMPILE_JOBS=$BUILD_JOBS && cmake --build "$BUILD_TREE" && "$BUILD_TREE/bin/fhhos4" -h | grep "^Version:"
+		-DENABLE_TESTS=ON -DMAX_COMPILE_JOBS=$BUILD_JOBS && cmake --build "$BUILD_TREE" && "$BUILD_TREE/bin/fhhos4" -h | grep "^Version:"
 }
 # An MPI run on all the cores; if it fails, MPICH's OFI over TCP (MPICH uses shared memory within the node anyway).
 step_mpi() {

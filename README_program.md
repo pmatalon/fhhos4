@@ -74,10 +74,10 @@ Build options (`cmake -D<OPTION>=ON|OFF ..`):
 | `ENABLE_2D`, `ENABLE_3D` | ON | Dimensions to compile (`ENABLE_1D`: OFF) |
 | `ENABLE_DG` | OFF | DG programs (`-discr dg`) |
 | `ENABLE_FEM` | OFF | FEM programs (`-discr fem`) |
-| `ENABLE_TESTS` | ON | Test suite (`fhhos4_tests`, run with `ctest`). Turning it off saves little time with Ninja, more with Make. |
+| `ENABLE_TESTS` | OFF | The tests (`fhhos4_tests` and others, run with `ctest` in the build directory; needs GoogleTest) |
 | `ENABLE_GMSH` | ON | GMSH interface |
 | `ENABLE_CGAL` | ON | Polygonal meshes (2D only) |
-| `ENABLE_PROGRAM` | OFF | The program `fhhos4` and its tests: set it ON. OFF (the default, for the users of the library): the library alone, which only needs Eigen |
+| `ENABLE_PROGRAM` | OFF | The program `fhhos4`: set it ON. OFF (the default, for the users of the library): the library alone, which only needs Eigen |
 | `ENABLE_AGMG` | OFF | AGMG solver (`-s agmg`, see below) |
 | `ENABLE_OPENMP` | ON | Shared-memory parallelism |
 | `ENABLE_NATIVE_ARCH` | OFF | `-march=native`: optimized for the CPU of the build machine, may not run on others |

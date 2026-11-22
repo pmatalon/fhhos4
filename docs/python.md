@@ -51,7 +51,8 @@ raised on all, a lower triangular `A_FF` refused). Not collective: the type erro
   mpi4py 4.1.2 and MUMPS 5.8.2, installed as in `docs/mpi.md`; NGSolve from pip, not on conda-forge), not the `fhhos4`
   env.
 - `build-python` (`-DENABLE_PROGRAM=OFF -DENABLE_PYTHON=ON`, ~1 min); `build-python-mpi` (the same with
-  `-DENABLE_MPI=ON -DENABLE_TESTS=OFF`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env `fhhos4`).
+  `-DENABLE_MPI=ON`, without `ENABLE_TESTS`: no GTest in that env; the GTest MPI tests run in `build-mpi-lib`, env
+  `fhhos4`).
 - With PETSc and petsc4py: env `fhhos4-petsc`, build directory `build-python-petsc` (`docs/library.md`, the
   preconditioner for PETSc).
 - For NGSolve on several processes: env `fhhos4-python-openmpi` (the same with openmpi 5.0.11 instead of mpich, and

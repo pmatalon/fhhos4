@@ -13,16 +13,26 @@ The Python module `fhhos4` has the classes, functions, parameters and enums of t
 
 ## Installation
 
-It needs Python (>= 3.9),
-[nanobind](https://nanobind.readthedocs.io) and NumPy (SciPy is optional), and is built with the library (not installed
-yet: use it from the build tree):
+You'll need what the [C++ library](cpp.md#install-from-source) needs, and
+- Python (>= 3.9),
+- [nanobind](https://nanobind.readthedocs.io),
+- NumPy (and SciPy for the tests).
+
+The module is built with the library, and used from the build tree (it is not installed yet):
 
 ```bash
+git clone https://github.com/pmatalon/fhhos4.git
+cd fhhos4
+git checkout $(git describe --tags --abbrev=0)    # the latest release
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PYTHON=ON
 cmake --build build
-export PYTHONPATH=$PWD/build/python    # the module fhhos4
 ctest --test-dir build                 # its tests (they need SciPy)
+export PYTHONPATH=$PWD/build/python    # the module fhhos4
 ```
+
+On several processes (MPI): add `-DENABLE_MPI=ON` (and, in 1.5.0 and before, `-DENABLE_TESTS=OFF`); you'll also need
+MPI, the MPI version of [MUMPS](https://mumps-solver.org) and [mpi4py](https://mpi4py.readthedocs.io). The release, its
+updates and the other build options: see [C++](cpp.md#install-from-source).
 
 ## How to use
 

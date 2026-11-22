@@ -5,9 +5,11 @@ Read before a release or a change of the conda recipe, the release workflow or t
 
 ## Release
 
-Change the version in `project()` and the release in "Install from source" of `library/doc/cpp.md` (the clone command,
-the text and the link below it), commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are
-`Release_X.Y.Z`). `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the
+Change the version in `project()`, commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are
+`Release_X.Y.Z`). The installations of `library/doc/` check out the latest tag (`git describe`): nothing to change
+there, except at 1.6, the first release with the preconditioner for PETSc: `petsc.md` (which clones `master` until
+then) then checks out the latest tag as `cpp.md` does, and its sentence about 1.6 is removed.
+`.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the
 installation and the library alone with 64-bit indices (`ENABLE_64BIT_INDEX=ON`) and the conda test client, the library
 with MPI (`ENABLE_MPI`) and its tests on 1-4 processes (`MPI_np*`), and in parallel jobs the conda package with its
 tests and the library alone on macOS (`library-macos`: both index types, each with the conda test client), then
@@ -47,8 +49,9 @@ feedstock too.
 
 The library alone too, in Spack's builtin repository (`spack/spack-packages`,
 `repos/spack_repo/builtin/packages/fhhos4/package.py`; PRs 7139, 7517), not in this repository. `CMakePackage`,
-`ENABLE_PROGRAM=OFF`, `ENABLE_NATIVE_ARCH=OFF` (Spack sets the target's flags), `ENABLE_TESTS=OFF` (with MPI they
-need GoogleTest), `eigen@3.4:`. Variants: `openmp` (default on); from 1.5.0 (64-bit indices do not compile in 1.4.0)
+`ENABLE_PROGRAM=OFF`, `ENABLE_NATIVE_ARCH=OFF` (Spack sets the target's flags), `ENABLE_TESTS=OFF` (the default from
+1.6; up to 1.5.0, with MPI, the tests need GoogleTest), `eigen@3.4:`. Variants: `openmp` (default on); from 1.5.0
+(64-bit indices do not compile in 1.4.0)
 `int64` (`ENABLE_64BIT_INDEX`), `mpi` (default on: `mpi`, `mumps+double+mpi`) and `mumps`, defined twice: always on
 with `+mpi` (`conflicts("~mumps", when="+mpi")`), default off with `~mpi` (`mumps+double~mpi`). Its stand-alone test (`spack test run fhhos4`) builds and runs the conda test client
 `conda/recipe/test`, cached from the sources: moving it changes the package too (per version).

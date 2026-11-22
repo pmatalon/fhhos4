@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # program options
-option(ENABLE_PROGRAM "Build the program fhhos4 and its tests. OFF (default, for the users of the library): the library alone, which only needs Eigen" OFF)
+option(ENABLE_PROGRAM "Build the program fhhos4 (its tests: ENABLE_TESTS). OFF (default, for the users of the library): the library alone, which only needs Eigen" OFF)
 option(ENABLE_GMSH "Build with the GMSH interface" ON)
 option(ENABLE_AGMG "Build with AGMG" OFF)
 option(ENABLE_CGAL "Build with CGAL" ON)
@@ -25,7 +25,7 @@ option(ENABLE_2D "Enable 2D" ON)
 option(ENABLE_3D "Enable 3D" ON)
 option(ENABLE_DG "Build the DG programs (-discr dg)" OFF)
 option(ENABLE_FEM "Build the FEM programs (-discr fem)" OFF)
-option(ENABLE_TESTS "Build the test suite (fhhos4_tests). Turn off to save its compilation time during development." ON)
+option(ENABLE_TESTS "Build the tests run by ctest (fhhos4_tests with the program, the MPI and PETSc tests, the example): needs GoogleTest, except for the example" OFF)
 option(ENABLE_OPENMP "Use OpenMP for the parallel loops (and Eigen's internal parallelism)" ON)
 option(ENABLE_NATIVE_ARCH "Optimize for the CPU of the build machine (-march=native: AVX2, FMA...). The binary may not run on other CPUs." OFF)
 option(ENABLE_PYTHON "Build the Python module of the library (fhhos4, with nanobind) and its tests" OFF)
@@ -313,7 +313,7 @@ endif()
 # Program fhhos4 and its tests
 #----------------------------------------------------------------------------------------------------------------------
 if(NOT ENABLE_PROGRAM)
-	message(STATUS "ENABLE_PROGRAM: OFF (the library alone; -DENABLE_PROGRAM=ON: the program and its tests)")
+	message(STATUS "ENABLE_PROGRAM: OFF (the library alone; -DENABLE_PROGRAM=ON: the program)")
 	return()
 endif()
 

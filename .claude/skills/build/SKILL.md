@@ -55,9 +55,9 @@ available, and kills the compilation below 1 GB.
 | `build-python-petsc` | the preconditioner for PETSc | `docs/library.md` |
 
 - **Debug while iterating** on light translation units: `build-debug` (env `fhhos4`, `-DCMAKE_BUILD_TYPE=Debug
-  -DENABLE_PROGRAM=ON`, create it when needed), one object at a time (`ninja -C build-debug -t targets all | grep
-  <File>.cpp.o` names the target). A change to a header that `Program.cpp` includes compiles in the Release `build`
-  directly: its Debug compilation exceeds the memory.
+  -DENABLE_PROGRAM=ON -DENABLE_TESTS=ON`, create it when needed), one object at a time (`ninja -C build-debug -t targets
+  all | grep <File>.cpp.o` names the target). A change to a header that `Program.cpp` includes compiles in the Release
+  `build` directly: its Debug compilation exceeds the memory.
 - **Release** for timings, the iteration-count tests and the final validation.
 - **Every tree compiles the library**: after a change to `library/`, to the solver code it shares, or to
   `CMakeLists.txt`, the other directories are stale. Rebuild those the change concerns before saying it works there,
