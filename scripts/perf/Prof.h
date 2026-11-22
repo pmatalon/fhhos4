@@ -62,6 +62,9 @@ inline void ProfAdd(const std::string& name, ProfStartPoint start)
 
 inline void ProfPrint()
 {
+	// On several processes (MPICH's PMI_RANK), rank 0's alone: the tables of all would interleave in the output
+	if (const char* rank = std::getenv("PMI_RANK"); rank && std::string(rank) != "0")
+		return;
 	int nLevels = 0;
 	std::vector<std::pair<std::string, double>> totals;
 	for (auto& [name, perLevel] : ProfRegistry())

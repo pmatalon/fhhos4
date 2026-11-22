@@ -4,17 +4,20 @@
 #PBS -l place=excl
 #PBS -l walltime=04:00:00
 #PBS -j oe
-# fhhos4 on one node of a cluster without internet: unpacks the env, builds, runs ctest, then measures U-AMG through the
-# library: strong and weak scaling, the cores on one socket or two, -march=native. Writes
-# <base>/results/<name>-<job>.tar.gz (the logs, a few MB, updated after each step: bring it back). Deletes nothing: the
+# fhhos4 on a node of a cluster without internet: unpacks the env, builds, runs ctest, then measures U-AMG through the
+# library: strong and weak scaling, the threads bound to their cores, the cores on one socket or two, -march=native, the
+# node's memory bandwidth; on several nodes (select=<nodes>:..., place=scatter), MPI across them. Writes the logs in
+# <base>/results/<name>-<job>/ (a few MB; scripts/cluster/collect.sh archives them to bring back). Deletes nothing: the
 # env, the builds and the meshes stay in <base> for the next jobs (each step reuses what is there).
 #
 # <base>: a directory visible from the compute nodes, holding the two files of scripts/cluster/pack.sh:
 #   cd <base> && tar xzf fhhos4-src-<name>.tar.gz && cd src/<name> && qsub scripts/cluster/run.pbs
 # <base> then holds envs/fhhos4-<hash> (by hand: source <base>/envs/fhhos4-<hash>/bin/activate), src/<name>,
 # build/<name> (bin/fhhos4), cache/ (the meshes and their partitions) and results/.
-# STEPS: the steps after env (default: all, below). QUICK=1: small cases on at most 4 cores (a test without PBS:
-# QUICK=1 bash scripts/cluster/run.pbs). One node only: mpiexec launches by fork.
+# STEPS: the steps after env (default: all, below). OTHERS: the names of other source trees in <base>/src, unpacked
+# there too: each step runs on this tree, then on each of them, in the same job (the same node: versions compared on
+# equal terms; their results in results/<other>-<job>). QUICK=1: small cases on at most 4 cores (a test without PBS:
+# QUICK=1 bash scripts/cluster/run.pbs). On one node, mpiexec launches by fork; on several, as MPICH finds (PBS_NODEFILE).
 set -u
 cd "${PBS_O_WORKDIR:-.}" || exit 1
 SRC=$(pwd -P)
@@ -29,7 +32,8 @@ OUT=$BASE/results/$NAME-$JOB
 mkdir -p "$OUT"
 export XDG_CACHE_HOME=$BASE/cache
 export BLIS_NUM_THREADS=1
-export HYDRA_LAUNCHER=fork
+NODES=$(sort -u "${PBS_NODEFILE:-/dev/null}" | wc -l)
+[ "$NODES" -gt 1 ] || export HYDRA_LAUNCHER=fork
 
 QUICK=${QUICK:-0}
 SOLVER="-s fcglibuamg"
@@ -76,7 +80,8 @@ configs() {
 	for ((p = 2; p < $1; p *= 2)); do list+=($p,$(($1 / p))); done
 	echo "${list[@]}"
 }
-# scale <directory in the results> <CPUs> <configs> <fhhos4 arguments...>, in $BIN_DIR (default: the build).
+# scale <directory in the results> <CPUs, or "": -bind-to core> <configs> <fhhos4 arguments...>, in $BIN_DIR (default:
+# the build).
 scale() {
 	local dir=$OUT/$1 cpus=$2 list=$3
 	shift 3
@@ -102,6 +107,7 @@ step_machine() {
 	echo "== os"; uname -a; cat /etc/os-release; ldd --version | head -1; ulimit -a
 	echo "== load (other jobs on the node are noise)"; uptime; top -bn1 | head -25
 	echo "== env"; gcc --version | head -1; cmake --version | head -1; mpichversion | head -4
+	echo "== profiling tools"; command -v numactl perf likwid-perfctr; cat /proc/sys/kernel/perf_event_paranoid
 }
 step_build() {
 	cmake -S "$SRC" -B "$BUILD_TREE" -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_PROGRAM=ON -DENABLE_MPI=ON \
@@ -137,12 +143,55 @@ step_large() {
 	list=$(configs $MAX | tr ' ' '\n' | grep -v -x -E '1,1|1,2|2,1' | xargs)
 	for case in "${LARGE[@]}"; do scale large/$(tag $case) "$COMPACT" "$list" $CUBE $case; done
 }
+# The threads bound to their cores (elsewhere, each process is bound to its cores but its threads move among them): the
+# pages first written by a thread stay on its NUMA node. On the configurations with threads; the k=2 case of large on
+# three (the program's assembly takes most of its time). The logs show where each thread runs (OMP_DISPLAY_AFFINITY).
+step_bind() {
+	local case list
+	list=$(configs $MAX | tr ' ' '\n' | grep -v -x -E '[0-9]+,1' | xargs)
+	export OMP_PLACES=cores OMP_PROC_BIND=close OMP_DISPLAY_AFFINITY=true
+	for case in "${STRONG[@]}" "${LARGE[0]}"; do scale bind/$(tag $case) "$COMPACT" "$list" $CUBE $case; done
+	for case in "${LARGE[@]:1}"; do scale bind/$(tag $case) "$COMPACT" "1,8 1,$MAX $((MAX / 8)),8" $CUBE $case; done
+	unset OMP_PLACES OMP_PROC_BIND OMP_DISPLAY_AFFINITY
+}
+# The bandwidth of the job's cores (scripts/perf/memory_bandwidth.cpp): the threads bound or not, the pages placed by
+# all the threads or by one.
+step_memory() {
+	local binary=$BUILD_TREE/memory_bandwidth placement cpus
+	cpus=$(echo $COMPACT | tr ' ' ,)
+	mkdir -p "$BUILD_TREE" && ${CXX:-g++} ${CXXFLAGS:-} -O3 -fopenmp "$SRC/scripts/perf/memory_bandwidth.cpp" -o "$binary" ${LDFLAGS:-} ||
+		return 1
+	for placement in parallel serial; do
+		OMP_NUM_THREADS=$MAX taskset -c $cpus "$binary" $placement
+		OMP_NUM_THREADS=$MAX OMP_PLACES=cores OMP_PROC_BIND=close taskset -c $cpus "$binary" $placement
+	done
+}
 # The same cores on two sockets (half each) instead of one: memory bandwidth and NUMA.
 step_sockets() {
 	[ -n "$SPREAD" ] || { echo "skipped: the job's cores are not on two NUMA nodes with $((MAX / 2)) each"; return 0; }
 	local case
 	for case in "${STRONG[@]}" "${LARGE[@]}"; do
 		scale sockets/$(tag $case) "$SPREAD" "1,$MAX 2,$((MAX / 2)) $MAX,1" $CUBE $case
+	done
+}
+# Several nodes: the nodes and their network, MPI across them (MPICH's choice of provider, then OFI over TCP if it
+# fails), then the cases of large and of weak on one node against all of them, one process per core (-bind-to core).
+step_nodes() {
+	[ "$NODES" -gt 1 ] || { echo "skipped: one node"; return 0; }
+	local total=$((NODES * MAX)) case p n
+	echo "== nodes"; sort "$PBS_NODEFILE" | uniq -c
+	echo "== network"; ip -br addr; ls /sys/class/infiniband 2>/dev/null; command -v fi_info && fi_info -l
+	echo "== one process per node"
+	mpiexec -n $NODES -ppn 1 bash -c 'echo $(hostname): $(grep Cpus_allowed_list /proc/self/status), $(nproc) CPUs'
+	if ! (cd "$BUILD_TREE" && MPIR_CVAR_DEBUG_SUMMARY=1 timeout 600 mpiexec -n $total ./bin/fhhos4 $CUBE -k 0 -n 8 $SOLVER); then
+		echo "== again with OFI over TCP"
+		export MPIR_CVAR_CH4_NETMOD=ofi FI_PROVIDER=tcp
+		(cd "$BUILD_TREE" && timeout 600 mpiexec -n $total ./bin/fhhos4 $CUBE -k 0 -n 8 $SOLVER) || return 1
+	fi
+	for case in "${LARGE[@]}"; do scale nodes/$(tag $case) "" "$MAX,1 $total,1" $CUBE $case; done
+	for p in $MAX $total; do
+		n=$(awk -v n0=$WEAK_N0 -v p=$p 'BEGIN { printf "%d", n0 * p^(1/3) + 0.5 }')
+		scale nodes/weak_p${p}_n$n "" "$p,1" $CUBE -k 1 -n $n
 	done
 }
 step_native() {
@@ -159,19 +208,20 @@ run() {
 	"step_$1" > "$OUT/$1.log" 2>&1
 	status=$?
 	echo "$(date +%H:%M:%S) $1: exit $status, $((SECONDS - start)) s" | tee -a "$OUT/steps.txt"
-	tar czf "$OUT.tar.gz" -C "$BASE/results" "$NAME-$JOB"
 	return $status
 }
 run env || exit 1
 set +u  # the activation scripts of the env read unset variables
 source "$ENV_DIR/bin/activate"
 set -u
-for step in ${STEPS:-machine build mpi ctest strong weak large sockets native}; do
+for step in ${STEPS:-machine build mpi ctest memory strong bind weak large sockets native nodes}; do
 	run $step
 	status=$?
 	[ $step = build ] && [ $status -ne 0 ] && break
 	[ -f "$OUT/mpi.env" ] && source "$OUT/mpi.env"
+	for other in ${OTHERS:-}; do
+		PBS_JOBID=$JOB PBS_O_WORKDIR=$BASE/src/$other STEPS=$step OTHERS= bash "$BASE/src/$other/scripts/cluster/run.pbs" > /dev/null
+	done
 done
 du -sh "$BASE"/envs "$BASE"/build "$BASE"/cache "$BASE"/results 2>/dev/null | tee -a "$OUT/steps.txt"
-tar czf "$OUT.tar.gz" -C "$BASE/results" "$NAME-$JOB"
-echo "Bring back $OUT.tar.gz"
+echo "To bring back, on the login node: cd $BASE && bash $SRC/scripts/cluster/collect.sh $JOB"

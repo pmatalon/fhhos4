@@ -91,7 +91,9 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
   "Distributed memory (MPI)" below.
 - **On a cluster without internet (PBS)**: `scripts/cluster/pack.sh` makes the conda env (conda-pack, for the cluster's
   glibc) and the sources to copy there; `scripts/cluster/run.pbs`, submitted from the sources, builds, runs `ctest`
-  and the scaling runs on one node, and writes the tarball of the logs to bring back (the comments of both scripts).
+  and the scaling runs on one node (or across several: step `nodes`), several versions in the same job (`OTHERS`);
+  `scripts/cluster/collect.sh <job>...` puts the jobs' logs into one archive to bring back (the comments of the
+  scripts).
   Plots: `scripts/perf/plot_scaling.py <output dir> [<label>=]<results dir>...` (matplotlib): strong scaling per case
   and weak scaling, setup and solve apart, several runs overlaid (the last in solid lines).
 - **Memory per process**: `scripts/perf/Mem.h` (`MemPoint("label")` at the steps to measure: the resident memory and its
@@ -1897,12 +1899,14 @@ Galerkin products (see Done).
 
 OpenMP scaling (2026-11-21, after Done "OpenMP scaling of the library's setup and solve"; Current profile):
 - **The profile by step on 32 cores** — to measure (the cluster), no code. The laptop's 8 threads are bound by its
-  memory (~3.5x at most); the cluster's 32 cores showed 6.4x with threads against 18x with processes. The job,
-  prepared (2026-11-21): the sources before and after the change, `fhhos4-src-v1.5.0-30-g88cd276a-before.tar.gz` and
-  `-omp.tar.gz` (`NAME=... scripts/cluster/pack.sh`, the env be8198ce already on the cluster), each run with
-  `qsub -v "STEPS=machine build strong large" scripts/cluster/run.pbs` (`ctest` too for `-omp`); compare `1 x p`
-  with `p x 1`, before and after. Then, if threads still lag, a copy of the sources with the timers of
-  `build/prof_omp2/` (`scripts/README.txt` there) on 1, 8, 16, 32 threads.
+  memory (~3.5x at most); the cluster's 32 cores showed 6.4x with threads against 18x with processes. Suspected: the
+  NUMA placement (3 NUMA nodes in the job; before the change, the setup's arrays were first written by the calling
+  thread, so all on its node; the threads are not bound to their cores). The job, prepared (2026-11-22): the sources
+  before and after the change, both with the timers of `build/prof_omp2/` (`fhhos4-src-v1.5.0-30-g88cd276a-prof`,
+  `-31-g8f57486b-prof`), in one job (`OTHERS`: step by step, on the same node), steps `machine build memory strong
+  bind large`. Compare `1 x p` with `p x 1`, before and after, by step; `bind`: the threads bound to their cores;
+  `memory`: the node's bandwidth, the pages placed by one thread or all. A second job after it, on 2 nodes (step
+  `nodes`): whether MPI runs across nodes (launcher, provider), the large cases and a weak case on 1 node against 2.
 - **The aggregation's order in parallel, with the same order** — estimated, medium effort, bit-identical. Its
   breadth-first order level by level: each new cell claimed by the first cell of the frontier that has it as a
   neighbour (a minimum by compare-and-swap: the neighbour lists are not guaranteed symmetric), the claimed cells of

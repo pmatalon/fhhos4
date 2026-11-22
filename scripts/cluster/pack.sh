@@ -50,5 +50,6 @@ Copy to <base> on the cluster (a directory visible from the compute nodes):
   fhhos4-src-$name.tar.gz
 Then, on the cluster:
   cd <base> && tar xzf fhhos4-src-$name.tar.gz && cd src/$name && qsub scripts/cluster/run.pbs
-Bring back <base>/results/$name-<job>.tar.gz.
+When the jobs are done (or to look at a running one), one archive of their results to bring back:
+  cd <base> && bash src/$name/scripts/cluster/collect.sh <job>...
 EOF
