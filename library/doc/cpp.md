@@ -2,6 +2,17 @@
 
 # The library in C++
 
+- [Installation](#installation)
+  - [Install from source](#install-from-source)
+  - [Conda and Spack packages](#conda-and-spack-packages)
+  - [Link](#link)
+- [How to use](#how-to-use)
+  - [Symmetric systems](#symmetric-systems)
+  - [Non-symmetric systems](#non-symmetric-systems)
+  - [Use as a preconditioner](#use-as-a-preconditioner)
+- Common to the three interfaces: [The system to give](system.md), [Several processes (MPI)](mpi.md),
+  [Parameters](parameters.md)
+
 ## Installation
 
 ### Install from source
@@ -58,7 +69,9 @@ and `-DCMAKE_PREFIX_PATH=<prefix>` (installation), or `-Dfhhos4_DIR=<fhhos4>/bui
 directory of the library in the RPATH of the executable. A library compiled with MPI brings MPI along
 (`MPI::MPI_CXX`). The preconditioner for PETSc, if built: `fhhos4::petsc`.
 
-## Symmetric systems
+## How to use
+
+### Symmetric systems
 
 ```cpp
 #include <fhhos4>
@@ -95,11 +108,11 @@ A complete example, an HHO discretization assembled into the blocks, on one proc
 The blocks are of type `fhhos4::SparseMatrix`, which is an Eigen sparse matrices (row-major, compressed).
 It can also an Eigen map of your own arrays (see [Inputs](system.md#inputs)).
 
-## Non-symmetric systems
+### Non-symmetric systems
 
 What changes for a non-symmetric matrix (e.g. convection-diffusion):
 
-- The block `A_FT` too, given to `SetupNonSym()`:
+- The block $A_{FT}$ too, given to `SetupNonSym()`:
   ```cpp
   solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellNearNullSpace, faceNearNullSpace);
   ```
@@ -112,7 +125,7 @@ What changes for a non-symmetric matrix (e.g. convection-diffusion):
   ```
 - With MPI: see [Several processes](mpi.md#non-symmetric-systems).
 
-## Use as a preconditioner
+### Use as a preconditioner
 
 The library includes everything to use it as a solver, Krylov method included. 
 However, it can also precondition an external Krylov

@@ -3,7 +3,17 @@
 # Python
 
 The Python module `fhhos4` has the classes, functions, parameters and enums of the [C++ library](cpp.md), with the same names
-(`solver.Krylov = fhhos4.Krylov.GCR`), and also reads its inputs in place, as NumPy arrays. It needs Python (>= 3.9),
+(`solver.Krylov = fhhos4.Krylov.GCR`), and also reads its inputs in place, as NumPy arrays.
+
+- [Installation](#installation)
+- [How to use](#how-to-use)
+  - [What differs from C++](#what-differs-from-c)
+- Common to the three interfaces: [The system to give](system.md), [Several processes (MPI)](mpi.md),
+  [Parameters](parameters.md)
+
+## Installation
+
+It needs Python (>= 3.9),
 [nanobind](https://nanobind.readthedocs.io) and NumPy (SciPy is optional), and is built with the library (not installed
 yet: use it from the build tree):
 
@@ -13,6 +23,8 @@ cmake --build build
 export PYTHONPATH=$PWD/build/python    # the module fhhos4
 ctest --test-dir build                 # its tests (they need SciPy)
 ```
+
+## How to use
 
 ```python
 import numpy as np
@@ -30,7 +42,7 @@ x_T, x_F = np.zeros(b_T.size), np.zeros(b_F.size)
 result = solver.Solve(b_T, b_F, x_T, x_F)  # x_T, x_F written in place
 ```
 
-What differs from C++:
+### What differs from C++
 
 - **The matrices**: SciPy's CSR matrices (or any object with the attributes `indptr`, `indices`, `data`, `shape` and
   `format` `"csr"`), a `fhhos4.CSRView(rows, cols, rowPointers, columnIndices, values)` of NumPy arrays (or of any
@@ -41,7 +53,7 @@ What differs from C++:
   `fhhos4.TransposedView(A)`.
 - **The vectors**: NumPy vectors of float64, read (outputs: written) in place; another dtype raises `TypeError`. The
   lists of `fhhos4.DoFLists(count, offsets, dofs)`: NumPy arrays of the same integer dtype.
-- **Lifetimes**: the solver keeps alive the arrays that its solves read (those of `A_FT`, for `SetupNonSym()`).
+- **Lifetimes**: the solver keeps alive the arrays that its solves read (those of $A_{FT}$, for `SetupNonSym()`).
   `CondensedMatrix()` returns a copy. The arrays of a `fhhos4.CSRMatrix` (`RowPointers`, `ColumnIndices`, `Values`)
   are read-only NumPy views of the library's memory, which they keep alive.
 - **The errors** raise `fhhos4.Error`, a `RuntimeError`. The setups, solves and helpers release the GIL.

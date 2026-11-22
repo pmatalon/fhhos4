@@ -170,22 +170,23 @@ Keep each document up to date in the same commit as the change it describes. Whe
   program or the sources. `README_library.md`, the landing page, has numbered sections (the user's structure): 1. The
   algorithm in a nutshell (in a few lines: p-levels, then h-levels and how the blocks give the aggregation), 2.
   Applicability, 3. How to use (the uncondensed system to give, then a link to the page of each interface and to the
-  shared pages); license, version last. `library/doc/`: a page per interface, each with its own installation
-  (`cpp.md`: from source, conda, Spack, the build options, link; symmetric and non-symmetric systems, use as a
-  preconditioner; `python.md`; `petsc.md`), and the pages shared by the three (`system.md`: the inputs and the other
+  shared pages); license last. `library/doc/`: a page per interface, each with two sections, Installation and How
+  to use (`cpp.md`: from source, conda, Spack, the build options, link; symmetric and non-symmetric systems,
+  use as a preconditioner; `python.md`; `petsc.md`: its options too), and the pages shared by the three (`system.md`: the inputs and the other
   matrix formats; `mpi.md`: several processes; `parameters.md`: the parameters and the constraints). Each page starts
-  with a link back to `README_library.md`. Rules:
+  with a link back to `README_library.md`; those of the interfaces then have a table of contents (their sections, then
+  the shared pages). Rules:
   - no details of the algorithm beyond that, no measurements, no client codes (HArDCore3D, Disk++), no internal
     files (`PERFORMANCE.md`, tests, `docs/`): they go in `docs/*.md` or `PERFORMANCE.md`;
-  - formulas in LaTeX (GitHub's math): `$...$` inline, without a space inside the dollars; display formulas in
-    ` ```math ` blocks (inside `$$...$$`, Markdown eats the backslashes: `\|`, `\\`, `\{`), without a `\\` at the end
-    of a line (GitHub's HTML adds a third backslash: write the rows on one line);
+  - the matrices, vectors and other math of the text in LaTeX (GitHub's math: $A_{TT}$, not `A_TT`), in code font only
+    within code (a call, a member, a variable of an example); `$...$` inline, without a space inside the dollars;
+    display formulas in ` ```math ` blocks (inside `$$...$$`, Markdown eats the backslashes: `\|`, `\\`, `\{`),
+    without a `\\` at the end of a line (GitHub's HTML adds a third backslash: write the rows on one line);
   - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:
     `Arguments()`, `CheckParameters()`, `DefaultPreSmoother()`), read in the code, never from the program (ADR-0008);
   - any change of the public interface (`library/include/*`: a setup or solve function, a parameter, its default or
     its accepted values, an input requirement, an error) or of the library's build, install or CMake package updates
-    these pages and the comments of `fhhos4.h`, which document the same interface; a version change updates the
-    Version section of `README_library.md`.
+    these pages and the comments of `fhhos4.h`, which document the same interface.
 - `docs/*.md`: how the code works today, for developers and agents; no history, no measurements.
 - `docs/clients.md`: updated when a client's integration changes or a target is studied; it drives the library's
   interface and helpers.

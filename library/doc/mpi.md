@@ -18,17 +18,17 @@ gives empty matrices and vectors, and still calls the setups and solves.
 
 Each process gives `SetupSym()` the following (the `FHHOS4_MPI` branch of the example above):
 
-- `A_TT` and `A_TF`: the rows of its cells. `A_FF`: the rows of its faces, assembled (with the contributions of the
+- $A_{TT}$ and $A_{TF}$: the rows of its cells. $A_{FF}$: the rows of its faces, assembled (with the contributions of the
   cells of other processes) and with both lower and upper triangular parts (on one process, the lower triangular part
   alone is enough).
-- The columns of `A_TF` and `A_FF` follow a local numbering of the faces: first the faces of the process, in the order
-  of the rows of `A_FF`, then its **ghost faces**, in any order. The ghost faces are the faces of other processes that
+- The columns of $A_{TF}$ and $A_{FF}$ follow a local numbering of the faces: first the faces of the process, in the order
+  of the rows of $A_{FF}$, then its **ghost faces**, in any order. The ghost faces are the faces of other processes that
   appear in these rows: the faces of its cells that other processes own, and the faces coupled to its own faces in
-  `A_FF` through the cells of other processes. This is the local numbering of DOLFINx's index maps.
+  $A_{FF}$ through the cells of other processes. This is the local numbering of DOLFINx's index maps.
 - `faceGhostGlobalNumbers`: the global numbers of its ghost faces (faces, not DoFs), in the order of their local
   numbers. The faces are numbered as PETSc and hypre require for their distributed matrices: those of each process
   contiguously, in rank order.
-- The vectors `b_T`, `b_F`, `x_T`, `x_F` and the near null space: the values on its own cells and faces.
+- The vectors $b_T$, $b_F$, $x_T$, $x_F$ and the near null space: the values on its own cells and faces.
 
 For example, with two processes, rank 0 owns the faces 0 to 9 and rank 1 the faces 10 to 19. If the rows of rank 0
 contain the faces 15 and 12 of rank 1, rank 0 numbers them locally 10 and 11 (or 11 and 10) and gives
@@ -42,9 +42,9 @@ PETSc's and hypre's distributed matrices store each block in two parts: `MergeOf
 
 ## Non-symmetric systems
 
-Each process gives the rows of its faces in `A_FT`. Its columns follow a local numbering of
-the cells, as those of `A_TF` and `A_FF` for the faces: first the cells of the process, in the order of the rows of
-`A_TT`, then its **ghost cells**, in any order (the cells of other processes that appear in these rows). `A_FT` is
+Each process gives the rows of its faces in $A_{FT}$. Its columns follow a local numbering of
+the cells, as those of $A_{TF}$ and $A_{FF}$ for the faces: first the cells of the process, in the order of the rows of
+$A_{TT}$, then its **ghost cells**, in any order (the cells of other processes that appear in these rows). $A_{FT}$ is
 the only block with ghost cells. Their global numbers, `cellGhostGlobalNumbers`, number the cells as
 `faceGhostGlobalNumbers` the faces:
 ```cpp
@@ -55,7 +55,7 @@ On each process, the Gauss-Seidel smoothers follow the downwind order of its own
 
 ## What you get back
 
-`Solve()` writes `x_T` and `x_F` on the cells and faces of the process, and returns the `Result`
+`Solve()` writes $x_T$ and $x_F$ on the cells and faces of the process, and returns the `Result`
 of the whole system. An error in the inputs of one process is raised on all the processes, so that none is left
 waiting.
 

@@ -4,7 +4,6 @@
 2. [Applicability](#2-applicability)
 3. [How to use](#3-how-to-use)
 4. [License](#license)
-5. [Version](#version)
 
 # 1. The algorithm in a nutshell
 
@@ -53,12 +52,12 @@ Then, once the system is reduced to one unknown per cell and face, h-coarsening 
 # 3. How to use
 
 Your code assembles the uncondensed system, i.e.
-- the matrix blocks `A_TT, A_TF, A_FF` for a symmetric system, and `A_FT` for a non-symmetric one,
-- the two blocks of the right-hand side `(b_T, b_F)`, without the DoFs of the Dirichlet faces (moved to the right-hand side).
+- the matrix blocks $A_{TT}$, $A_{TF}$, $A_{FF}$ for a symmetric system, and $A_{FT}$ for a non-symmetric one,
+- the two blocks of the right-hand side $(b_T, b_F)$, without the DoFs of the Dirichlet faces (moved to the right-hand side).
 
 That's it, no static condensation.
 The library condenses the system internally and solves it for both the
-cell and face unknowns `(x_T, x_F)`.
+cell and face unknowns $(x_T, x_F)$.
 
 Then, by the interface of your code:
 
@@ -81,12 +80,3 @@ and, compiled with MPI or `ENABLE_MUMPS`, on MPI and MUMPS (CeCILL-C, compatible
 dependencies depend on its build: conda-forge's `mumps-mpi` brings ParMETIS, whose license forbids commercial use), not
 on the GPL dependencies of the program (GMSH, CGAL): codes under other licenses can link it, under the conditions
 of section 4 of the LGPL (in short: keep the license notices, and let the user replace the shared library).
-
-# Version
-
-- `find_package(fhhos4 1.5 REQUIRED)` accepts the versions 1.x with x >= 5.
-- Binary compatibility only within a minor version (`libfhhos4.so.1.5`): adding a parameter to `fhhos4::Solver`
-  changes its size. Rebuild your code when fhhos4 changes minor version.
-- `FHHOS4_VERSION` (`"1.5.0"`), `FHHOS4_VERSION_MAJOR`, `_MINOR`, `_PATCH`: the version of the header (`<fhhos4>`).
-- `fhhos4::Version()`: the version of the library, followed by the commit (`git describe`) when it was built from a git
-  clone, e.g. `1.5.0 (v1.5.0-12-gabc1234-dirty)`. Give it in bug reports.
