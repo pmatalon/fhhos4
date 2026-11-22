@@ -3,7 +3,7 @@
 #pragma once
 
 // fhhos4's preconditioner for PETSc, -pc_type fhhos4 (libfhhos4_petsc, built with -DENABLE_PETSC_PC=ON): see
-// README_library.md. A PETSc program loads it without being recompiled with the option
+// library/doc/petsc.md. A PETSc program loads it without being recompiled with the option
 // -dll_append <dir>/libfhhos4_petsc.so (PETSc then calls PetscDLLibraryRegister_fhhos4_petsc()); a program linked to
 // it calls PetscDLLibraryRegister_fhhos4_petsc() once, after PetscInitialize().
 #include <petscpc.h>

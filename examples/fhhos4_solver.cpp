@@ -1,6 +1,6 @@
-// fhhos4 as the solver (README_library.md "How to use"), without PETSc: the HHO discretization of HHO_diffusion.h
+// fhhos4 as the solver (library/doc/cpp.md), without PETSc: the HHO discretization of HHO_diffusion.h
 // assembled into the blocks of the uncondensed system, Eigen matrices in the format of the library, and solved by
-// fhhos4 (its FCG preconditioned by the AMG). With MPI (FHHOS4_MPI, README_library.md "With MPI"), each process gives
+// fhhos4 (its FCG preconditioned by the AMG). With MPI (FHHOS4_MPI, library/doc/mpi.md), each process gives
 // the rows of its own cells and faces, the columns of the faces numbered locally: its own faces, then the others met in
 // its rows, its ghosts, whose global numbers it gives too. Nothing sends the contributions of a cell to the rows of the
 // faces of other processes: each process also computes the local matrices of the other cells of its faces (of other

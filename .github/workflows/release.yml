@@ -82,7 +82,7 @@ jobs:
           ./build-client/fhhos4_client
 
       # The library on several processes (docs/mpi.md): its MPI tests on 1 to 4 processes (MPI_np*). BLIS_NUM_THREADS=1:
-      # MUMPS's BLAS on one thread (README_library.md). UCX_TLS: MPICH's UCX on shared memory, otherwise it opens the
+      # MUMPS's BLAS on one thread (library/doc/mpi.md). UCX_TLS: MPICH's UCX on shared memory, otherwise it opens the
       # RDMA adapter of the Azure runner (mana_0) and MPI_Init fails ("uct_iface_open(ud_verbs/mana_0:1) failed").
       - name: Library with MPI (ENABLE_MPI=ON)
         run: |

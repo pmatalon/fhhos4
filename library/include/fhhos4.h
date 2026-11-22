@@ -51,7 +51,7 @@
 // without it, on the calling process alone, as without MPI), on a system distributed by rows: each process gives the
 // rows of its own cells and faces, the columns of the faces numbered locally, its own faces first, then the other faces
 // of its cells (its ghosts), whose global numbers it gives too (GhostGlobalNumbers); the same for the columns of the
-// cells of A_FT (non-symmetric). See the setups below, and README_library.md.
+// cells of A_FT (non-symmetric). See the setups below, and library/doc/mpi.md.
 namespace fhhos4
 {
 	// The index type of the sparse matrices of the library: int (32 bits), or 64 bits if fhhos4 is compiled with
@@ -515,7 +515,7 @@ namespace fhhos4
 		// then its ghost cells, the other cells of its rows (of other processes), whose global numbers are
 		// cellGhostGlobalNumbers (as faceGhostGlobalNumbers: the cells of the process of rank 0 first, etc.). On one
 		// process, faceGhostGlobalNumbers and cellGhostGlobalNumbers are empty.
-		// See README_library.md.
+		// See library/doc/mpi.md.
 		template <typename TT, typename TF, typename FT, typename FF>
 		void SetupNonSym(const Eigen::SparseCompressedBase<TT>& A_TT, const Eigen::SparseCompressedBase<TF>& A_TF, const Eigen::SparseCompressedBase<FT>& A_FT,
 		                       const Eigen::SparseCompressedBase<FF>& A_FF,

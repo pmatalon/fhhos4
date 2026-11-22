@@ -5,14 +5,14 @@ biharmonic) problems with the Hybrid High-Order (HHO) discretizations, with a fo
 
 It comes in two parts:
 
+- **The library `fhhos4`**: the algebraic multigrid for hybrid discretizations (U-AMG) for your own HHO/HDG code.
+  Only needs Eigen (and MPI, optionally, for distributed systems). Install, interfaces and usage:
+  [README_library.md](README_library.md).
 - **The program `fhhos4`**: a full solver for research (HHO and DG discretizations, high-order, unstructured meshes,
   GMSH binding, geometric and algebraic multigrid, many parameters, exports of the linear systems, shared-memory
   parallelism, and distributed memory (MPI) for the algebraic multigrid U-AMG). The numerical experiments of related papers are reproduced following the instructions in the
   `reproducibility` folder.
   Install and use: [README_program.md](README_program.md).
-- **The library `fhhos4`**: the algebraic multigrid for hybrid discretizations (U-AMG) for your own HHO/HDG code.
-  Only needs Eigen (and MPI, optionally, for distributed systems). Install, interfaces and usage:
-  [README_library.md](README_library.md).
 
 # License
 

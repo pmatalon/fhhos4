@@ -1,7 +1,7 @@
 # The library: how it is built
 
-For the library's users: `README_library.md`. This file is for changing the library. Decisions: `docs/adr/` (0002-0006,
-0008, 0013, 0020, 0023). Its measurements: `PERFORMANCE.md`.
+For the library's users: `README_library.md` and its pages, `library/doc/`. This file is for changing the library.
+Decisions: `docs/adr/` (0002-0006, 0008, 0013, 0020, 0023). Its measurements: `PERFORMANCE.md`.
 
 ## Target and files
 
@@ -141,7 +141,7 @@ on several processes too (see `docs/uamg.md`). `tests/UAMGLibraryTest.cpp` compa
 
 ## The examples
 
-`examples/` (`README_library.md` refers to them; built with the tests, run by ctest): `fhhos4_solver.cpp`, the library
+`examples/` (`library/doc/` refers to them; built with the tests, run by ctest): `fhhos4_solver.cpp`, the library
 alone (`ExampleSolver`: on 3 processes with MPI; its exit code: converged), and those of PETSc (below). The C++ ones
 share `HHO_diffusion.h`: an HHO discretization on n x n squares (degrees k and l, Legendre bases), the mesh distributed
 by rows, but seen by the assemblies as unstructured (cells and faces by global numbers, the faces of each cell, the
@@ -184,7 +184,7 @@ compiled into it: moving into PETSc, `src/ksp/pc/impls`, means installing this h
 - Options `-pc_fhhos4_*` (`PCSetFromOptions_FHHOS4()`), `PCView_FHHOS4()` (`-ksp_view`).
 - Tests: `tests/PETSc/PCTest.cpp` (`fhhos4_petsc_tests`, its own `main()`: MPI, then PETSc; `ctest -R PETScPC`, 1-4
   processes, the library loaded by `-dll_append`, as by a user's program: not linked, it composes the index sets
-  itself); the examples of `README_library.md`,
+  itself); the examples of `library/doc/petsc.md`,
   `examples/petsc_preconditioner.cpp` and `.py` (`ctest -R ExamplePETScPreconditioner`: `Cpp`, linked to the library,
   built with the tests; `Python`, if petsc4py is installed). Their HHO, the local matrix of the reference square, was
   checked by hand: symmetric, its kernel the interpolation of 1, exact on x^2; the C++ one (`examples/HHO_diffusion.h`,

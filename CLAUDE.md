@@ -139,8 +139,8 @@ Example invocations for specific experiments/figures live in `reproducibility/*.
 
 ## Library (`library/`)
 
-`libfhhos4` gives U-AMG to other HHO codes (`README_library.md` for its users; its code: `docs/library.md`). Public
-interface `library/include/fhhos4.h`: `Solver` (parameters as public members), `SetupSym()`/
+`libfhhos4` gives U-AMG to other HHO codes (`README_library.md` and `library/doc/` for its users; its code:
+`docs/library.md`). Public interface `library/include/fhhos4.h`: `Solver` (parameters as public members), `SetupSym()`/
 `SetupNonSym()` from the blocks of the uncondensed system (ADR-0002), then `Solve(b_T, b_F, x_T, x_F)`. Inputs
 are Eigen matrices only (ADR-0004), read in place, never copied (ADR-0003); inputs whose wrong value silently breaks
 the solver have no default (ADR-0005); the dimension, degrees and space not set are inferred from the stored pattern
@@ -161,24 +161,31 @@ build, rewritten only when the commit changes; nothing else may depend on the co
 ## Documentation
 
 Keep each document up to date in the same commit as the change it describes. Where things go:
-- `README.md`: minimal. What fhhos4 is, its two parts (one paragraph each, linking to the two files below), and the
-  license. Nothing else.
+- `README.md`: minimal. What fhhos4 is, its two parts (one paragraph each, the library first, linking to the two files
+  below), and the license. Nothing else.
 - `README_program.md`: the program, for its users (researchers running experiments): dependencies, conda environment,
   build (options table: every `option()` of `CMakeLists.txt`), installation, where the program reads and writes,
   troubleshooting.
-- `README_library.md`: the library, for the developers of client codes, who don't need the program or the sources. Its
-  numbered sections (the user's structure): 1. Installation (install from source, the library alone; the conda
-  package; link, CMake package), 2. The algorithm in a nutshell (in a few lines: p-levels, then h-levels and how the
-  blocks give the aggregation; applicability), 3. How to use (the uncondensed system, with an example; non-symmetric;
-  several processes; Python; inputs, parameters, constraints, license, version last). Rules:
+- `README_library.md` and its pages `library/doc/`: the library, for the developers of client codes, who don't need the
+  program or the sources. `README_library.md`, the landing page, has numbered sections (the user's structure): 1. The
+  algorithm in a nutshell (in a few lines: p-levels, then h-levels and how the blocks give the aggregation), 2.
+  Applicability, 3. How to use (the uncondensed system to give, then a link to the page of each interface and to the
+  shared pages); license, version last. `library/doc/`: a page per interface, each with its own installation
+  (`cpp.md`: from source, conda, Spack, the build options, link; symmetric and non-symmetric systems, use as a
+  preconditioner; `python.md`; `petsc.md`), and the pages shared by the three (`system.md`: the inputs and the other
+  matrix formats; `mpi.md`: several processes; `parameters.md`: the parameters and the constraints). Each page starts
+  with a link back to `README_library.md`. Rules:
   - no details of the algorithm beyond that, no measurements, no client codes (HArDCore3D, Disk++), no internal
     files (`PERFORMANCE.md`, tests, `docs/`): they go in `docs/*.md` or `PERFORMANCE.md`;
+  - formulas in LaTeX (GitHub's math): `$...$` inline, without a space inside the dollars; display formulas in
+    ` ```math ` blocks (inside `$$...$$`, Markdown eats the backslashes: `\|`, `\\`, `\{`), without a `\\` at the end
+    of a line (GitHub's HTML adds a third backslash: write the rows on one line);
   - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:
     `Arguments()`, `CheckParameters()`, `DefaultPreSmoother()`), read in the code, never from the program (ADR-0008);
   - any change of the public interface (`library/include/*`: a setup or solve function, a parameter, its default or
     its accepted values, an input requirement, an error) or of the library's build, install or CMake package updates
-    `README_library.md` and the comments of `fhhos4.h`, which document the same interface; a version change updates
-    its Version section.
+    these pages and the comments of `fhhos4.h`, which document the same interface; a version change updates the
+    Version section of `README_library.md`.
 - `docs/*.md`: how the code works today, for developers and agents; no history, no measurements.
 - `docs/clients.md`: updated when a client's integration changes or a target is studied; it drives the library's
   interface and helpers.

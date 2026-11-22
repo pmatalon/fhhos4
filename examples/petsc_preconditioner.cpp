@@ -1,4 +1,4 @@
-// fhhos4 as a preconditioner of PETSc (-pc_type fhhos4, README_library.md "With PETSc"), in C++: the HHO
+// fhhos4 as a preconditioner of PETSc (-pc_type fhhos4, library/doc/petsc.md), in C++: the HHO
 // discretization of -div(kappa grad u) = 1 on the unit square (n x n squares, kappa 1 or 10 on a checkerboard of 8 x 8
 // squares, homogeneous Dirichlet conditions), with polynomials of degree k on the faces and l in the cells, assembled
 // cell by cell into a MATNEST, and solved by PETSc's FCG preconditioned by fhhos4. The program links fhhos4::petsc and

@@ -5,7 +5,7 @@ Read before a release or a change of the conda recipe, the release workflow or t
 
 ## Release
 
-Change the version in `project()` and the release in "Install from source" of `README_library.md` (the clone command,
+Change the version in `project()` and the release in "Install from source" of `library/doc/cpp.md` (the clone command,
 the text and the link below it), commit, then push an annotated tag `vX.Y.Z` (the tags before 1.3.0 are
 `Release_X.Y.Z`). `.github/workflows/release.yml` checks the tag against the version, builds, runs `ctest`, the
 installation and the library alone with 64-bit indices (`ENABLE_64BIT_INDEX=ON`) and the conda test client, the library

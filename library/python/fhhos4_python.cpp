@@ -3,7 +3,7 @@
 // contiguous, is refused). The matrices (no Eigen in Python, the arrays of the library's implementation): a CSRView of
 // NumPy arrays, a CSRMatrix (the result of the helpers that copy, as ToCSR()), or any object with the attributes
 // indptr, indices, data, shape and format "csr" (SciPy's CSR matrices: SciPy itself is not needed); the vectors: NumPy
-// vectors of float64. See README_library.md.
+// vectors of float64. See library/doc/python.md.
 // Compiled with MPI (FHHOS4_MPI): Solver.Comm, from an mpi4py communicator, and the ghost faces (and cells) of the setups.
 #include <cstdint>
 #include <string>
