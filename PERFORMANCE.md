@@ -1685,7 +1685,7 @@ elapsed setup / solve (s). Laptop: the same code (`build-mpi`), plugged in, 2026
   solve"): sequential parts that processes don't have, fixed since (the first writes of the setup's fresh arrays by
   the calling thread, copies of the passes' P, a transpose's loop O(columns x threads), FCG's and the K-cycle's vector
   operations); left, the aggregation (9% of the setup on 8 threads); the other steps bound by the laptop's memory
-  (~3.5x on 8 threads at most). On the cluster: not measured since (Next ideas, "The profile by step on 32 cores"). A
+  (~3.5x on 8 threads at most). On the cluster after these changes: 2026-11-22 below (another node type). A
   client calling the library from one process with threads got ~6x on 32 cores before these changes.
 - Below ~10k unknowns per process, no gain from more processes (k=0 n=32 solve on 8 / 16 / 32 processes: 0.21 / 0.18 /
   0.19 s; k=2 n=12, 32 x 1 slower than 16 x 1): threads per process help there (16 x 2, 4 x 8); see Next ideas 3 below.
@@ -1702,6 +1702,56 @@ elapsed setup / solve (s). Laptop: the same code (`build-mpi`), plugged in, 2026
 - The job (3 h 57 of its 4 h): the program's assembly 1.9 h (k=2: ~8 ms of CPU per cell, as on the laptop: n=32, 163k
   cells, 11 min on 2 threads), 4 timeouts of 20 min (k=2 n=32 on 1 x 1: the assembly alone takes longer), the setups
   and solves of U-AMG a few minutes.
+
+2026-11-22, the same cluster, another node type (PBS jobs 3113388 and 3113389, `~/code/fhhos4-cluster/results/
+3113388-3113389`, plots in `~/code/fhhos4-cluster/plots/3113388-3113389`): queue `smallq`, node type `par`
+(be-par131), 2x AMD EPYC 9534 (64 cores per socket, no SMT, 8 NUMA nodes of 16 cores, each 2 CCDs of 8 cores), 768
+GB. The job's 32 cores: CPUs 0-31, NUMA nodes 0 and 1 (4 CCDs); the rest of the node idle at the start. Not comparable
+with the node of 2026-11-20 (`lml`: 12 cores per NUMA node, 3 NUMA nodes in that job). Two source trees in one job, step
+by step on the same node: before (`88cd276a`) and after (`8f57486b`) Done "OpenMP scaling of the library's setup and
+solve", both with the timers of `build/prof_omp2/` (rank 0's table). Cube-tet, `-s fcglibuamg`, best of 2, elapsed
+setup / solve (s); `p x t` on CPUs 0 to p t - 1, each process on its own.
+
+| Case, iterations | | 1 x 8 | 1 x 16 | 16 x 1 | 1 x 32 | 32 x 1 | 2 x 16 | 4 x 8 |
+|---|---|---|---|---|---|---|---|---|
+| k=0 n=64 (3.64M), 26 | before | 2.13 / 2.33 | 1.75 / 1.66 | 0.88 / 1.44 | 1.49 / 1.25 | 0.44 / 0.76 | 1.32 / 0.90 | 0.81 / 0.74 |
+| | after | 1.94 / 2.24 | 1.45 / 1.55 | 0.87 / 1.44 | 1.09 / 1.07 | 0.44 / 0.76 | 1.19 / 0.83 | 0.78 / 0.71 |
+| k=2 n=32 (3.54M), 33 | before | 1.03 / 4.69 | 0.86 / 2.89 | 0.62 / 2.61 | 0.68 / 2.03 | 0.33 / 1.45 | 0.80 / 1.58 | 0.63 / 1.41 |
+| | after | 0.97 / 4.56 | 0.73 / 2.78 | 0.61 / 2.61 | 0.51 / 1.82 | 0.33 / 1.45 | 0.83 / 1.51 | 0.58 / 1.38 |
+
+- The change: on 1 x 32 the setup 1.37 / 1.34 times faster (k=0 n=64 / k=2 n=32), the solve 1.18 / 1.12; one thread
+  and the processes unchanged (k=0 n=32 1 x 1: 0.86 / 0.76 s before and after); the same iterations.
+- The node's memory (`scripts/perf/memory_bandwidth.cpp`, 512 MB, GB/s of a streaming read): one core 9.8; one CCD (8
+  threads bound `close`) 48, the same 8 threads unbound (spread by the OS over the job's 4 CCDs) 77; one NUMA node (16
+  cores) 92; the job's 2 NUMA nodes 142 (random gather 2850 M/s). The pages first written by one thread (all on its
+  NUMA node): 87 GB/s and 1570 M/s on 32 threads. So the strong scaling follows the CCDs: k=0 n=64 solve on 4 / 8 / 16 /
+  32 processes 3.27 / 2.46 / 1.44 / 0.76 s (from 4 to 8 cores, the same CCD: 1.33 times faster; then 1.7 and 1.9 for
+  each doubling of the CCDs).
+- The solve, threads against processes: the same within one NUMA node (1 x 16 against 16 x 1, the cycle: 1.34 / 1.30 s
+  at k=0 n=64, 2.53 / 2.47 at k=2 n=32); across the two, the threads 1.34 / 1.17 times slower (cycle 0.90 / 0.67,
+  1.60 / 1.36), the gap in the smoothing of level 0 (k=0: pre-smoothing 0.25 / 0.15 s, post-smoothing 0.33 / 0.25).
+  One process per NUMA node recovers most of it (2 x 16: cycle 0.75 at k=0, 1.42 at k=2); one per CCD beats 32 x 1 (4 x
+  8: solve 0.71 against 0.76 at k=0). Binding the threads (`OMP_PLACES=cores OMP_PROC_BIND=close`) changes nothing
+  beyond the noise, before and after the change (after, 1 x 32 k=0 n=64: 1.09 / 1.07 -> 1.05 / 1.04 s): the cause is
+  not the threads moving but arrays read from the other NUMA node than the one of the thread that first wrote them
+  (written by one thread, or read with another split of the rows: Eigen's sparse x dense product is `schedule(dynamic)`,
+  the Chebyshev passes static). Which arrays: Next ideas.
+- The setup, threads against processes: 1 x 32 2.5 / 1.5 times slower than 32 x 1 (k=0 n=64 / k=2 n=32), already 1.7 /
+  1.2 within one NUMA node. By step at k=0 n=64, 1 x 32 / 32 x 1 (rank 0), s: setup 1.08 / 0.43, of which the
+  aggregation 0.28 / 0.007 (sequential: 26% of the setup on 32 threads; its order 0.11, its greedy 0.17), the passes'
+  other steps 0.50 / 0.31, the smoothers 0.12 / 0.026 (1 x 4: 0.17: they barely scale), the library's setup outside the
+  multigrid (condensation, condensed matrix) 0.14 / 0.04. At k=2 n=32 the aggregation is small (0.03 s: it runs on the
+  k=0 level, ~8 times fewer faces) and the smoothers lead (0.14 / 0.08).
+- Two nodes (job 3113389, `select=2`, `place=scatter:excl`, nodes `par`): MPICH runs across the nodes (hydra through
+  PBS's node file) over OFI's TCP provider. The probe over UCX (MPICH's default netmod) was killed by its 600 s timeout
+  during the setup of the coarse solver, but it ran 32 threads per process (64 x 32 on 64 cores: a bug of `step_nodes`;
+  its TCP run took 61 s for 260 unknowns): UCX over InfiniBand (`mlx5_0`; the env has UCX's `ib_mlx5` transports) is
+  not judged. Over TCP, 64 x 1 against 32 x 1: the setup 1.4 times faster (k=0 n=64 0.44 -> 0.31; k=2 n=32 0.33 ->
+  0.24), the solve slower (0.78 -> 1.16; 1.47 -> 1.57); weak, k=1 n=51 on 32 processes -> n=64 on 64: setup 0.50 ->
+  0.57, solve 1.62 -> 2.81, 27 -> 28 iterations.
+- `perf` is installed on the compute nodes (`/bin/perf`; `perf_event_paranoid` unreadable: untried).
+- The jobs: 3 h 11 of 4 h (per tree: build 2.5 min, memory 11 s, strong 11.5 min, bind 20.5 min, large 60 min, mostly
+  the program's assembly of k=2 n=32), peak 17.7 GB; the 2 nodes 16 min of 30 (10 of them the probe's timeout), 27.5 GB.
 
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:
@@ -1743,8 +1793,9 @@ limit: ~3.5x, Done):
 So on 8 threads the setup's only sequential step left is the aggregation (9% of it; Done: an exact parallel greedy
 costs more than it saves), and the others gain 2.4-4.2x against a memory limit of ~3.5x here: bound by the laptop's
 memory (2 channels), not by sequential parts. The steps at 2.4-3x (decomposition, chaining, smoothers, `R = P^T`) do
-scattered writes or grow their chunks by `push_back()` (`BuildByRows()`). On the cluster's node (8 NUMA nodes, 12
-channels), what bounds them on 32 cores: the job of Next ideas ("The profile by step on 32 cores").
+scattered writes or grow their chunks by `push_back()` (`BuildByRows()`). On 32 cores of the cluster (2026-11-22, in
+"Distributed memory (MPI)"): the aggregation becomes 26% of the setup, the smoothers barely scale, and the solve
+loses 1.2-1.3x to the NUMA placement across two NUMA nodes.
 
 **Setup and solve by step through the library, 1 / 8 threads** (2026-11-21, `3b42f153`, before the OpenMP changes
 above; the question: why do threads gain less than processes on the cluster?). Cube-tet k=0 n=32 (318k faces, 24 iterations), `-s fcglibuamg`,
@@ -1769,7 +1820,7 @@ above; the question: why do threads gain less than processes on the cluster?). C
   on a problem 30x larger: +26% (Done, "The setup's arrays").
 
 On 8 threads, no step left dominates the setup: the steps that gain only ~2x may be the laptop's bandwidth (one thread
-reads half of it); the cluster's 32 cores need their own profile by step.
+reads half of it); the cluster's 32 cores: 2026-11-22, in "Distributed memory (MPI)".
 
 | Case | Setup, sequential / parallel | Solve, sequential / parallel |
 |---|---|---|
@@ -1897,22 +1948,44 @@ Galerkin products (see Done).
 
 ## Next ideas, by expected gain
 
-OpenMP scaling (2026-11-21, after Done "OpenMP scaling of the library's setup and solve"; Current profile):
-- **The profile by step on 32 cores** — to measure (the cluster), no code. The laptop's 8 threads are bound by its
-  memory (~3.5x at most); the cluster's 32 cores showed 6.4x with threads against 18x with processes. Suspected: the
-  NUMA placement (3 NUMA nodes in the job; before the change, the setup's arrays were first written by the calling
-  thread, so all on its node; the threads are not bound to their cores). The job, prepared (2026-11-22): the sources
-  before and after the change, both with the timers of `build/prof_omp2/` (`fhhos4-src-v1.5.0-30-g88cd276a-prof`,
-  `-31-g8f57486b-prof`), in one job (`OTHERS`: step by step, on the same node), steps `machine build memory strong
-  bind large`. Compare `1 x p` with `p x 1`, before and after, by step; `bind`: the threads bound to their cores;
-  `memory`: the node's bandwidth, the pages placed by one thread or all. A second job after it, on 2 nodes (step
-  `nodes`): whether MPI runs across nodes (launcher, provider), the large cases and a weak case on 1 node against 2.
-- **The aggregation's order in parallel, with the same order** — estimated, medium effort, bit-identical. Its
-  breadth-first order level by level: each new cell claimed by the first cell of the frontier that has it as a
-  neighbour (a minimum by compare-and-swap: the neighbour lists are not guaranteed symmetric), the claimed cells of
-  each frontier cell sorted by count as now, their positions by a prefix sum. About 2-2.5 times the memory accesses of
-  the sequential order, against the laptop's ~3.5x: 0.065 -> ~0.04 s on 8 threads at n=48 (1% of the setup); more on
-  32 cores, where the aggregation's share grows (Amdahl).
+OpenMP scaling (2026-11-22, the cluster's 32 cores in "Distributed memory (MPI)"; Current profile). What separates one
+process of 32 threads from 32 processes, k=0 n=64: the setup 1.08 / 0.43 s, the solve 1.07 / 0.76 s. The setup's 0.65 s:
+the sequential aggregation 0.27, the passes' other steps 0.18, the smoothers' setup 0.09, the condensation 0.09. The
+solve's 0.31 s: the NUMA placement (none within one NUMA node), mostly level 0's smoothing. Hence the entries below, by
+gain. On all the cores, processes or threads, the solve follows the node's bandwidth (the CCDs): its gains there are
+fewer bytes read, not more parallelism.
+- **The solve's NUMA placement** — measured, cause to find. On 32 cores (2 NUMA nodes) one process with threads solves
+  1.17-1.34 times slower than 32 processes, the same within one NUMA node, and binding the threads does not help: some
+  arrays of level 0's smoothing are read by threads of the other NUMA node than the one that first wrote them. The
+  lead: the solve's vectors are allocated at the setup without being written (`Level::AllocateCycleVectors()`,
+  `BlockChebyshev::AllocateWorkVectors()`: Eigen's `resize()`), so the first solve's first kernel to write each places
+  its pages: wrong if that kernel is an Eigen vector expression (one thread) or Eigen's sparse x dense product
+  (`schedule(dynamic)`: another split of the rows at each call); level 0's matrix is placed by the split of the
+  condensation that writes it. To find by reading the code (which kernel first writes each array that level 0's
+  smoothing reads), to confirm on the cluster (below). Then first-write each with the static split of the rows that
+  reads it, and replace Eigen's product where it reads a large matrix. Gain: up to the 2 x 16 solve (k=0 n=64: 1.07 ->
+  ~0.83 s), on any node of several NUMA nodes (2 sockets: every cluster node).
+- **The aggregation in parallel** — estimated, medium effort. 26% of the setup on 32 threads (k=0 n=64: 0.28 of 1.08 s;
+  its order 0.11, its greedy 0.17), 9% on the laptop's 8; small at k=2 (0.03 of 0.49 s: it runs on the k=0 level).
+  `CoarseningPass::Aggregate()`, the default flat passes; on several processes each runs it on its own cells.
+  - The order, bit-identical: breadth-first level by level, each new cell claimed by the first cell of the frontier that
+    has it as a neighbour (a minimum by compare-and-swap: the neighbour lists are not guaranteed symmetric), the
+    claimed cells of each frontier cell sorted by count as now, their positions by a prefix sum; about 2-2.5 times the
+    memory accesses of the sequential order, against ~14 times the bandwidth on 32 cores: 0.11 -> ~0.02 s.
+  - The greedy, the larger part: exactly in parallel, Done measured more synchronization (~0.2 s on 8 threads at n=48)
+    than the whole sequential greedy, and barriers cost more on 32 threads. Left: a faster sequential greedy (one
+    thread's random accesses: one core gathers 166 M/s); overlapping it with work that does not depend on it (level
+    0's smoothers' setup needs only level 0's matrix); or, opt-in, the cells split among the threads and aggregated
+    apart as the processes do (other aggregates: the iterations vary by at most one with the processes).
+- **The smoothers' setup on 32 threads** — to profile. k=0 n=64: 0.17 s on 4 threads, 0.12 on 32 (rank 0 of 32
+  processes: 0.026); k=2 n=32 0.14 against 0.08. Lanczos (its products and dots) or the block inverses: timers inside.
+- **The next cluster round** — prepared from these questions: (1) which arrays of the solve sit on the wrong NUMA node:
+  a query in `Prof.h` (`move_pages()` returns the node of each page) on level 0's matrix and the solve's vectors, and
+  1 x 32 under `numactl --interleave=0,1`; `perf stat` on the remote DRAM accesses if `perf` works there; (2) MPI over
+  InfiniBand: `step_nodes`'s probe with one thread per process (the bug of job 3113389), `ucx_info -d`, then the same
+  runs over UCX and over TCP: whether 2 nodes gain over 1 in the solve (TCP: slower); (3) the node type pinned (`par`;
+  `resources_used.nodetype` names it: whether the select accepts it), so the rounds compare; (4) the changes above, on
+  32 threads.
 - **The condensation, 1.7x on 8 threads** (0.14 / 0.08 s at n=48) — to profile: its sequential part is not known (its
   loops are parallel; the per-cell heap allocations of Eigen's dense blocks, `_W`'s outer index zero-filled by Eigen?).
 - **`BuildByRows()`'s chunks** (the products, the chaining of P, 3.0x on 8 threads): each chunk's vectors grow by
