@@ -75,7 +75,11 @@ the given bases.
 
 ## h-levels
 
-- Multiple pairwise aggregation (factor 3.8), interface collapsing.
+- Multiple pairwise aggregation (factor 3.8), interface collapsing. The aggregation order (breadth-first, from the
+  cell that is the strong neighbour of the fewest cells) runs on the threads a level of the search at a time, the same
+  order as on one thread (`CoarseningPass::ParallelAggregationOrder()`); the greedy pairing that follows it is
+  sequential, and on several threads runs on the cells renumbered in that order (in parallel), whose neighbours are
+  then mostly in the cache.
 - Interpolation of 1: the constant modes are rescaled before the h-coarsening (`UncondensedLevel::CoarsenMesh()`).
 - Coarsening prolongation, program default `ReconstructSmoothedTraceOrInject` (P_F, the papers'): trace of
   `-A_TcTc^{-1} A_TcFc` on the removed faces, smoothed by block Jacobi omega = 2/3; chained as multigrid prolongation.

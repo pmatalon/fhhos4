@@ -347,6 +347,11 @@ passes, which replace P on the levels with blocks of faces of at least 2 DoFs.
   the bases), non-symmetric system with asymmetry 0.5, the coarse operators `Q_F^T A Q_F` (not Galerkin)) — on the
   32 x 32 system of `LocalMatricesTest.cpp`, on all the threads: the operators and prolongations of all the levels are
   the same, bit for bit.
+- **`CoarseningPass.AggregationOnThreads`** — the aggregation on 4 threads (its order by
+  `CoarseningPass::ParallelAggregationOrder()`, with every level of its search on the threads
+  (`ParallelOrderMinLevelSize = 1`), then none; the greedy on the cells renumbered in that order): the aggregates of one
+  thread, pairwise and with all the neighbours, on the 64 x 64 system and on its two halves without a face between them
+  (the search restarts from the first cell not reached).
 - **`CoarseningPass.PassProlongations*`** (3 cases: symmetric, rescaled bases, non-symmetric) — on the same system
   (degree 0: the prolongations of the passes forced, `PassProlongationsMinFaceBlockSize = 1`), with the new
   prolongation, the transfers by the prolongations of the passes against P: the same levels and operators, bit for bit,

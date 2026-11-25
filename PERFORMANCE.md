@@ -1376,7 +1376,82 @@ copy of the old binary, e.g. `cp bin/fhhos4 /tmp/fhhos4_before`, to compare with
     ~0.2 s of synchronization alone, against 0.11 s for the whole sequential greedy. The random orders that make it
     parallel (the same paper) change the aggregates.
   - The ordering (its breadth-first order, 0.065 s on 8 threads) can be parallel with the same order (below, Next
-    ideas): not done, ~0.02 s.
+    ideas): done on 2026-11-23, "The aggregation order in parallel" below.
+
+- **The aggregation order in parallel** (2026-11-23, the user's request: "Parallelize the aggregation of U-AMG's
+  coarsening: on many threads, the setup's largest sequential step"; Next ideas, "The aggregation in parallel").
+  `CoarseningPass::ParallelAggregationOrder()`: the same breadth-first order, a level of the search at a time. Each
+  cell of the next level is claimed by the first cell of the current level that has it as a neighbour (an atomic
+  minimum of its position by compare-and-swap: the neighbour lists are not guaranteed symmetric); each thread then
+  collects the cells claimed by its chunk of the level, sorts those of each cell as the sequential order (the same
+  `std::sort` on the same sequence: the same order of the equal counts) and copies them at its position (a prefix sum
+  over the threads); a new seed per disconnected part, as the sequential order. The levels of fewer than
+  `ParallelOrderMinLevelSize` = 1024 cells run on the calling thread (by the same claims); on one thread (each MPI
+  process, usually) the sequential order is unchanged. Bit-identical.
+
+  Cube-tet k=0 n=48, `-s fcglibuamg`, the conditions of "OpenMP scaling of the library's setup and solve" above
+  (glibc's thresholds of a large problem, plugged in); timers of `Prof.h` in two worktrees of HEAD instrumented by
+  `build/prof_omp2/scripts/instrument.py` (`build/prof_order/`: the program of the "before" tree, the two libraries by
+  `LD_PRELOAD`, `runs/ab.sh`); medians of 5 interleaved runs, before -> after (s; time ratio: x0.79 = 21% less time):
+
+  | | 1 thread | 8 threads |
+  |---|---|---|
+  | setup (the program's table) | 6.411 -> 6.429 | 1.784 -> 1.768 |
+  | the order (all the passes) | 0.047 -> 0.047 | 0.058 -> 0.046 (x0.79) |
+  | the greedy | 0.103 -> 0.097 | 0.106 -> 0.107 |
+
+  The same 25 iterations; the setup's difference is within the noise. Why only 1.26 times faster on 8 threads (a
+  diagnostic, 3 runs): over all the passes, 291 levels of at least 1024 cells (970k cells; level 0's first pass, 527k
+  cells: 130 levels with 507k cells, 58 smaller with 19k) take 0.040 s, the smaller levels (89k cells, on one thread)
+  0.009 s. The parallel levels cost ~41 ns per cell on 8 threads, the sequential order ~44 ns per cell on one: each
+  cell makes ~9 random accesses (its entries of `Neighbours.Start` and `NNeighbours`, its list, the claims of its ~4.5
+  neighbours, the count of each cell it claims), ~26 ms at the laptop's 333 M random accesses/s on 8 threads, where
+  the sequential order makes ~6, prefetched, in its 40-byte `CellData`. Not the fence of the compare-and-swap: a plain
+  store instead (the races unresolved, for the time only) gives the same 0.039 s. The gain is for many cores (a random
+  gather 2850 M/s on the cluster's 32 cores, 166 on one, 2026-11-22): estimated 0.11 -> ~0.02-0.03 s at k=0 n=64, to
+  measure in the next cluster round.
+
+  Validation: `solutions.sh` 78/78 `OK`; `ctest -E HPConfig` 406/406, with a new test
+  (`CoarseningPass.AggregationOnThreads`: every level on 4 threads, also on two halves without a face between
+  them; it fails with the parallel sort removed); Cube-tet n=48 on 8 threads and n=32 on 16 (levels above the
+  threshold, which the cases of `solutions.sh` don't reach) bit for bit; `build-mpi-lib` 5/5, `build-mpi`
+  `ProgramMPI` 18/18.
+
+- **The greedy aggregation on the cells renumbered in its order** (2026-11-25, the user's choice among the options of
+  Next ideas, "The aggregation in parallel": "Go with the faster sequential greedy first", then, after the prototype
+  below, "Port the renumbering"). On several threads, `Aggregate()` renumbers the cells in the aggregation order
+  before the greedy (parallel loops: each cell's data and its strong neighbours, all its neighbours with
+  `allNeighbours`, in the new numbers, in an `IndexLists`): a cell's neighbours are then within a few levels of the
+  breadth-first search (~10k cells, ~1 MB at n=48), mostly in the cache, instead of anywhere in the 21 MB of the cells'
+  data (level 0's first pass). The same decisions in the same order: bit-identical. On one thread unchanged: the
+  renumbering's random accesses, at one core's rate, would cost what it saves.
+
+  Tried first and dropped: prefetching the probable partner (the free strong neighbour of the smallest count, as seen
+  a few cells ahead), its neighbour list, then its strong neighbours' data. Slower on 8 threads: the greedy 0.120 ->
+  0.135 / 0.142 / 0.140 s (the partner's stages 4 and 2 cells ahead; 6 and 3; 6 and 3 with the existing prefetching 12
+  cells ahead instead of 8; 3 runs each). The estimate of Next ideas (two memory latencies per aggregate, the greedy
+  1.5-2.5 times faster) did not hold.
+
+  Measured as "The aggregation order in parallel" above (the same workspace, `build/prof_order/`; that day's runs about
+  10% slower than those of 2026-11-23, before and after alike: compare within the table), before (the parallel order)
+  -> after, medians of 5 interleaved runs (s):
+
+  | | 1 thread | 8 threads |
+  |---|---|---|
+  | setup (the program's table) | 6.534 -> 6.552 | 2.040 -> 1.997 |
+  | the greedy | 0.102 -> 0.101 | 0.120 -> 0.063 |
+  | the renumbering | - | 0.032 |
+  | `Aggregate()` (all the passes) | 0.175 -> 0.173 | 0.180 -> 0.155 (x0.86) |
+
+  The same 25 iterations; the setup's difference within the noise. On 8 threads the greedy itself 1.9 times faster,
+  and the renumbering costs more than half of that gain: `Aggregate()` -0.025 s. The renumbering is bound by its random
+  accesses (~6 per cell over the ~1.06M cells of the passes); on the cluster's 32 cores (random gathers 17 times one
+  core's), estimated ~0.005-0.01 s and the greedy 0.17 -> ~0.09-0.11 s at k=0 n=64: to measure in the next cluster
+  round. `build/prof_omp2/scripts/instrument.py` times the renumbering apart ("aggr: renumbering").
+
+  Validation: `solutions.sh` 78/78 `OK` against the parallel order; `ctest -E HPConfig` 406/406 (the test
+  `CoarseningPass.AggregationOnThreads` also with all the neighbours (`-cs mn`), comparing `CellAggregate` too); n=48
+  on 8 threads and n=32 on 16 bit for bit; `build-mpi-lib` 5/5, `build-mpi` `ProgramMPI` 18/18.
 
 ## Distributed memory (MPI)
 
@@ -1782,20 +1857,21 @@ limit: ~3.5x, Done):
 - Setup 6.32 / 1.98 (3.2x): the passes 4.26 / 1.25 (3.4x): `ComputeProlongation()` 1.70 / 0.40 (4.2x), `Build()`
   0.78 / 0.19 (4.0x), local Galerkin products 0.67 / 0.17 (3.9x), interface collapsing 0.56 / 0.13 (4.2x),
   decomposition 0.40 / 0.14 (2.9x), the aggregation 0.165 / 0.186 (sequential: its order 0.046 / 0.065, its greedy
-  0.096 / 0.113). Outside the passes: the condensed matrix 0.59 / 0.18 (3.2x), the chaining of P 0.51 / 0.17 (3.0x),
-  the smoothers (Lanczos) 0.40 / 0.14 (2.9x), the assembly of the coarse operators 0.17 / 0.045 (3.8x), `R = P^T`
-  0.15 / 0.06 (2.4x), the condensation 0.14 / 0.08 (1.7x: not explained).
+  0.096 / 0.113; since then, Done: the order parallel, 0.046 on 8 threads; the greedy on renumbered cells on 8 threads,
+  `Aggregate()` x0.86). Outside the passes: the condensed matrix 0.59 / 0.18 (3.2x), the chaining of P 0.51 / 0.17
+  (3.0x), the smoothers (Lanczos) 0.40 / 0.14 (2.9x), the assembly of the coarse operators 0.17 / 0.045 (3.8x),
+  `R = P^T` 0.15 / 0.06 (2.4x), the condensation 0.14 / 0.08 (1.7x: not explained).
 - Solve 6.55 / 2.15 (3.0x): the cycle 6.24 / 1.91 (3.3x; post-smoothing 3.4x, pre-smoothing 3.2x, restriction 3.6x,
   prolongation 2.9x), FCG's vector operations 0.17 / 0.095 (1.75x), the K-cycle's 0.023 / 0.014.
 - The sequential first writes of fresh memory: 18 MB in the setup (361 MB before), 8 MB in the solve (the first
   iterations).
 
-So on 8 threads the setup's only sequential step left is the aggregation (9% of it; Done: an exact parallel greedy
-costs more than it saves), and the others gain 2.4-4.2x against a memory limit of ~3.5x here: bound by the laptop's
-memory (2 channels), not by sequential parts. The steps at 2.4-3x (decomposition, chaining, smoothers, `R = P^T`) do
-scattered writes or grow their chunks by `push_back()` (`BuildByRows()`). On 32 cores of the cluster (2026-11-22, in
-"Distributed memory (MPI)"): the aggregation becomes 26% of the setup, the smoothers barely scale, and the solve
-loses 1.2-1.3x to the NUMA placement across two NUMA nodes.
+So on 8 threads the setup's only sequential step left is the aggregation (9% of it, its greedy since 2026-11-23; Done:
+an exact parallel greedy costs more than it saves), and the others gain 2.4-4.2x against a memory limit of ~3.5x here:
+bound by the laptop's memory (2 channels), not by sequential parts. The steps at 2.4-3x (decomposition, chaining,
+smoothers, `R = P^T`) do scattered writes or grow their chunks by `push_back()` (`BuildByRows()`). On 32 cores of the
+cluster (2026-11-22, in "Distributed memory (MPI)"): the aggregation becomes 26% of the setup, the smoothers barely
+scale, and the solve loses 1.2-1.3x to the NUMA placement across two NUMA nodes.
 
 **Setup and solve by step through the library, 1 / 8 threads** (2026-11-21, `3b42f153`, before the OpenMP changes
 above; the question: why do threads gain less than processes on the cluster?). Cube-tet k=0 n=32 (318k faces, 24 iterations), `-s fcglibuamg`,
@@ -1965,18 +2041,38 @@ fewer bytes read, not more parallelism.
   smoothing reads), to confirm on the cluster (below). Then first-write each with the static split of the rows that
   reads it, and replace Eigen's product where it reads a large matrix. Gain: up to the 2 x 16 solve (k=0 n=64: 1.07 ->
   ~0.83 s), on any node of several NUMA nodes (2 sockets: every cluster node).
-- **The aggregation in parallel** — estimated, medium effort. 26% of the setup on 32 threads (k=0 n=64: 0.28 of 1.08 s;
-  its order 0.11, its greedy 0.17), 9% on the laptop's 8; small at k=2 (0.03 of 0.49 s: it runs on the k=0 level).
-  `CoarseningPass::Aggregate()`, the default flat passes; on several processes each runs it on its own cells.
-  - The order, bit-identical: breadth-first level by level, each new cell claimed by the first cell of the frontier that
-    has it as a neighbour (a minimum by compare-and-swap: the neighbour lists are not guaranteed symmetric), the
-    claimed cells of each frontier cell sorted by count as now, their positions by a prefix sum; about 2-2.5 times the
-    memory accesses of the sequential order, against ~14 times the bandwidth on 32 cores: 0.11 -> ~0.02 s.
+- **The aggregation in parallel** — the order done (2026-11-23), the greedy faster (2026-11-25), the rest estimated.
+  26% of the setup on 32 threads (k=0 n=64: 0.28 of 1.08 s; its order 0.11, its greedy 0.17), 9% on the laptop's 8;
+  small at k=2 (0.03 of 0.49 s: it runs on the k=0 level). `CoarseningPass::Aggregate()`, the default flat passes; on
+  several processes each runs it on its own cells.
+  - The order: parallel, bit-identical (Done, "The aggregation order in parallel"): 0.058 -> 0.046 s on the laptop's 8
+    threads at n=48, bound by its random accesses (~9 per cell, against ~6 prefetched for the sequential order); on
+    32 cores, to measure (estimated 0.11 -> ~0.02-0.03 s). Left: its per-cell data together as the sequential
+    order's (the claim, the start and size of the neighbour list, the count in one struct: ~6 accesses per cell
+    instead of ~9, ~1.5 times faster parallel levels), and a threshold of ~300-500 cells on 8 threads (the levels on
+    one thread are 0.009 of its 0.046 s).
   - The greedy, the larger part: exactly in parallel, Done measured more synchronization (~0.2 s on 8 threads at n=48)
-    than the whole sequential greedy, and barriers cost more on 32 threads. Left: a faster sequential greedy (one
-    thread's random accesses: one core gathers 166 M/s); overlapping it with work that does not depend on it (level
-    0's smoothers' setup needs only level 0's matrix); or, opt-in, the cells split among the threads and aggregated
-    apart as the processes do (other aggregates: the iterations vary by at most one with the processes).
+    than the whole sequential greedy, and barriers cost more on 32 threads. It spends ~180 ns per aggregate on one
+    thread (n=48: 0.096 s, ~530k aggregates over the passes); level 0's four passes hold 94% of the cells it visits
+    (n=48: 527k, 265k, 133k, 67k of ~1.06M). Done (2026-11-25): on several threads, on the cells renumbered in its
+    order, 1.9 times faster on 8 threads plus the renumbering (`Aggregate()` x0.86); on 32 cores, to measure
+    (estimated 0.17 -> ~0.1 s); prefetching the probable partner was slower. The options left, estimated on 32
+    threads at k=0 n=64:
+    - Overlapping it with work that does not depend on it: level 0's smoothers' setup (it reads only level 0's
+      operator: in double, in single precision, or in block CSR built from it by `OnStartSetup()`, and for a
+      non-symmetric matrix the downwind order, also from the operator) and the first pass's decomposition (only the
+      lists of `Build()`). At most ~0.1 s (the smoothers' setup), 0.05-0.08 s likely; nothing on one thread or with
+      processes, less now that the greedy is faster. High cost: the greedy on its own thread beside an OpenMP team of
+      one thread fewer, the order of the setup changed across `Multigrid.h`, `Level.h` and `UncondensedLevel.h`, logs
+      from two threads, the MPI calls on the main thread only, the coarsening that stops at level 0.
+    - Opt-in, the cells split among the threads: as the processes do (ranges of cell numbers, an order and a greedy
+      per thread: the whole aggregation 0.28 -> ~0.02 s, the setup -23%; the aggregates depend on the number of threads
+      and on the numbering of the cells, whose ranges are not compact subdomains), or the parallel order cut into one
+      block per thread (consecutive levels of the search: compact layers), the same greedy in each, the cells of the
+      other blocks unavailable (the aggregates of the sequential greedy except near the boundaries of the blocks; the
+      greedy, ~0.1 s after the renumbering, -> ~0.01 s, the setup -8%; ~40 lines, an option of the library and the
+      program, its documentation and a test). The iterations vary by at most one with the processes; to check with
+      `amg_papers.sh`.
 - **The smoothers' setup on 32 threads** — to profile. k=0 n=64: 0.17 s on 4 threads, 0.12 on 32 (rank 0 of 32
   processes: 0.026); k=2 n=32 0.14 against 0.08. Lanczos (its products and dots) or the block inverses: timers inside.
 - **The next cluster round** — prepared from these questions: (1) which arrays of the solve sit on the wrong NUMA node:
@@ -1984,7 +2080,14 @@ fewer bytes read, not more parallelism.
   1 x 32 under `numactl --interleave=0,1`; `perf stat` on the remote DRAM accesses if `perf` works there; (2) MPI over
   InfiniBand: `step_nodes`'s probe with one thread per process (the bug of job 3113389), `ucx_info -d`, then the same
   runs over UCX and over TCP: whether 2 nodes gain over 1 in the solve (TCP: slower); (3) the node type pinned (`par`;
-  `resources_used.nodetype` names it: whether the select accepts it), so the rounds compare; (4) the changes above, on
+  `resources_used.nodetype` names it: whether the select accepts it), so the rounds compare; (4) the aggregation on
+  many threads (Done, "The aggregation order in parallel" and "The greedy aggregation on the cells renumbered in its
+  order"): the trees before (`14d84afa`) and after them, with `instrument.py`'s timers ("aggr: order", "aggr:
+  renumbering", "aggr: greedy", "pass: Aggregate"), k=0 n=64 on 1 x 8, 1 x 16, 1 x 32 (estimated on 1 x 32: the order
+  0.11 -> ~0.02-0.03 s, the greedy 0.17 -> ~0.1 s plus ~0.005-0.01 s of renumbering), and k=2 n=32 (small there);
+  the threshold `ParallelOrderMinLevelSize` (1024, set on the laptop's 8 threads) on 32 threads: 256, 1024 and 4096 in
+  one tree (an environment variable read by the instrumented copy); from the results, whether the opt-in split of the
+  greedy among the threads is worth it (Next ideas, "The aggregation in parallel"); (5) the other changes above, on
   32 threads.
 - **The condensation, 1.7x on 8 threads** (0.14 / 0.08 s at n=48) — to profile: its sequential part is not known (its
   loops are parallel; the per-cell heap allocations of Eigen's dense blocks, `_W`'s outer index zero-filled by Eigen?).

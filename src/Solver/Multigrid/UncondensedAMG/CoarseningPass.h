@@ -68,6 +68,9 @@ public:
 	// The number of components of the unknown (UncondensedAMG::VectorComponents): the constants are the first
 	// VectorComponents DoFs of each block, those of the removed faces given by the reconstruction (ComputeProlongation())
 	int VectorComponents = 1;
+	// The levels of the aggregation order's breadth-first search of at least this number of cells run on the threads
+	// (ParallelAggregationOrder()): a smaller level costs less than their synchronization. Tests: 1.
+	inline static BigNumber ParallelOrderMinLevelSize = 1024;
 
 	CoarseningPass(int cellBlockSize, int faceBlockSize, bool symmetric, double strongCouplingThreshold)
 		: _cbs(cellBlockSize), _fbs(faceBlockSize), _symmetric(symmetric), _strongCouplingThreshold(strongCouplingThreshold)
@@ -321,54 +324,78 @@ public:
 		// already ordered, each time by increasing number of cells of which they are a strong neighbour
 		UninitializedVector<BigNumber> order; // first written in parallel (fresh memory), then in the order of the cells
 		ParallelAssign(order, NCells, (BigNumber)0);
-		BigNumber start = 0;
-		for (BigNumber e = 0; e < NCells; ++e)
+		BigNumber start = min_element(NStrongNeighbourOf.begin(), NStrongNeighbourOf.end()) - NStrongNeighbourOf.begin();
+		if (Parallelism::NThreads() > 1)
+			ParallelAggregationOrder(start, order);
+		else
 		{
-			if (cells[e].Count < cells[start].Count)
-				start = e;
-		}
-		BigNumber nOrdered = 0;
-		order[nOrdered++] = start;
-		cells[start].Ordered = true;
-		vector<BigNumber> unordered;
-		BigNumber nextUnordered = 0;
-		for (BigNumber i = 0; i < NCells; ++i)
-		{
-			if (i == nOrdered) // disconnected cells: continue from the first cell not ordered yet
+			BigNumber nOrdered = 0;
+			order[nOrdered++] = start;
+			cells[start].Ordered = true;
+			vector<BigNumber> unordered;
+			BigNumber nextUnordered = 0;
+			for (BigNumber i = 0; i < NCells; ++i)
 			{
-				while (cells[nextUnordered].Ordered)
-					nextUnordered++;
-				order[nOrdered++] = nextUnordered;
-				cells[nextUnordered].Ordered = true;
-			}
-			prefetch(order, i, nOrdered, false);
-			const CellData& c = cells[order[i]];
-			unordered.clear();
-			for (int k = 0; k < c.NNeighbours; ++k)
-			{
-				BigNumber n = neighbours[c.NeighboursStart + k];
-				if (!cells[n].Ordered)
-					unordered.push_back(n);
-			}
-			if (unordered.empty())
-				continue;
-			// Same sort as PairwiseAggregation: same order of the equal counts
-			sort(unordered.begin(), unordered.end(), [&cells](BigNumber n1, BigNumber n2) { return cells[n1].Count < cells[n2].Count; });
-			for (BigNumber n : unordered)
-			{
-				order[nOrdered++] = n;
-				cells[n].Ordered = true;
+				if (i == nOrdered) // disconnected cells: continue from the first cell not ordered yet
+				{
+					while (cells[nextUnordered].Ordered)
+						nextUnordered++;
+					order[nOrdered++] = nextUnordered;
+					cells[nextUnordered].Ordered = true;
+				}
+				prefetch(order, i, nOrdered, false);
+				const CellData& c = cells[order[i]];
+				unordered.clear();
+				for (int k = 0; k < c.NNeighbours; ++k)
+				{
+					BigNumber n = neighbours[c.NeighboursStart + k];
+					if (!cells[n].Ordered)
+						unordered.push_back(n);
+				}
+				if (unordered.empty())
+					continue;
+				// Same sort as PairwiseAggregation: same order of the equal counts
+				sort(unordered.begin(), unordered.end(), [&cells](BigNumber n1, BigNumber n2) { return cells[n1].Count < cells[n2].Count; });
+				for (BigNumber n : unordered)
+				{
+					order[nOrdered++] = n;
+					cells[n].Ordered = true;
+				}
 			}
 		}
 
-		// Aggregation
+		// Aggregation. On several threads, on the cells renumbered in the aggregation order (the cell numbered i is
+		// order[i]): the neighbours of a cell are then a few levels of the breadth-first search away, mostly in the cache,
+		// instead of anywhere in memory. The renumbering is parallel: on one thread it would cost what it saves.
+		bool renumbered = Parallelism::NThreads() > 1;
+		IndexLists renumberedNeighbours; // the strong neighbours of each cell (all its neighbours with allNeighbours)
+		if (renumbered)
+		{
+			UninitializedVector<BigNumber> number(NCells); // written by the parallel loop below
+			#pragma omp parallel for
+			for (BigNumber i = 0; i < NCells; ++i)
+				number[order[i]] = i;
+			renumberedNeighbours.Allocate(NCells, [&](BigNumber i) { const CellData& c = cells[order[i]]; return allNeighbours ? c.NNeighbours : c.NStrong; });
+			UninitializedVector<CellData> renumberedCells(NCells); // written by the parallel loop below
+			#pragma omp parallel for
+			for (BigNumber i = 0; i < NCells; ++i)
+			{
+				CellData c = cells[order[i]];
+				for (int k = 0; k < renumberedNeighbours.Size(i); ++k)
+					renumberedNeighbours[i][k] = number[neighbours[c.NeighboursStart + k]];
+				c.NeighboursStart = renumberedNeighbours.Start[i];
+				renumberedCells[i] = c;
+			}
+			cells.swap(renumberedCells);
+			neighbours = renumberedNeighbours.Items.data();
+		}
 		NAggregates = 0;
 		ParallelAssign(AggregateCells.Start, NCells + 1, (BigNumber)0); // first written in parallel, as order
 		ParallelAssign(AggregateCells.Items, NCells, (BigNumber)0);
 		BigNumber nItems = 0;
 		auto addToAggregate = [&](BigNumber e)
 		{
-			AggregateCells.Items[nItems++] = e;
+			AggregateCells.Items[nItems++] = renumbered ? order[e] : e;
 			CellData& c = cells[e];
 			c.Aggregate = NAggregates;
 			for (int k = 0; k < c.NStrong; ++k)
@@ -381,8 +408,9 @@ public:
 		BigNumber remaining = NCells;
 		for (BigNumber i = 0; i < NCells; ++i)
 		{
-			prefetch(order, i, NCells, !allNeighbours);
-			BigNumber e = order[i];
+			if (!renumbered)
+				prefetch(order, i, NCells, !allNeighbours);
+			BigNumber e = renumbered ? i : order[i];
 			if (cells[e].Aggregate >= 0)
 				continue;
 			addToAggregate(e);
@@ -430,9 +458,98 @@ public:
 		CellAggregate.resize(NCells);
 		#pragma omp parallel for
 		for (BigNumber e = 0; e < NCells; ++e)
-			CellAggregate[e] = cells[e].Aggregate;
+			CellAggregate[renumbered ? order[e] : e] = cells[e].Aggregate;
 
 		return CoarsestMeshReached(comm);
+	}
+
+	// The aggregation order of Aggregate() on several threads, the same: breadth-first, a level of the search at a time.
+	// Each cell of the next level is claimed by the first cell of the current level that has it as a neighbour (a
+	// minimum by compare-and-swap: the neighbour lists aren't symmetric), then the cells claimed by each cell are sorted
+	// as in the sequential order and placed by a prefix sum over the threads. About twice the memory accesses of the
+	// sequential order: Aggregate() keeps the sequential one on one thread (the usual case of each MPI process).
+	void ParallelAggregationOrder(BigNumber start, UninitializedVector<BigNumber>& order) const
+	{
+		const BigNumber unclaimed = NCells;
+		UninitializedVector<BigNumber> claimedBy; // the position in order of the cell that claimed each cell, -1: a start
+		ParallelAssign(claimedBy, NCells, unclaimed);
+		auto byCount = [this](BigNumber n1, BigNumber n2) { return NStrongNeighbourOf[n1] < NStrongNeighbourOf[n2]; };
+		ThreadLocal<vector<BigNumber>> claimed; // the cells claimed by the chunk of the level of each thread, in order
+		order[0] = start;
+		claimedBy[start] = -1;
+		BigNumber begin = 0; // the current level: order[begin, end)
+		BigNumber end = 1;
+		BigNumber nextUnclaimed = 0;
+		while (begin < end)
+		{
+			BigNumber newEnd = end;
+			if (end - begin < ParallelOrderMinLevelSize)
+			{
+				for (BigNumber i = begin; i < end; ++i)
+				{
+					BigNumber e = order[i];
+					BigNumber first = newEnd;
+					for (int k = 0; k < NNeighbours[e]; ++k)
+					{
+						BigNumber n = Neighbours[e][k];
+						if (claimedBy[n] == unclaimed)
+						{
+							claimedBy[n] = i;
+							order[newEnd++] = n;
+						}
+					}
+					sort(order.begin() + first, order.begin() + newEnd, byCount); // same sort as the sequential order
+				}
+			}
+			else
+			{
+				#pragma omp parallel
+				{
+					auto [chunkBegin, chunkEnd] = Parallelism::ThreadChunk(end - begin);
+					for (BigNumber i = begin + chunkBegin; i < begin + chunkEnd; ++i)
+					{
+						BigNumber e = order[i];
+						for (int k = 0; k < NNeighbours[e]; ++k)
+						{
+							BigNumber* claimer = &claimedBy[Neighbours[e][k]];
+							BigNumber current = __atomic_load_n(claimer, __ATOMIC_RELAXED);
+							while (current > i && !__atomic_compare_exchange_n(claimer, &current, i, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+								;
+						}
+					}
+					#pragma omp barrier
+					vector<BigNumber>& local = claimed.Local();
+					local.clear();
+					for (BigNumber i = begin + chunkBegin; i < begin + chunkEnd; ++i)
+					{
+						BigNumber e = order[i];
+						size_t first = local.size();
+						for (int k = 0; k < NNeighbours[e]; ++k)
+						{
+							if (claimedBy[Neighbours[e][k]] == i)
+								local.push_back(Neighbours[e][k]);
+						}
+						sort(local.begin() + first, local.end(), byCount);
+					}
+					#pragma omp barrier
+					BigNumber position = end;
+					for (int t = 0; t < Parallelism::ThreadNumber(); ++t)
+						position += (claimed.begin() + t)->size();
+					copy(local.begin(), local.end(), order.begin() + position);
+					if (Parallelism::ThreadNumber() == Parallelism::TeamSize() - 1)
+						newEnd = position + local.size();
+				}
+			}
+			if (newEnd == end && end < NCells) // disconnected cells: continue from the first cell not ordered yet
+			{
+				while (claimedBy[nextUnclaimed] != unclaimed)
+					nextUnclaimed++;
+				order[newEnd++] = nextUnclaimed;
+				claimedBy[nextUnclaimed] = -1;
+			}
+			begin = end;
+			end = newEnd;
+		}
 	}
 
 	// The coarsening ratio of the aggregation (of all the processes) is too small

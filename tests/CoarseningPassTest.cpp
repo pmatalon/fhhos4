@@ -341,6 +341,39 @@ TEST(CoarseningPass, NonsymmetricSystem)
 	CheckLevels(0.5, 1);
 }
 
+// The aggregation on several threads (its order by CoarseningPass::ParallelAggregationOrder(), the greedy on the cells
+// renumbered in that order): the aggregates of one thread, with every level of the order's search on the threads or
+// none, pairwise and with all the neighbours; on a connected mesh, and on two halves without a face between them (the
+// search restarts from the first cell not ordered yet)
+TEST(CoarseningPass, AggregationOnThreads)
+{
+	int n = 64;
+	CartesianHybridSystem system(n, 0);
+	BigNumber firstHorizontalFace = (n - 1) * n;
+	SparseMatrix halves = system.A_TF; // without the faces between the rows of cells n/2 - 1 and n/2
+	halves.prune([&](Eigen::Index, Eigen::Index f, double) { return f < firstHorizontalFace + (n / 2 - 1) * n || f >= firstHorizontalFace + n / 2 * n; });
+	for (const SparseMatrix* A_T_F : { &system.A_TF, &halves })
+	{
+		for (bool allNeighbours : { false, true })
+		{
+			auto aggregates = [&](int nThreads, BigNumber minLevelSize)
+			{
+				Parallelism::SetNThreads(nThreads);
+				CoarseningPass::ParallelOrderMinLevelSize = minLevelSize;
+				CoarseningPass pass(1, 1, true, 0.25);
+				pass.Build(*A_T_F, nullptr);
+				pass.Aggregate(allNeighbours);
+				return pair(pass.AggregateCells.Items, pass.CellAggregate);
+			};
+			auto sequential = aggregates(1, 1);
+			EXPECT_TRUE(aggregates(4, 1) == sequential) << "allNeighbours " << allNeighbours;
+			EXPECT_TRUE(aggregates(4, n * n) == sequential) << "allNeighbours " << allNeighbours;
+		}
+	}
+	Parallelism::SetNThreads(0);
+	CoarseningPass::ParallelOrderMinLevelSize = 1024;
+}
+
 // The coarse operators Q_F^T A Q_F: the face prolongation chained over the coarsening passes
 TEST(CoarseningPass, NotGalerkin)
 {
