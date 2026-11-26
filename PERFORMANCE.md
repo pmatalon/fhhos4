@@ -1828,6 +1828,32 @@ setup / solve (s); `p x t` on CPUs 0 to p t - 1, each process on its own.
 - The jobs: 3 h 11 of 4 h (per tree: build 2.5 min, memory 11 s, strong 11.5 min, bind 20.5 min, large 60 min, mostly
   the program's assembly of k=2 n=32), peak 17.7 GB; the 2 nodes 16 min of 30 (10 of them the probe's timeout), 27.5 GB.
 
+**The reproducibility modes** (2026-11-26, ADR-0024): the cost of `-reproducibility on-any-nthreads` against `none`
+(the default), within the memory caps, plugged in, best of 2, elapsed setup / solve (s). Ratios are times with / times
+without (x0.5: twice faster). Scripts and logs: `build/bench_repro/` (`run.sh`), `build-mpi/bench_repro_mpi/`.
+- 4 processes x 2 threads (`OMP_NUM_THREADS=2 BLIS_NUM_THREADS=1`), `-s fcglibuamg` (Chebyshev in both modes: only the
+  coarse solve differs, MUMPS against the matrix gathered on the process 0 and Eigen's factorization there) and
+  `-s gcrlibuamg -uamg-nonsym` (also `l1hbgs` against `l1bgs`):
+
+  | Case | `none` | `on-any-nthreads` | ratios |
+  |---|---|---|---|
+  | Cube-tet k=0 n=8, FCG (20 it) | 0.028 / 0.030 | 0.019 / 0.011 | x0.68 / x0.37 |
+  | Cube-tet k=2 n=8, FCG (30 it) | 0.070 / 0.177 | 0.065 / 0.114 | x0.93 / x0.64 |
+  | Cube-tet k=0 n=8, GCR non-sym. (27 it) | 0.032 / 0.042 | 0.031 / 0.014 | x0.97 / x0.33 |
+  | Cube-tet k=2 n=8, GCR non-sym. (101 -> 68 it) | 0.085 / 0.548 | 0.079 / 0.221 | x0.93 / x0.40 |
+
+  The gathered coarse solve is faster here: a coarse matrix of at most 1000 rows, whose distributed MUMPS solves cost
+  more in messages than a solve on one process plus a gather and a scatter. The serial step will cost on many
+  processes, where the coarsest matrix grows with `MinRowsPerProcess` (not measured: one node). At k=2 non-symmetric,
+  `l1hbgs` on 2 threads per process (Jacobi between the threads too) took 101 iterations, `l1bgs` 68.
+- One process, `-s gcrlibuamg -uamg-nonsym`, 8 threads and 1: Cube-tet k=2 n=8 (34 it), Cube-cart k=2 n=8 (12 it),
+  Square-tri k=2 n=16 (17 it): the same residual tables in both modes and on both thread counts, the same times
+  within the noise (e.g. Cube-tet 8 threads 0.056 / 0.215 against 0.056 / 0.209). At these sizes `l1hbgs` already
+  sweeps sequentially (matrices under 20000 non-zeros, or more than 20% of them between the threads): no cost. Where
+  its sweeps run in parallel, the cost is the hybrid speedup lost: `hbgs` against `bgs` on 8 threads, x0.6-0.7 on the
+  solve of HArDCore3D 32^3-48^3 k=1-2 (2026-10-08, Done), so about x1.4-1.6 for `on-any-nthreads` there, fewer
+  iterations aside (not measured beyond the caps).
+
 Next ideas:
 1. **The memory per process** (2026-10-28 above), by expected gain:
    - `A`, `Acons` and `Astab` of the cells: done (2026-10-29 above). What stays of the local matrices: `P` (1.25 KB per
@@ -1844,7 +1870,8 @@ Next ideas:
    (overlap): not measured, probably small on one node.
 3. **The coarse levels on fewer processes**: on many processes the reductions of the K-cycle on the coarse levels, and the
    coarsest level (MUMPS on all the processes), cost latency; agglomerate the levels with few rows per process (as
-   hypre, AGMG), and factorize the coarsest level on a subset of the processes.
+   hypre, AGMG), and factorize the coarsest level on a subset of the processes. On 4 processes, the coarse matrix
+   gathered on one (the reproducible modes) made the solve x0.33-0.64 (2026-11-26 above).
 4. `AssembleFromLocalRows()` still sorts the rows of both `Diag` and `Offd` (two passes on the rows); `BuildByRows()`
    copies each matrix twice (chunks, then the matrix).
 

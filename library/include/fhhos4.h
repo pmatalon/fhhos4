@@ -263,6 +263,12 @@ namespace fhhos4
 		BlockGaussSeidel,               // bgs
 		BackwardBlockGaussSeidel,       // rbgs
 		SymmetricBlockGaussSeidel,      // sbgs: forward then backward
+		L1BlockGaussSeidel,             // l1bgs: BlockGaussSeidel in l1 Gauss-Seidel (Baker et al., SISC 2011): the diagonal of
+		                                // the rows coupled to other processes increased by Solver::L1Theta (1/2) times the
+		                                // sum of the |a_ij| of these couplings, which keeps it convergent whatever the
+		                                // partition. Sequential in each process: its results don't depend on the number of
+		                                // threads. On 1 process: BlockGaussSeidel
+		L1BackwardBlockGaussSeidel,     // l1rbgs
 		HybridBlockGaussSeidel,         // hbgs: Gauss-Seidel in the rows of each thread, Jacobi between the threads:
 		                                // parallel, except on the levels where the rows of the threads are poorly
 		                                // separated; the results depend on the number of threads, not on the run. On 1
@@ -284,14 +290,31 @@ namespace fhhos4
 	};
 
 	// The solver of the coarsest level (Solver::CoarseSolver). On several processes (MPI), the factorizations are MUMPS's,
-	// distributed over the processes.
+	// distributed over the processes; in the reproducible modes (Solver::Reproducibility), the coarse matrix gathered on
+	// the process of rank 0 and factorized there.
 	enum class CoarseSolver
 	{
 		Default,  // Cholesky for a symmetric matrix (SetupSym...()), LU otherwise (SetupNonSym...())
 		Cholesky, // sparse Cholesky factorization, for a symmetric positive definite matrix
 		LU,       // sparse LU factorization
 		MUMPS     // MUMPS's sparse factorization: LDL^T for a symmetric matrix (positive definite), LU otherwise. Needs
-		          // the library compiled with MUMPS (ENABLE_MUMPS; always with MPI)
+		          // the library compiled with MUMPS (ENABLE_MUMPS; always with MPI). On several processes, its solutions
+		          // vary from run to run at the rounding level: refused in the reproducible modes
+	};
+
+	// The reproducibility of the solution (Solver::Reproducibility): the same solution, bit for bit, from run to run, given
+	// the same binary, machine, matrix, parameters and number of processes (each process aggregates its own cells: the
+	// solution depends on the partition). The parallel algorithms that would break it are replaced, the fastest within
+	// it. Not covered: MPI's reductions, deterministic in practice but not by the MPI standard.
+	enum class ReproducibilityMode
+	{
+		None,            // no guarantee: the fastest. On several processes, MUMPS's coarse solve varies from run to run at
+		                 // the rounding level
+		OnFixedNThreads, // on the same number of threads per process: on several processes, the coarse matrix gathered on
+		                 // the process of rank 0 and factorized there (CoarseSolver Default, Cholesky or LU; MUMPS refused),
+		                 // a serial step
+		OnAnyNThreads    // on any number of threads: also the default smoother for a non-symmetric matrix
+		                 // L1BlockGaussSeidel (sequential in each process; the hybrid smoothers refused)
 	};
 
 	struct Result
@@ -371,20 +394,23 @@ namespace fhhos4
 		// - for a non-symmetric matrix (the Chebyshev smoothers require a symmetric one), L1HybridBlockGaussSeidel:
 		//   parallel, convergent whatever the numbers of threads and processes. For convection-dominated problems,
 		//   HybridBlockGaussSeidel usually takes fewer iterations; keep the l1 one if the iterations stall, e.g. in 3D at
-		//   degree 2 or more, or on several processes.
+		//   degree 2 or more, or on several processes. With ReproducibilityMode::OnAnyNThreads, L1BlockGaussSeidel
+		//   (sequential in each process: the results of the hybrid ones depend on the number of threads).
 		// PostSmoother Default: the adjoint of PreSmoother, which makes the cycle symmetric: the sweep in the other
-		// direction for Gauss-Seidel (BackwardBlockGaussSeidel after BlockGaussSeidel, HybridBackwardBlockGaussSeidel after
-		// HybridBlockGaussSeidel, L1HybridBackwardBlockGaussSeidel after L1HybridBlockGaussSeidel, and the other way
-		// around), PreSmoother itself if it is symmetric (Chebyshev, Jacobi, SymmetricBlockGaussSeidel).
+		// direction for Gauss-Seidel (BackwardBlockGaussSeidel after BlockGaussSeidel, L1BackwardBlockGaussSeidel after
+		// L1BlockGaussSeidel, HybridBackwardBlockGaussSeidel after HybridBlockGaussSeidel, L1HybridBackwardBlockGaussSeidel
+		// after L1HybridBlockGaussSeidel, and the other way around), PreSmoother itself if it is symmetric (Chebyshev,
+		// Jacobi, SymmetricBlockGaussSeidel).
 		// Non-symmetric matrix (SetupNonSym...()): on a level with one-sided couplings (convection), the Gauss-Seidel
 		// smoothers keep their type, block size and number of sweeps, but not their direction: all their sweeps
 		// (backward and symmetric ones included) follow the downwind order of the level. Jacobi ignores it.
 		fhhos4::Smoother PreSmoother = fhhos4::Smoother::Default;
 		fhhos4::Smoother PostSmoother = fhhos4::Smoother::Default;
-		// The l1 Gauss-Seidel smoothers (L1HybridBlockGaussSeidel, L1HybridBackwardBlockGaussSeidel): the diagonal of the
-		// rows coupled to other threads or processes increased by L1Theta (>= 0) times the sum of the |a_ij| of these
-		// couplings. From 1/2 (the default), convergent for a symmetric matrix whatever the threads and processes;
-		// smaller values may take fewer iterations where the plain hybrid sweeps converge (0: HybridBlockGaussSeidel).
+		// The l1 Gauss-Seidel smoothers (L1BlockGaussSeidel, L1HybridBlockGaussSeidel and their backward versions): the
+		// diagonal of the rows coupled to other threads (the hybrid ones) or processes increased by L1Theta (>= 0) times
+		// the sum of the |a_ij| of these couplings. From 1/2 (the default), convergent for a symmetric matrix whatever the
+		// threads and processes; smaller values may take fewer iterations where the plain sweeps converge (0:
+		// BlockGaussSeidel, HybridBlockGaussSeidel).
 		double L1Theta = 0.5;
 		// The prolongation of the h-coarsening: from the faces of the boundary of each aggregate to its interior faces
 		fhhos4::Prolongation Prolongation = fhhos4::Prolongation::HarmonicExtension;
@@ -404,7 +430,8 @@ namespace fhhos4
 		// coarsest matrix cannot reach CoarseMatrixMaxRows, and the last levels would have a few rows per process.
 		int MinRowsPerProcess = 50;
 #endif
-		// Solver of the coarsest level. Default: Cholesky for a symmetric matrix, LU otherwise.
+		// Solver of the coarsest level. Default: Cholesky for a symmetric matrix, LU otherwise. On several processes:
+		// MUMPS's, or, in the reproducible modes (Reproducibility), the matrix gathered on the process of rank 0.
 		fhhos4::CoarseSolver CoarseSolver = fhhos4::CoarseSolver::Default;
 		// Mixed precision: the matrices of the levels of the AMG (operators, transfers, smoothers) stored and its cycles
 		// run in single precision (float), but the coarsest solve: half the memory of the levels, faster cycles. The setup
@@ -428,6 +455,12 @@ namespace fhhos4
 		                   // at most one thread per physical core (no hyper-threading) unless OMP_NUM_THREADS or OpenMP's
 		                   // binding (OMP_PROC_BIND, OMP_PLACES) is set. On several processes (MPI): the cores divided
 		                   // among the processes of Comm that run on the same CPUs (not bound to distinct cores)
+		// The reproducibility of the solution that the solver guarantees (see fhhos4::ReproducibilityMode): None (the
+		// default, the fastest), OnFixedNThreads (the same solution from run to run on the same number of threads per
+		// process), OnAnyNThreads (whatever the number of threads). Refused: a hybrid smoother set in OnAnyNThreads
+		// (HybridBlockGaussSeidel, L1HybridBlockGaussSeidel and their backward versions: L1BlockGaussSeidel instead), and
+		// CoarseSolver::MUMPS on several processes in both reproducible modes.
+		fhhos4::ReproducibilityMode Reproducibility = fhhos4::ReproducibilityMode::None;
 		int Verbosity = 0; // 0: nothing; 1: one line per setup (number of levels, time) and per solve (iterations,
 		                   // residual, time); 2: all the messages of fhhos4, with the precision of the levels (single or
 		                   // double, and why if MixedPrecision is not applied) and the residual at each iteration.

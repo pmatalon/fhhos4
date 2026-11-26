@@ -107,6 +107,7 @@ structures): `-ksp_norm_type unpreconditioned` for `-ksp_rtol` on $b - Ax$, as t
 | `-pc_fhhos4_cycle k\|v\|w` | `k` | `Cycle` |
 | `-pc_fhhos4_krylov none\|fcg\|gcr` | `none`: one cycle | `Krylov` in each application: the whole solve of the library, with `-ksp_type preonly` |
 | `-pc_fhhos4_max_it`, `-pc_fhhos4_rtol` | `1`, `1e-8` | `MaxIterations` (cycles with `none`), `Tolerance` |
+| `-pc_fhhos4_reproducibility none\|on-fixed-nthreads\|on-any-nthreads` | `none` | `Reproducibility`: the same solution from run to run (see [Parameters](parameters.md)); in the view (`-ksp_view`) when not `none` |
 | `-pc_fhhos4_verbosity` | `0` | `Verbosity` |
 
 The other parameters keep the library's defaults.

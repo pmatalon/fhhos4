@@ -299,7 +299,7 @@ void print_usage() {
 	cout << "      Ratio lambdaMax/lambdaMin of the interval of the Chebyshev smoothers of the 1st kind (cheb, bcheb). Default: 10." << endl;
 	cout << endl;
 	cout << "-gs-l1 NUM" << endl;
-	cout << "      theta of the l1 Gauss-Seidel smoothers (l1hbgs, l1hrbgs) on the rows coupled to other threads (hybrid sweeps)" << endl;
+	cout << "      theta of the l1 Gauss-Seidel smoothers (l1bgs, l1rbgs, l1hbgs, l1hrbgs) on the rows coupled to other threads (hybrid sweeps)" << endl;
 	cout << "      or processes, with which they are Jacobi: theta sum_j |a_ij| over these couplings added to the diagonal (and" << endl;
 	cout << "      theta sum_j |a_ij| x_i to the right-hand side). From 1/2, convergent whatever the parts (symmetric matrix). No" << endl;
 	cout << "      effect on one thread and one process; the library (-s *libuamg) keeps its default. Default: 0.5." << endl;
@@ -390,7 +390,8 @@ void print_usage() {
 	cout << "      (Jacobi, symmetric Gauss-Seidel, Chebyshev). For the alternating ones, it depends on the number of smoothing steps:" << endl;
 	cout << "      if the pre-smoother is \"ags\", the post-smoother will also be \"ags\" if the number of smoothing steps is even, or \"rags\" if odd." << endl;
 	cout << "      Default: \"bcheb4\" for U-AMG on a symmetric matrix (the library's: its results don't depend on the numbers of threads" << endl;
-	cout << "      and processes), with the cycle K,2,2 if -cycle is not given; \"bgs\" otherwise (-uamg-nonsym, the other multigrids)." << endl;
+	cout << "      and processes), with the cycle K,2,2 if -cycle is not given; \"l1hbgs\" with -uamg-nonsym (\"l1bgs\" with" << endl;
+	cout << "      -reproducibility on-any-nthreads); \"bgs\" for the other multigrids." << endl;
 	cout << "              j     - Jacobi" << endl;
 	cout << "              gs    - Gauss-Seidel" << endl;
 	cout << "              rgs   - Reverse Gauss-Seidel" << endl;
@@ -404,10 +405,15 @@ void print_usage() {
 	cout << "              sbgs  - Symmetric Block Gauss-Seidel (forward then backward)" << endl;
 	cout << "              abgs  - Alternating Block Gauss-Seidel (starting with forward)" << endl;
 	cout << "              rabgs - Reverse Alternating Block Gauss-Seidel (starting with backward)" << endl;
+	cout << "              l1bgs - l1 Block Gauss-Seidel: 'bgs', the rows coupled to other processes in l1 Gauss-Seidel (-gs-l1):" << endl;
+	cout << "                      convergent whatever the partition, its results independent of the number of threads. Default of" << endl;
+	cout << "                      -uamg-nonsym with -reproducibility on-any-nthreads" << endl;
+	cout << "              l1rbgs - l1 Reverse Block Gauss-Seidel" << endl;
 	cout << "              hbgs  - Hybrid Block Gauss-Seidel (parallelization of 'bgs')" << endl;
 	cout << "              hrbgs - Hybrid Reverse Block Gauss-Seidel (parallelization of 'rbgs')" << endl;
 	cout << "              l1hbgs - l1 Hybrid Block Gauss-Seidel: 'hbgs', the rows coupled to other threads or processes in l1" << endl;
-	cout << "                      Gauss-Seidel (-gs-l1): convergent whatever the parts. Default of -uamg-nonsym" << endl;
+	cout << "                      Gauss-Seidel (-gs-l1): convergent whatever the parts. Default of -uamg-nonsym (but with" << endl;
+	cout << "                      -reproducibility on-any-nthreads: its results depend on the number of threads)" << endl;
 	cout << "              l1hrbgs - l1 Hybrid Reverse Block Gauss-Seidel" << endl;
 	cout << "              cheb  - Chebyshev (1st kind) preconditioned by Jacobi: polynomial in D^-1 A, whose degree is the number of" << endl;
 	cout << "                      smoothing iterations (one product by A each), minimal on [lambdaMax/ratio, lambdaMax] (-cheb-ratio)." << endl;
@@ -635,6 +641,20 @@ void print_usage() {
 	cout << "              1     - sequential execution" << endl;
 	cout << "              other - requested number of threads" << endl;
 	cout << endl;
+	cout << "-reproducibility CODE" << endl;
+	cout << "      The reproducibility of the solution that the solver guarantees: the same solution, bit for bit, from run to" << endl;
+	cout << "      run, given the same binary, machine, matrix, options and number of processes (each process aggregates its" << endl;
+	cout << "      own cells). The parallel algorithms that would break it are replaced, the fastest within it (ADR-0024)." << endl;
+	cout << "      Not covered: the OpenMP sums outside the solve (the L2 errors, the full Neumann compatibility check), and" << endl;
+	cout << "      MPI's reductions (deterministic in practice, not by the MPI standard). fhhos4::Solver::Reproducibility." << endl;
+	cout << "              none              - no guarantee: on several processes, MUMPS's coarse solve varies from run to" << endl;
+	cout << "                                  run at the rounding level (default)" << endl;
+	cout << "              on-fixed-nthreads - on the same number of threads per process: on several processes, the coarse" << endl;
+	cout << "                                  matrix of U-AMG gathered on the process 0 and factorized there (ch, lu;" << endl;
+	cout << "                                  -coarse-solver mumpsch|mumpslu refused)" << endl;
+	cout << "              on-any-nthreads   - on any number of threads: also the default smoother of -uamg-nonsym l1bgs" << endl;
+	cout << "                                  (sequential in each process), the hybrid smoothers refused" << endl;
+	cout << endl;
 	cout << "-export CODES" << endl;
 	cout << "      Data export. The CODES must be comma-separated." << endl;
 	cout << "              lsys       - linear system (.dat files, readable by Matlab)" << endl;
@@ -846,6 +866,7 @@ int Run(int argc, char* argv[])
 		OPT_ApproxL2ProjNSubtriangulations,
 		// Misc
 		OPT_Threads,
+		OPT_Reproducibility,
 		OPT_Export,
 		OPT_VisuTolerance,
 		OPT_VisuMaxRefinements,
@@ -956,6 +977,7 @@ int Run(int argc, char* argv[])
 		 // Misc
 		 { "help", no_argument, NULL, 'h' },
 		 { "threads", required_argument, NULL, OPT_Threads },
+		 { "reproducibility", required_argument, NULL, OPT_Reproducibility },
 		 { "export", required_argument, NULL, OPT_Export },
 		 { "visu-tol", required_argument, NULL, OPT_VisuTolerance },
 		 { "visu-max-refin", required_argument, NULL, OPT_VisuMaxRefinements },
@@ -1649,6 +1671,15 @@ int Run(int argc, char* argv[])
 			case OPT_Threads:
 				Parallelism::SetNThreads(atoi(optarg));
 				break;
+			case OPT_Reproducibility:
+			{
+				string code = optarg;
+				auto mode = find(begin(ReproducibilityCodes), end(ReproducibilityCodes), code);
+				if (mode == end(ReproducibilityCodes))
+					argument_error("unknown -reproducibility code '" + code + "': none, on-fixed-nthreads or on-any-nthreads.");
+				args.Solver.Reproducibility = (ReproducibilityMode)(mode - begin(ReproducibilityCodes));
+				break;
+			}
 			case OPT_Export:
 			{
 				vector<string> exports = Utils::Explode(optarg, ',');

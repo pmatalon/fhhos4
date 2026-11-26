@@ -183,7 +183,8 @@ Keep each document up to date in the same commit as the change it describes. Whe
     display formulas in ` ```math ` blocks (inside `$$...$$`, Markdown eats the backslashes: `\|`, `\\`, `\{`),
     without a `\\` at the end of a line (GitHub's HTML adds a third backslash: write the rows on one line);
   - the parameters table gives the library's own defaults (`library/include/fhhos4.h` and `library/Solver.cpp`:
-    `Arguments()`, `CheckParameters()`, `DefaultPreSmoother()`), read in the code, never from the program (ADR-0008);
+    `Arguments()`, `CheckParameters()`; the default smoother: `UncondensedAMGDefaultPreSmoother()`,
+    `src/ProgramArgumentsDefaults.h`), read in the code, never from the program (ADR-0008);
   - any change of the public interface (`library/include/*`: a setup or solve function, a parameter, its default or
     its accepted values, an input requirement, an error) or of the library's build, install or CMake package updates
     these pages and the comments of `fhhos4.h`, which document the same interface.

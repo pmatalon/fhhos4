@@ -282,12 +282,20 @@ write them, not on the node of the setup's thread.
   `Smoother::BlockChebyshevFourthKind`, `bcheb4` in the program; `Pre/PostSmoothingIterations` -1: degree 2), also in
   the program (`SmootherType::Default` resolved by `ApplyProgramArgumentDefaults()`: `bcheb4`, K(2,2) without
   `-cycle`). For a non-symmetric matrix, l1 hybrid block Gauss-Seidel (`L1HybridBlockGaussSeidel`, `l1hbgs,l1hrbgs`,
-  ADR-0018), also for `-uamg-nonsym`; `bgs,rbgs` for the program's other multigrids.
+  ADR-0018), also for `-uamg-nonsym`, but l1 block Gauss-Seidel (`L1BlockGaussSeidel`, `l1bgs,l1rbgs`) in the
+  reproducible mode `OnAnyNThreads` (ADR-0024); `bgs,rbgs` for the program's other multigrids. One rule for the
+  library and the program: `UncondensedAMGDefaultPreSmoother()` (`ProgramArgumentsDefaults.h`).
+- Reproducibility modes (ADR-0024; `Solver::Reproducibility` and `-reproducibility`, of type `ReproducibilityMode` in
+  both): `OnAnyNThreads` refuses the hybrid smoothers (`SmootherFactory::IsHybrid()`; in the library's
+  `CheckParameters()`, in the program's `ApplyProgramArgumentDefaults()`); both reproducible modes refuse MUMPS on several
+  processes and gather the coarse matrix instead (`docs/mpi.md`). The rest of U-AMG gives the same results on any
+  number of threads (the setup, Chebyshev, the sequential sweeps, the Krylov methods).
 - Chebyshev (`bcheb4`, `bcheb`; `Solver/FixedPoint/BlockChebyshev.h`): symmetric matrices only (the library refuses
   them otherwise); `lambdaMax` of `D^-1 A` by 10 Lanczos iterations at the setup.
 - Hybrid block Gauss-Seidel (`hbgs`, `hrbgs`; ADR-0018; scalar kernels at k = 0; `Solver/FixedPoint/HybridChunks.h`):
   sequential sweeps on a level where more than 20% of the non-zeros couple rows of different threads
-  (`HybridChunks::MaxExternalFraction`; e.g. GMSH's numbering on the tetrahedral meshes).
+  (`HybridChunks::MaxExternalFraction`; e.g. GMSH's numbering on the tetrahedral meshes): a switch that depends on the
+  number of threads too.
 - Jacobi between the parts (the chunks of the hybrid sweeps, the processes) is not a contraction at k = 2 in 3D under
   that threshold: the cycle diverges; nor at k = 0 on several processes (Cube-tet n=32, 2 processes: GCR stagnates at
   3.7e-2). l1 Gauss-Seidel (`l1hbgs`, `l1hrbgs`: `BlockGaussSeidel` with `l1`, and `GaussSeidel` with `l1` at k = 0;
@@ -297,4 +305,6 @@ write them, not on the node of the setup's thread.
   `GaussSeidel::Diagonal()`), and times the old x_i in the right-hand side (`SweepRhs()`). theta: each smoother's
   (`_l1Theta`, 0: no l1 terms), from `Multigrid::L1Theta` through `SmootherFactory::Create()` (library `L1Theta`, program
   `-gs-l1`), 1/2 by default: M + M^T - A >= D for a symmetric A, whatever the parts. No row has an l1 term on one thread
-  and one process.
+  and one process. `l1bgs`, `l1rbgs` (`L1BlockGaussSeidel`): the same kernels without the hybrid chunks
+  (`SmootherFactory::HybridOrL1GaussSeidel()`, `hybrid` false), the l1 terms of `Offd` only: `l1hbgs` on one thread per
+  process, `bgs` on one process, bit for bit.

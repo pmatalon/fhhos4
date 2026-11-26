@@ -336,7 +336,7 @@ NB_MODULE(fhhos4, m)
 		.value("Default", fhhos4::Krylov::Default)
 		.value("FCG", fhhos4::Krylov::FCG)
 		.value("GCR", fhhos4::Krylov::GCR)
-		.value("None", fhhos4::Krylov::None);
+		.value("None_", fhhos4::Krylov::None); // None: a keyword of Python
 
 	nb::enum_<fhhos4::Cycle>(m, "Cycle")
 		.value("V", fhhos4::Cycle::V)
@@ -360,6 +360,8 @@ NB_MODULE(fhhos4, m)
 		.value("BlockGaussSeidel", fhhos4::Smoother::BlockGaussSeidel)
 		.value("BackwardBlockGaussSeidel", fhhos4::Smoother::BackwardBlockGaussSeidel)
 		.value("SymmetricBlockGaussSeidel", fhhos4::Smoother::SymmetricBlockGaussSeidel)
+		.value("L1BlockGaussSeidel", fhhos4::Smoother::L1BlockGaussSeidel)
+		.value("L1BackwardBlockGaussSeidel", fhhos4::Smoother::L1BackwardBlockGaussSeidel)
 		.value("HybridBlockGaussSeidel", fhhos4::Smoother::HybridBlockGaussSeidel)
 		.value("HybridBackwardBlockGaussSeidel", fhhos4::Smoother::HybridBackwardBlockGaussSeidel)
 		.value("L1HybridBlockGaussSeidel", fhhos4::Smoother::L1HybridBlockGaussSeidel)
@@ -373,6 +375,11 @@ NB_MODULE(fhhos4, m)
 		.value("Cholesky", fhhos4::CoarseSolver::Cholesky)
 		.value("LU", fhhos4::CoarseSolver::LU)
 		.value("MUMPS", fhhos4::CoarseSolver::MUMPS);
+
+	nb::enum_<fhhos4::ReproducibilityMode>(m, "ReproducibilityMode")
+		.value("None_", fhhos4::ReproducibilityMode::None)
+		.value("OnFixedNThreads", fhhos4::ReproducibilityMode::OnFixedNThreads)
+		.value("OnAnyNThreads", fhhos4::ReproducibilityMode::OnAnyNThreads);
 
 	nb::class_<fhhos4::Result>(m, "Result")
 		.def_ro("Iterations", &fhhos4::Result::Iterations)
@@ -541,6 +548,7 @@ NB_MODULE(fhhos4, m)
 		.def_rw("BlockCSRStorage", &fhhos4::Solver::BlockCSRStorage)
 		// Execution
 		.def_rw("Threads", &fhhos4::Solver::Threads)
+		.def_rw("Reproducibility", &fhhos4::Solver::Reproducibility)
 		.def_rw("Verbosity", &fhhos4::Solver::Verbosity)
 #if FHHOS4_MPI
 		// The processes of the solver: an mpi4py communicator (MPI.COMM_SELF, MPI.COMM_WORLD...); not set: one process

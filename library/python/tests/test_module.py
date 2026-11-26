@@ -311,6 +311,9 @@ def test_parameters():
     assert solver.PolynomialSpace == fhhos4.PolynomialSpace.Inferred and not solver.SingularMatrix and solver.VectorComponents == -1
     assert solver.Dimension == -1 and solver.FaceDegree == -1 and solver.CellDegree == -1
     assert solver.Restart == -1 and solver.L1Theta == 0.5
+    assert solver.Reproducibility == fhhos4.ReproducibilityMode.None_
+    solver.Reproducibility = fhhos4.ReproducibilityMode.OnAnyNThreads
+    assert solver.Reproducibility == fhhos4.ReproducibilityMode.OnAnyNThreads
     solver.L1Theta = 1.0
     assert solver.L1Theta == 1.0
     solver.Restart = 5
@@ -322,6 +325,36 @@ def test_parameters():
     assert solver.PCoarsening == fhhos4.PCoarsening.ToZero and solver.PreSmoother == fhhos4.Smoother.BlockGaussSeidel
     assert solver.PolynomialSpace == fhhos4.PolynomialSpace.Q and solver.SingularMatrix
     assert fhhos4.Version().startswith("1.")
+
+
+def test_reproducibility():
+    """ReproducibilityMode.OnAnyNThreads: the same solution bit for bit on 1 and 4 threads (non-symmetric: the default
+    l1 block Gauss-Seidel), a hybrid smoother refused; Krylov.None_ (None: a keyword of Python), MaxIterations 1: one
+    cycle"""
+    system = HybridSystem(32, asymmetry=0.3)
+    solutions = []
+    for threads in (1, 4):
+        solver = ToySolver()
+        solver.Reproducibility = fhhos4.ReproducibilityMode.OnAnyNThreads
+        solver.Threads = threads
+        solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
+        x_T, x_F = np.zeros(system.b_T.size), np.zeros(system.b_F.size)
+        assert solver.Solve(system.b_T, system.b_F, x_T, x_F).Converged
+        solutions.append(np.concatenate([x_T, x_F]))
+    assert np.array_equal(solutions[0], solutions[1])
+    solver.PreSmoother = fhhos4.Smoother.HybridBlockGaussSeidel
+    try:
+        solver.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellNearNullSpace, system.FaceNearNullSpace)
+        assert False, "a hybrid smoother accepted in OnAnyNThreads"
+    except fhhos4.Error as e:
+        assert "OnAnyNThreads" in str(e), str(e)
+    symmetric = HybridSystem(32)
+    cycle = ToySolver()
+    cycle.Krylov = fhhos4.Krylov.None_
+    cycle.MaxIterations = 1
+    cycle.SetupSym(symmetric.A_TT, symmetric.A_TF, symmetric.A_FF, symmetric.CellNearNullSpace, symmetric.FaceNearNullSpace)
+    x_T, x_F = np.zeros(symmetric.b_T.size), np.zeros(symmetric.b_F.size)
+    assert cycle.Solve(symmetric.b_T, symmetric.b_F, x_T, x_F).Iterations == 1
 
 
 def test_inferred_discretization():

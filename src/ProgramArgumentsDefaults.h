@@ -12,6 +12,19 @@ inline void argument_error(string msg)
 	exit(EXIT_FAILURE);
 }
 
+// The default pre-smoother of U-AMG, the library's and the program's (its post-smoother: the adjoint). For a symmetric
+// matrix, block Chebyshev of the fourth kind (ADR-0017): its results don't depend on the number of threads; on 1
+// thread, slower than the block Gauss-Seidel. For a non-symmetric one (Chebyshev requires a symmetric matrix), l1 block
+// Gauss-Seidel, convergent whatever the numbers of threads and processes (ADR-0018): hybrid (parallel), but sequential
+// in each process in ReproducibilityMode::OnAnyNThreads (ADR-0024), the hybrid one's results depending on the number
+// of threads; on 1 thread and 1 process both are the sequential block Gauss-Seidel.
+inline SmootherType UncondensedAMGDefaultPreSmoother(bool symmetric, ReproducibilityMode reproducibility)
+{
+	if (symmetric)
+		return SmootherType::BlockChebyshevFourthKind;
+	return reproducibility == ReproducibilityMode::OnAnyNThreads ? SmootherType::L1BlockGaussSeidel : SmootherType::L1HybridBlockGaussSeidel;
+}
+
 // The defaults of U-AMG (-s uamg, fcguamg, libuamg...) for the face degree k: part of ApplyProgramArgumentDefaults(),
 // also used by the library fhhos4 (library/Solver.cpp). The booleans: see ApplyProgramArgumentDefaults().
 inline void ApplyUncondensedAMGDefaults(MultigridArguments& mg, int k, bool defaultCoarseOperator = true, bool defaultCycle = true, bool defaultHPCoarseningStgy = true)

@@ -1,4 +1,6 @@
 #include "ProgramArgumentsDefaults.h"
+#include "Solver/Multigrid/SmootherFactory.h"
+#include "Utils/Communicator.h"
 #ifdef GMSH_ENABLED
 #include "Mesher/GMSH/GMSHMesh.h"
 #endif
@@ -348,8 +350,7 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 
 		ApplyUncondensedAMGDefaults(args.Solver.MG, args.Discretization.PolyDegree - 1, defaultCoarseOperator, defaultCycle, defaultHPCoarseningStgy);
 
-		// For a non-symmetric matrix: the K-cycle iterates with GCR, LU on the coarsest level, no FCG; the library's
-		// smoother, the l1 hybrid block Gauss-Seidel (ADR-0018), the sequential block Gauss-Seidel on 1 thread and 1 process
+		// For a non-symmetric matrix: the K-cycle iterates with GCR, LU on the coarsest level, no FCG
 		if (args.Solver.MG.UAMGNonsymmetric)
 		{
 			if (args.Solver.SolverCode.compare("fcg") == 0)
@@ -357,15 +358,12 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 			args.Solver.MG.KCycleKrylov = KrylovMethod::GCR;
 			if (defaultCoarseSolver)
 				args.Solver.MG.CoarseSolverCode = "lu";
-			if (args.Solver.MG.PreSmoother == SmootherType::Default)
-				args.Solver.MG.PreSmoother = SmootherType::L1HybridBlockGaussSeidel;
 		}
-		// For a symmetric matrix, the library's smoother (ADR-0017): block Chebyshev of the fourth kind, degree 2, whose
-		// results don't depend on the numbers of threads and processes
-		else if (args.Solver.MG.PreSmoother == SmootherType::Default)
+		// The library's smoother; for a symmetric matrix (Chebyshev), of degree 2
+		if (args.Solver.MG.PreSmoother == SmootherType::Default)
 		{
-			args.Solver.MG.PreSmoother = SmootherType::BlockChebyshevFourthKind;
-			if (defaultCycle)
+			args.Solver.MG.PreSmoother = UncondensedAMGDefaultPreSmoother(!args.Solver.MG.UAMGNonsymmetric, args.Solver.Reproducibility);
+			if (!args.Solver.MG.UAMGNonsymmetric && defaultCycle)
 				args.Solver.MG.PreSmoothingIterations = args.Solver.MG.PostSmoothingIterations = 2;
 		}
 	}
@@ -373,6 +371,20 @@ void ApplyProgramArgumentDefaults(ProgramArguments& args,
 		argument_error("-uamg-nonsym requires U-AMG: -s uamg, gcruamg, libuamg or gcrlibuamg.");
 	if (args.Solver.MG.PreSmoother == SmootherType::Default)
 		args.Solver.MG.PreSmoother = SmootherType::BlockGaussSeidel;
+
+	// The reproducible modes (ADR-0024): what would break their guarantee is refused
+	string reproducibility = string("-reproducibility ") + ReproducibilityCodes[(unsigned)args.Solver.Reproducibility];
+	if (args.Solver.Reproducibility == ReproducibilityMode::OnAnyNThreads)
+	{
+		for (SmootherType smoother : { args.Solver.MG.PreSmoother, args.Solver.MG.PostSmoother })
+		{
+			if (SmootherFactory::IsHybrid(smoother))
+				argument_error(reproducibility + ": the results of the hybrid smoother '" + SmootherFactory::Code(smoother) + "' depend on the number of threads. Use -smoothers l1bgs, sequential in each process.");
+		}
+	}
+	bool mumps = args.Solver.MG.CoarseSolverCode.compare("mumpsch") == 0 || args.Solver.MG.CoarseSolverCode.compare("mumpslu") == 0;
+	if (args.Solver.Reproducibility != ReproducibilityMode::None && mumps && Communicator::Current().IsDistributed())
+		argument_error(reproducibility + ": on several processes, MUMPS's solutions vary from run to run. Leave -coarse-solver to its default (the coarse matrix gathered on the process 0).");
 	if (args.Solver.MG.UAMGCollapseBoundaryFaces && (!args.Solver.UsesUncondensedAMG() || args.Solver.UsesLibraryUAMG()))
 		argument_error("-uamg-bfc requires U-AMG in the program: -s uamg, fcguamg or gcruamg (not an option of the library).");
 

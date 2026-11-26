@@ -30,6 +30,8 @@ private:
 			{ "absor",  SmootherType::AlternatingBlockGaussSeidel },
 			{ "rabgs",  SmootherType::BackwardAlternatingBlockGaussSeidel },
 			{ "rabsor", SmootherType::BackwardAlternatingBlockGaussSeidel },
+			{ "l1bgs",  SmootherType::L1BlockGaussSeidel },
+			{ "l1rbgs", SmootherType::L1BackwardBlockGaussSeidel },
 			{ "hbgs",   SmootherType::HybridBlockGaussSeidel },
 			{ "hrbgs",  SmootherType::HybridBackwardBlockGaussSeidel },
 			{ "l1hbgs", SmootherType::L1HybridBlockGaussSeidel },
@@ -53,12 +55,13 @@ private:
 			return new BlockSORSmoother(blockSize, omega, direction, nSmootherIterations);
 	}
 
-	// l1Theta > 0: the rows coupled to other threads or processes in l1 Gauss-Seidel, theta l1Theta
-	static Smoother* HybridBlockGaussSeidel(int blockSize, Direction direction, int nSmootherIterations, double l1Theta = 0)
+	// hybrid: Jacobi between the threads; l1Theta > 0: the rows coupled to other threads (hybrid) or processes in l1
+	// Gauss-Seidel, theta l1Theta
+	static Smoother* HybridOrL1GaussSeidel(int blockSize, Direction direction, bool hybrid, int nSmootherIterations, double l1Theta = 0)
 	{
 		if (blockSize == 1) // the scalar kernels are faster
-			return new GaussSeidelSmoother(direction, true, nSmootherIterations, l1Theta);
-		return new BlockGaussSeidelSmoother(blockSize, direction, true, nSmootherIterations, l1Theta);
+			return new GaussSeidelSmoother(direction, hybrid, nSmootherIterations, l1Theta);
+		return new BlockGaussSeidelSmoother(blockSize, direction, hybrid, nSmootherIterations, l1Theta);
 	}
 
 public:
@@ -96,6 +99,14 @@ public:
 		       smoother == SmootherType::ChebyshevFourthKind || smoother == SmootherType::BlockChebyshevFourthKind;
 	}
 
+	// The hybrid smoothers: Jacobi between the threads, so their results depend on the number of threads (refused in
+	// ReproducibilityMode::OnAnyNThreads)
+	static bool IsHybrid(SmootherType smoother)
+	{
+		return smoother == SmootherType::HybridBlockGaussSeidel || smoother == SmootherType::HybridBackwardBlockGaussSeidel ||
+		       smoother == SmootherType::L1HybridBlockGaussSeidel || smoother == SmootherType::L1HybridBackwardBlockGaussSeidel;
+	}
+
 	// l1Theta: the theta of the l1 Gauss-Seidel smoothers (L1HybridBlockGaussSeidel...)
 	static Smoother* Create(SmootherType smoother, int nSmootherIterations, int blockSize, double omega, double l1Theta)
 	{
@@ -128,14 +139,18 @@ public:
 			case SmootherType::BackwardAlternatingBlockGaussSeidel:
 				return BlockSOROrGaussSeidel(blockSize, omega, Direction::AlternatingBackwardFirst, nSmootherIterations);
 
+			case SmootherType::L1BlockGaussSeidel:
+				return HybridOrL1GaussSeidel(blockSize, Direction::Forward, false, nSmootherIterations, l1Theta);
+			case SmootherType::L1BackwardBlockGaussSeidel:
+				return HybridOrL1GaussSeidel(blockSize, Direction::Backward, false, nSmootherIterations, l1Theta);
 			case SmootherType::HybridBlockGaussSeidel:
-				return HybridBlockGaussSeidel(blockSize, Direction::Forward, nSmootherIterations);
+				return HybridOrL1GaussSeidel(blockSize, Direction::Forward, true, nSmootherIterations);
 			case SmootherType::HybridBackwardBlockGaussSeidel:
-				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations);
+				return HybridOrL1GaussSeidel(blockSize, Direction::Backward, true, nSmootherIterations);
 			case SmootherType::L1HybridBlockGaussSeidel:
-				return HybridBlockGaussSeidel(blockSize, Direction::Forward, nSmootherIterations, l1Theta);
+				return HybridOrL1GaussSeidel(blockSize, Direction::Forward, true, nSmootherIterations, l1Theta);
 			case SmootherType::L1HybridBackwardBlockGaussSeidel:
-				return HybridBlockGaussSeidel(blockSize, Direction::Backward, nSmootherIterations, l1Theta);
+				return HybridOrL1GaussSeidel(blockSize, Direction::Backward, true, nSmootherIterations, l1Theta);
 
 			case SmootherType::Jacobi:
 				return new BlockJacobiSmoother(1, omega, nSmootherIterations);

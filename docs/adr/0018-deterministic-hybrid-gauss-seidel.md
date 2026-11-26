@@ -18,6 +18,10 @@ fewer iterations (HArDCore3D, 4 threads: convection-dominated 4 -> 7, 8 -> 11, t
 +0-2). A smoother rather than a parameter: an explicit choice keeps its meaning, only the default changes; as hypre
 and MFEM, which have l1-Gauss-Seidel as its own relaxation type.
 
+The hybrid smoothers are refused in the reproducible mode `OnAnyNThreads` (ADR-0024), whose default for a
+non-symmetric matrix is the l1 block Gauss-Seidel (`L1BlockGaussSeidel`, `l1bgs`): sequential in each process, the l1
+terms on the rows coupled to other processes only.
+
 ## Considered Options
 
 - The racy version (threads reading each other's values as they change): with GCR, 191 iterations instead of 26 on

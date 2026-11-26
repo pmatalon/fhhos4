@@ -181,34 +181,6 @@ namespace fhhos4
 			return make_unique<BorrowedSparseMatrix>(M.Rows, M.Cols, M.RowPointers ? M.RowPointers : noRows, M.ColumnIndices, M.Values);
 		}
 
-		// Runs check() on all the processes of comm: if it throws on one of them, all of them throw (an error on one
-		// process alone would leave the others waiting in the next collective call), with the message of the first
-		// process where it threw
-		template <class Check>
-		void CollectiveCheck(const Communicator& comm, Check check)
-		{
-			if (!comm.IsDistributed())
-			{
-				check();
-				return;
-			}
-			string message;
-			try
-			{
-				check();
-			}
-			catch (const fhhos4::Error& e)
-			{
-				message = e.what();
-			}
-			int failedRank = comm.Min(message.empty() ? comm.Size() : comm.Rank());
-			if (failedRank == comm.Size())
-				return;
-			vector<char> text(message.begin(), message.end());
-			comm.Broadcast(text, failedRank);
-			Utils::FatalError(string(text.begin(), text.end()) + (comm.Size() > 1 ? " (on the process " + to_string(failedRank) + ")" : ""));
-		}
-
 		// The end of the errors of the inputs of a distributed system given on one process: Comm forgotten, if it is not set
 		// and MPI runs several processes
 		string ForgottenComm(const Solver& s)
@@ -486,11 +458,17 @@ namespace fhhos4
 				Utils::FatalError("fhhos4::Solver: Restart must be >= 1, or -1 (the Krylov method's default), got " + to_string(s.Restart) + ".");
 			if (s.PreSmoothingIterations < -1 || s.PostSmoothingIterations < -1)
 				Utils::FatalError("fhhos4::Solver: PreSmoothingIterations and PostSmoothingIterations must be >= 0, or -1 (the smoother's default), got " + to_string(s.PreSmoothingIterations) + " and " + to_string(s.PostSmoothingIterations) + ".");
+			LibraryParameters::ProgramReproducibility(s.Reproducibility); // refuses a value out of the enum
+			string mode = s.Reproducibility == fhhos4::ReproducibilityMode::OnAnyNThreads ? "ReproducibilityMode::OnAnyNThreads" : "ReproducibilityMode::OnFixedNThreads";
 			for (fhhos4::Smoother smoother : { s.PreSmoother, s.PostSmoother })
 			{
 				if (!symmetric && SmootherFactory::IsChebyshev(LibraryParameters::ProgramSmoother(smoother)))
 					Utils::FatalError("fhhos4::Solver: the Chebyshev smoothers require a symmetric positive definite matrix: leave PreSmoother and PostSmoother Default for a non-symmetric one.");
+				if (s.Reproducibility == fhhos4::ReproducibilityMode::OnAnyNThreads && SmootherFactory::IsHybrid(LibraryParameters::ProgramSmoother(smoother)))
+					Utils::FatalError("fhhos4::Solver: " + mode + ", but the results of the hybrid smoothers (HybridBlockGaussSeidel, L1HybridBlockGaussSeidel and their backward versions) depend on the number of threads: set PreSmoother to L1BlockGaussSeidel, sequential in each process (or leave PreSmoother and PostSmoother Default).");
 			}
+			if (s.Reproducibility != fhhos4::ReproducibilityMode::None && CoarseSolver == fhhos4::CoarseSolver::MUMPS && Comm.IsDistributed())
+				Utils::FatalError("fhhos4::Solver: " + mode + ", but on several processes the solutions of MUMPS (CoarseSolver::MUMPS) vary from run to run: leave CoarseSolver Default (or Cholesky, LU: the coarse matrix gathered on the process of rank 0).");
 			if (!(s.KCycleMinimumOperatorReduction >= 0))
 				Utils::FatalError("fhhos4::Solver: KCycleMinimumOperatorReduction must be >= 0, got " + to_string(s.KCycleMinimumOperatorReduction) + ".");
 			if (!(s.L1Theta >= 0))
@@ -545,18 +523,6 @@ namespace fhhos4
 			return !constants;
 		}
 
-		// The pre-smoother when Solver::PreSmoother is empty, whatever the Krylov method (PERFORMANCE.md): for a symmetric
-		// matrix, the block Chebyshev of the fourth kind, whatever the number of threads (the user's choice: the same
-		// results on any number of threads; on 1 thread, slower than the block Gauss-Seidel); for a non-symmetric one
-		// (Chebyshev requires a symmetric matrix), the l1 hybrid block Gauss-Seidel (ADR-0018): convergent whatever the
-		// numbers of threads and processes; on 1 thread and 1 process, the sequential block Gauss-Seidel
-		SmootherType DefaultPreSmoother() const
-		{
-			if (Symmetric)
-				return SmootherType::BlockChebyshevFourthKind;
-			return SmootherType::L1HybridBlockGaussSeidel;
-		}
-
 		// The number of iterations of the smoother when Solver::Pre/PostSmoothingIterations is -1: the degree 2 for the
 		// Chebyshev smoothers (PERFORMANCE.md), 1 otherwise
 		static int DefaultSmoothingIterations(SmootherType smoother)
@@ -571,13 +537,15 @@ namespace fhhos4
 			args.Solver.Tolerance = s.Tolerance;
 			args.Solver.MaxIterations = s.MaxIterations;
 			args.Solver.PrintIterationResults = s.Verbosity >= 2;
+			args.Solver.Reproducibility = LibraryParameters::ProgramReproducibility(s.Reproducibility);
 			MultigridArguments& mg = args.Solver.MG;
 			mg.Cycle = LibraryParameters::ProgramCycle(s.Cycle);
 			mg.WLoops = s.Cycle == fhhos4::Cycle::W ? 2 : 1;
 			mg.P_CS = LibraryParameters::ProgramPCoarsening(s.PCoarsening);
 			mg.CoarseningProlongationCode = (int)LibraryParameters::ProgramProlongation(s.Prolongation);
 			mg.KCycleKrylov = Krylov == fhhos4::Krylov::GCR || !Symmetric ? KrylovMethod::GCR : KrylovMethod::FCG; // GCR under GCR (Notay)
-			mg.PreSmoother = s.PreSmoother != fhhos4::Smoother::Default ? LibraryParameters::ProgramSmoother(s.PreSmoother) : DefaultPreSmoother();
+			// Default: whatever the Krylov method (PERFORMANCE.md)
+			mg.PreSmoother = s.PreSmoother != fhhos4::Smoother::Default ? LibraryParameters::ProgramSmoother(s.PreSmoother) : UncondensedAMGDefaultPreSmoother(Symmetric, args.Solver.Reproducibility);
 			mg.PostSmoother = LibraryParameters::ProgramSmoother(s.PostSmoother); // Default: the program's, the adjoint of the pre-smoother (rbgs after bgs, the same Chebyshev...)
 			mg.PreSmoothingIterations = s.PreSmoothingIterations >= 0 ? s.PreSmoothingIterations : DefaultSmoothingIterations(mg.PreSmoother);
 			// PostSmoother Default: of the type of the pre-smoother

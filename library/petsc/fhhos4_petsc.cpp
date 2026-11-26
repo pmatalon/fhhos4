@@ -507,6 +507,7 @@ namespace
 	const char* const Cycles[] = { "v", "w", "k" };      // fhhos4::Cycle
 	const char* const Krylovs[] = { "none", "fcg", "gcr" }; // fhhos4::Krylov None, FCG, GCR
 	const char* const Spaces[] = { "p", "q", "inferred" }; // fhhos4::PolynomialSpace
+	const char* const Reproducibilities[] = { "none", "on-fixed-nthreads", "on-any-nthreads" }; // fhhos4::ReproducibilityMode
 
 	PetscErrorCode PCSetFromOptions_FHHOS4(PC pc, PetscOptionItems PetscOptionsObject)
 	{
@@ -545,6 +546,9 @@ namespace
 		PetscCall(PetscOptionsReal("-pc_fhhos4_rtol", "Relative tolerance of fhhos4's Krylov method", "PCFHHOS4", s.Tolerance, &tolerance, &set));
 		if (set)
 			s.Tolerance = tolerance;
+		PetscCall(PetscOptionsEList("-pc_fhhos4_reproducibility", "The same solution from run to run: none (the fastest), on-fixed-nthreads (on the same number of threads per process), on-any-nthreads", "PCFHHOS4", Reproducibilities, 3, Reproducibilities[(int)s.Reproducibility], &value, &set));
+		if (set)
+			s.Reproducibility = (fhhos4::ReproducibilityMode)value;
 		PetscCall(PetscOptionsInt("-pc_fhhos4_verbosity", "fhhos4's printouts: 0, 1 (one line per setup and solve), 2", "PCFHHOS4", s.Verbosity, &value, &set));
 		if (set)
 			s.Verbosity = (int)value;
@@ -569,6 +573,8 @@ namespace
 				PetscCall(PetscViewerASCIIPrintf(viewer, "  %d cycle(s) per application\n", s.MaxIterations));
 			else
 				PetscCall(PetscViewerASCIIPrintf(viewer, "  fhhos4's %s in each application: %d iterations at most, relative tolerance %g\n", s.Krylov == fhhos4::Krylov::FCG ? "FCG" : "GCR", s.MaxIterations, s.Tolerance));
+			if (s.Reproducibility != fhhos4::ReproducibilityMode::None)
+				PetscCall(PetscViewerASCIIPrintf(viewer, "  reproducibility %s: the same solution from run to run\n", Reproducibilities[(int)s.Reproducibility]));
 			if (s.IsSetUp())
 				PetscCall(PetscViewerASCIIPrintf(viewer, "  %s setup, %d levels\n", ctx->SetUpSymmetric ? "symmetric" : "non-symmetric", s.NumberOfLevels()));
 		}

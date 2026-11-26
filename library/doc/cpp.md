@@ -121,7 +121,8 @@ What changes for a non-symmetric matrix (e.g. convection-diffusion):
   ```
 - The same algorithm runs, with GCR instead of FCG, and Gauss-Seidel smoothers that follow the direction of the flow
   (downwind order). The default smoother, `L1HybridBlockGaussSeidel`, converges whatever the numbers of threads and
-  processes. For convection-dominated problems, `HybridBlockGaussSeidel` usually takes fewer iterations; keep the
+  processes (`L1BlockGaussSeidel`, sequential in each process, with `ReproducibilityMode::OnAnyNThreads`: see
+  [Parameters](parameters.md)). For convection-dominated problems, `HybridBlockGaussSeidel` usually takes fewer iterations; keep the
   default if the iterations stall, e.g. in 3D at degree 2 or more, or on several processes:
   ```cpp
   solver.PreSmoother = fhhos4::Smoother::HybridBlockGaussSeidel;

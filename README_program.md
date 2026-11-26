@@ -157,7 +157,9 @@ mpiexec -n 4 ./bin/fhhos4 -geo cube -mesh tetra -n 16 -k 1 -s fcglibuamg
   results don't depend on the number of processes), block Jacobi and block Gauss-Seidel (Gauss-Seidel in each process,
   Jacobi between them: it can converge much more slowly than on one process, or stagnate, e.g. in 3D at k=2; the l1
   hybrid block Gauss-Seidel, `-smoothers l1hbgs`, the default of `-uamg-nonsym`, converges, more slowly than on one
-  process). Refused: the other meshers, problems, discretizations and solvers,
+  process). The coarsest level is solved by MUMPS, whose solutions vary from run to run at the rounding level; with
+  `-reproducibility on-fixed-nthreads|on-any-nthreads`, the same solution from run to run (the coarse matrix
+  gathered on the first process; see `fhhos4 -h`). Refused: the other meshers, problems, discretizations and solvers,
   the exports, initial guesses other than 0.
 - On one process (`mpiexec -n 1`, or without `mpiexec`), the program is the one compiled without MPI.
 

@@ -487,6 +487,78 @@ TEST(DistributedLibrary, NearNullSpaceBeyondTheConstants)
 	}
 }
 
+// The solution of the uncondensed system (singular: the pure Neumann one, SingularMatrix) distributed by rows over
+// blocks of processes (the ghosts in reverse order), gathered on all the processes, solved by the solver of the
+// processes configured by set()
+template <class Set>
+Vector DistributedSolution(double asymmetry, bool singular, Set set)
+{
+	int n = 60;
+	CartesianHybridSystem global(n, asymmetry, singular);
+	PartitionedSystem system(global, n, PartitionShape::Blocks, World());
+	const IndexMap& faces = *system.Faces;
+	const IndexMap& cells = *system.Cells;
+	SparseMatrix ownA_TF = system.Global.A_TF.middleRows(cells.Begin, cells.NOwned);
+	SparseMatrix ownA_FF = system.Global.A_FF.middleRows(faces.Begin, faces.NOwned);
+	SparseMatrix ownA_FT = system.Global.A_FT.middleRows(faces.Begin, faces.NOwned);
+	vector<BigNumber> ghostFaces = ReversedGhosts({ &ownA_TF, &ownA_FF }, faces), ghostCells = ReversedGhosts({ &ownA_FT }, cells);
+	fhhos4::SparseMatrix A_TT = system.A_TT, A_TF = LocalColumns(ownA_TF, faces, ghostFaces);
+	fhhos4::SparseMatrix A_FF = LocalColumns(ownA_FF, faces, ghostFaces), A_FT = LocalColumns(ownA_FT, cells, ghostCells);
+	vector<int64_t> faceGhosts(ghostFaces.begin(), ghostFaces.end()), cellGhosts(ghostCells.begin(), ghostCells.end());
+	Vector cellOnes = Vector::Ones(cells.NOwned), faceOnes = Vector::Ones(faces.NOwned);
+	fhhos4::Solver solver = CartesianSolver(World().Comm());
+	solver.SingularMatrix = singular;
+	set(solver);
+	if (asymmetry == 0)
+		solver.SetupSym(A_TT, A_TF, A_FF, cellOnes, faceOnes, faceGhosts);
+	else
+		solver.SetupNonSym(A_TT, A_TF, A_FT, A_FF, cellOnes, faceOnes, faceGhosts, cellGhosts);
+	Vector b_T = Vector::LinSpaced(global.A_TT.rows(), 1, 2).segment(cells.Begin, cells.NOwned), b_F = Vector::Zero(faces.NOwned);
+	Vector x_T(cells.NOwned), x_F = Vector::Zero(faces.NOwned);
+	EXPECT_TRUE(solver.Solve(b_T, b_F, x_T, x_F).Converged);
+	Vector x(global.A_TT.rows() + global.S.rows());
+	x << Gathered(x_T), Gathered(x_F);
+	return x;
+}
+
+// The reproducible modes on several processes (ADR-0024): repeated setups and solves give the same solution bit for
+// bit (the coarse matrix gathered on the process 0: MUMPS's solutions vary from run to run), symmetric, singular (its
+// matrix pinned before it is gathered) or not; the default smoother of OnAnyNThreads for a non-symmetric matrix, the
+// l1 block Gauss-Seidel, is the l1 hybrid one bit for bit on one thread per process; CoarseSolver::MUMPS refused
+TEST(DistributedLibrary, ReproducibleModes)
+{
+	for (fhhos4::ReproducibilityMode mode : { fhhos4::ReproducibilityMode::OnFixedNThreads, fhhos4::ReproducibilityMode::OnAnyNThreads })
+	{
+		for (auto [asymmetry, singular] : { pair{ 0.0, false }, { 0.3, false }, { 0.0, true } })
+		{
+			auto set = [mode](fhhos4::Solver& s) { s.Reproducibility = mode; };
+			Vector first = DistributedSolution(asymmetry, singular, set), second = DistributedSolution(asymmetry, singular, set);
+			EXPECT_TRUE((first.array() == second.array()).all()) << "mode " << (int)mode << ", asymmetry " << asymmetry << ", singular " << singular;
+		}
+	}
+
+	auto oneThread = [](fhhos4::Smoother smoother) { return [smoother](fhhos4::Solver& s) { s.Threads = 1; s.PreSmoother = smoother; }; };
+	Vector l1 = DistributedSolution(0.3, false, oneThread(fhhos4::Smoother::L1BlockGaussSeidel));
+	Vector hybrid = DistributedSolution(0.3, false, oneThread(fhhos4::Smoother::L1HybridBlockGaussSeidel));
+	EXPECT_TRUE((l1.array() == hybrid.array()).all());
+
+	if (World().Size() == 1)
+		return; // MUMPS: on one process, reproducible
+	for (fhhos4::ReproducibilityMode mode : { fhhos4::ReproducibilityMode::OnFixedNThreads, fhhos4::ReproducibilityMode::OnAnyNThreads })
+	{
+		try
+		{
+			DistributedSolution(0, false, [mode](fhhos4::Solver& s) { s.Reproducibility = mode; s.CoarseSolver = fhhos4::CoarseSolver::MUMPS; });
+			ADD_FAILURE() << "MUMPS accepted on several processes in a reproducible mode";
+		}
+		catch (const fhhos4::Error& e)
+		{
+			EXPECT_NE(string(e.what()).find("ReproducibilityMode::On"), string::npos) << e.what();
+			EXPECT_NE(string(e.what()).find("leave CoarseSolver Default"), string::npos) << e.what();
+		}
+	}
+}
+
 // MinRowsPerProcess on P processes: the coarsening stops as with CoarseMatrixMaxRows at MinRowsPerProcess * P rows (on
 // 2 and 4 processes, a level earlier than at 1000); at the fine level with the number of faces
 TEST(DistributedLibrary, MinRowsPerProcess)

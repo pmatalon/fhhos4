@@ -35,10 +35,12 @@ public:
 		Solver* solver = nullptr;
 		string GaussSeidelRelaxation1 = "The relaxation parameter of Gauss-Seidel is 1. Delete -relax arg to remove this warning, or use -s sor.";
 
+		// On several processes, MUMPS's factorizations, or in the reproducible modes the matrix gathered on the process 0
+		bool gathered = args.Solver.Reproducibility != ReproducibilityMode::None;
 		if (args.Solver.SolverCode.compare("lu") == 0)
-			solver = new EigenSparseLU();
+			solver = new EigenSparseLU(gathered);
 		else if (args.Solver.SolverCode.compare("ch") == 0)
-			solver = new EigenSparseCholesky();
+			solver = new EigenSparseCholesky(gathered);
 		else if (args.Solver.SolverCode.compare("mumpslu") == 0)
 			solver = new MUMPSSolver(false);
 		else if (args.Solver.SolverCode.compare("mumpsch") == 0)
@@ -173,6 +175,8 @@ public:
 			case SmootherType::BackwardSOR:                    return SmootherType::SOR;
 			case SmootherType::BlockGaussSeidel:               return SmootherType::BackwardBlockGaussSeidel;
 			case SmootherType::BackwardBlockGaussSeidel:       return SmootherType::BlockGaussSeidel;
+			case SmootherType::L1BlockGaussSeidel:             return SmootherType::L1BackwardBlockGaussSeidel;
+			case SmootherType::L1BackwardBlockGaussSeidel:     return SmootherType::L1BlockGaussSeidel;
 			case SmootherType::HybridBlockGaussSeidel:         return SmootherType::HybridBackwardBlockGaussSeidel;
 			case SmootherType::HybridBackwardBlockGaussSeidel: return SmootherType::HybridBlockGaussSeidel;
 			case SmootherType::L1HybridBlockGaussSeidel:         return SmootherType::L1HybridBackwardBlockGaussSeidel;
@@ -240,6 +244,7 @@ public:
 		argsCoarseSolver.Solver.SolverCode = args.Solver.MG.CoarseSolverCode;
 		argsCoarseSolver.Solver.Tolerance = args.Solver.Tolerance;
 		argsCoarseSolver.Solver.PrintIterationResults = false;
+		argsCoarseSolver.Solver.Reproducibility = args.Solver.Reproducibility;
 		argsCoarseSolver.Actions.Export.MultigridIterationVectors = args.Actions.Export.MultigridIterationVectors;
 		if (Utils::EndsWith(args.Solver.MG.CoarseSolverCode, "aggregamg"))
 		{

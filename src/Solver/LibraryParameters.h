@@ -23,6 +23,8 @@ private:
 			{ fhhos4::Smoother::BlockGaussSeidel,               SmootherType::BlockGaussSeidel },
 			{ fhhos4::Smoother::BackwardBlockGaussSeidel,       SmootherType::BackwardBlockGaussSeidel },
 			{ fhhos4::Smoother::SymmetricBlockGaussSeidel,      SmootherType::SymmetricBlockGaussSeidel },
+			{ fhhos4::Smoother::L1BlockGaussSeidel,             SmootherType::L1BlockGaussSeidel },
+			{ fhhos4::Smoother::L1BackwardBlockGaussSeidel,     SmootherType::L1BackwardBlockGaussSeidel },
 			{ fhhos4::Smoother::HybridBlockGaussSeidel,         SmootherType::HybridBlockGaussSeidel },
 			{ fhhos4::Smoother::HybridBackwardBlockGaussSeidel, SmootherType::HybridBackwardBlockGaussSeidel },
 			{ fhhos4::Smoother::L1HybridBlockGaussSeidel,         SmootherType::L1HybridBlockGaussSeidel },
@@ -73,6 +75,16 @@ private:
 			{ fhhos4::PolynomialSpace::Q, true }
 		};
 		return polynomialSpaces;
+	}
+
+	static const Table<fhhos4::ReproducibilityMode, ReproducibilityMode>& Reproducibilities()
+	{
+		static const Table<fhhos4::ReproducibilityMode, ReproducibilityMode> reproducibilities = {
+			{ fhhos4::ReproducibilityMode::None,              ReproducibilityMode::None },
+			{ fhhos4::ReproducibilityMode::OnFixedNThreads, ReproducibilityMode::OnFixedNThreads },
+			{ fhhos4::ReproducibilityMode::OnAnyNThreads,   ReproducibilityMode::OnAnyNThreads }
+		};
+		return reproducibilities;
 	}
 
 	// The coarse solvers of the library (Default: chosen by the library) and their codes in the program
@@ -143,6 +155,11 @@ public:
 		return ToProgram(PolynomialSpaces(), polynomialSpace, "PolynomialSpace");
 	}
 
+	static ReproducibilityMode ProgramReproducibility(fhhos4::ReproducibilityMode reproducibility)
+	{
+		return ToProgram(Reproducibilities(), reproducibility, "Reproducibility");
+	}
+
 	// The code of the coarse solver (not Default); MUMPS: its factorization for the symmetry of the matrix
 	static string ProgramCoarseSolver(fhhos4::CoarseSolver coarseSolver, bool symmetric)
 	{
@@ -185,6 +202,11 @@ public:
 	static fhhos4::PolynomialSpace LibraryPolynomialSpace(bool usePolynomialSpaceQ)
 	{
 		return *ToLibrary(PolynomialSpaces(), usePolynomialSpaceQ);
+	}
+
+	static fhhos4::ReproducibilityMode LibraryReproducibility(ReproducibilityMode reproducibility)
+	{
+		return *ToLibrary(Reproducibilities(), reproducibility);
 	}
 
 	static fhhos4::CoarseSolver LibraryCoarseSolver(const string& coarseSolverCode)

@@ -46,6 +46,7 @@ public:
 		_solver.CoarseSolver = LibraryParameters::LibraryCoarseSolver(mg.CoarseSolverCode);
 		_solver.MixedPrecision = mg.UAMGMixedPrecision; // the program's default: double (the papers)
 		_solver.BlockCSRStorage = mg.UAMGBlockCSRStorage;
+		_solver.Reproducibility = LibraryParameters::LibraryReproducibility(args.Solver.Reproducibility);
 		_solver.Threads = Parallelism::NThreads(); // the setting of the program for its solvers (-threads, SolverThreads)
 		_solver.Verbosity = args.Solver.PrintIterationResults ? 2 : 1;
 		// Comm not set: the system of the program on one process; SetupFromDistributedBlocks(): all of them

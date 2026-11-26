@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <type_traits>
 #include <vector>
 #include <unistd.h>
@@ -13,6 +14,7 @@
 #endif
 #include "Parallelism.h"
 #include "Types.h"
+#include "fhhos4_error.h"
 using namespace std;
 
 // The processes of a distributed computation (MPI): their number, and the reductions and exchanges between them.
@@ -186,6 +188,67 @@ public:
 		return all;
 	}
 
+	// The concatenation of the vectors of all the processes, in rank order, on the process root (empty on the others);
+	// counts: the size of each, on root, if not null
+	template <class T>
+	vector<T> GatherV(const vector<T>& local, int root = 0, vector<int>* counts = nullptr) const
+	{
+		static_assert(is_trivially_copyable_v<T>);
+#ifdef MPI_ENABLED
+		if (_size > 1)
+		{
+			int bytes = Bytes<T>(local.size());
+			vector<int> sizes(_rank == root ? _size : 0);
+			MPI_Gather(&bytes, 1, MPI_INT, sizes.data(), 1, MPI_INT, root, _comm);
+			vector<int> displacements(sizes.size() + 1, 0);
+			for (size_t r = 0; r < sizes.size(); r++)
+				displacements[r + 1] = displacements[r] + sizes[r];
+			vector<T> all(displacements.back() / sizeof(T));
+			MPI_Gatherv(local.data(), bytes, MPI_BYTE, all.data(), sizes.data(), displacements.data(), MPI_BYTE, root, _comm);
+			if (counts)
+			{
+				counts->resize(sizes.size());
+				for (size_t r = 0; r < sizes.size(); r++)
+					(*counts)[r] = sizes[r] / sizeof(T);
+			}
+			return all;
+		}
+#endif
+		if (counts)
+			*counts = { (int)local.size() };
+		return local;
+	}
+
+	// The other way around: counts[r] values of all, in rank order, to the process r, from the process root (all and
+	// counts read there only); returns the count values of this process
+	template <class T>
+	vector<T> ScatterV(const vector<T>& all, const vector<int>& counts, size_t count, int root = 0) const
+	{
+		static_assert(is_trivially_copyable_v<T>);
+		vector<T> local(count);
+#ifdef MPI_ENABLED
+		if (_size > 1)
+		{
+			vector<int> sizes, displacements;
+			if (_rank == root)
+			{
+				sizes.resize(_size);
+				displacements.assign(_size, 0);
+				for (int r = 0; r < _size; r++)
+				{
+					sizes[r] = Bytes<T>(counts[r]);
+					if (r > 0)
+						displacements[r] = displacements[r - 1] + sizes[r - 1];
+				}
+			}
+			MPI_Scatterv(all.data(), sizes.data(), displacements.data(), MPI_BYTE, local.data(), Bytes<T>(count), MPI_BYTE, root, _comm);
+			return local;
+		}
+#endif
+		copy(all.begin(), all.begin() + count, local.begin());
+		return local;
+	}
+
 	// The number of processes of this communicator on the node of this one that run on the same CPUs (the same
 	// affinity), among which its cores are divided (see Parallelism::SharingProcesses()). Collective.
 	int SharingProcesses() const
@@ -342,6 +405,34 @@ private:
 	}
 #endif
 };
+
+// Runs check() on all the processes of comm: if it throws on one of them, all of them throw (an error on one process
+// alone would leave the others waiting in the next collective call), with the message of the first process where it
+// threw
+template <class Check>
+void CollectiveCheck(const Communicator& comm, Check check)
+{
+	if (!comm.IsDistributed())
+	{
+		check();
+		return;
+	}
+	string message;
+	try
+	{
+		check();
+	}
+	catch (const fhhos4::Error& e)
+	{
+		message = e.what();
+	}
+	int failedRank = comm.Min(message.empty() ? comm.Size() : comm.Rank());
+	if (failedRank == comm.Size())
+		return;
+	vector<char> text(message.begin(), message.end());
+	comm.Broadcast(text, failedRank);
+	throw fhhos4::Error(string(text.begin(), text.end()) + " (on the process " + to_string(failedRank) + ")");
+}
 
 // The MPI environment of an executable (the program, the tests): MPI_Init_thread() at the construction, MPI_Finalize()
 // at the destruction or at exit() (e.g. after the help, or an error in the arguments), and the communicator of all the

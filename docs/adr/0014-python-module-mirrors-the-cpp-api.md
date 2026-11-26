@@ -4,3 +4,6 @@ The Python module has the C++ names (`solver.FaceDegree`, `SetupSym()`, `Solve()
 serves both (2026-10-18). It is built in this repository (nanobind, `ENABLE_PYTHON`, off) and reads NumPy arrays in
 place like the C++ library (ADR-0003): no conversion, float64 vectors only; SciPy matrices are duck-typed, SciPy is
 not needed. Its pip or conda packaging is decided after its validation in the client frameworks.
+
+One exception (ADR-0024, 2026-11-26): the enumerators named `None` (`Krylov::None`, `ReproducibilityMode::None`) are
+`None_` in Python, where `None` is a keyword (reachable only by `getattr()`).

@@ -3,7 +3,8 @@
 # Python
 
 The Python module `fhhos4` has the classes, functions, parameters and enums of the [C++ library](cpp.md), with the same names
-(`solver.Krylov = fhhos4.Krylov.GCR`), and also reads its inputs in place, as NumPy arrays.
+(`solver.Krylov = fhhos4.Krylov.GCR`), but `None`, a keyword of Python: `fhhos4.Krylov.None_`,
+`fhhos4.ReproducibilityMode.None_`. It also reads its inputs in place, as NumPy arrays.
 
 - [Installation](#installation)
 - [How to use](#how-to-use)

@@ -108,6 +108,7 @@ struct SolverArguments
 	double RelaxationParameter = 1;
 	int BlockSize = -1;
 	int Restart = 0;
+	ReproducibilityMode Reproducibility = ReproducibilityMode::None; // -reproducibility
 
 	string BiHarmonicSolverCode = "fcg";
 	string BiHarmonicPreconditionerCode = "s";

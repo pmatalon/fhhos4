@@ -530,7 +530,9 @@ if(ENABLE_TESTS)
 	# (-uamg-mixed: the p-level and the h-levels in float) within 1, also with a p-level of degree 1 (-p-cs -1: it and
 	# the finest level in block CSR, 19 iterations in double); the default smoother of -uamg-nonsym, the l1 hybrid block
 	# Gauss-Seidel (Jacobi between the processes and the threads, the rows coupled to them in l1 Gauss-Seidel: 66
-	# iterations; with -smoothers bgs, 160), also at k=0 (the scalar sweeps: 28 iterations, 200 without l1).
+	# iterations; with -smoothers bgs, 160), also at k=0 (the scalar sweeps: 28 iterations, 200 without l1), and 27 in
+	# -reproducibility on-any-nthreads (its default smoother l1bgs, sequential in each process, and the coarse matrix
+	# gathered on the process 0; MUMPS refused there).
 	# -no-cache: no concurrent writes of GMSH's cache by the tests run in parallel.
 	if(ENABLE_MPI)
 		set(mpi_program_cases
@@ -541,6 +543,8 @@ if(ENABLE_TESTS)
 			"3D_k2_gcruamg_nonsym|4|-geo cube -mesh tetra -n 4 -k 2 -s gcruamg -uamg-nonsym|\n66 iterations.*L2 Error = 9.83e-02"
 			"3D_k0_fcguamg|2|-geo cube -mesh tetra -n 8 -k 0 -s fcguamg|L2 Error = 7.18e-01"
 			"3D_k0_gcruamg_nonsym|4|-geo cube -mesh tetra -n 16 -k 0 -s gcruamg -uamg-nonsym|\n28 iterations.*L2 Error = 2.07e-01"
+			"3D_k0_gcruamg_nonsym_reproducible|4|-geo cube -mesh tetra -n 16 -k 0 -s gcruamg -uamg-nonsym -reproducibility on-any-nthreads|\n27 iterations.*L2 Error = 2.07e-01"
+			"ReproducibleMUMPSRefused|2|-geo square -mesh tri -mesher gmsh -n 8 -k 0 -s fcglibuamg -coarse-solver mumpsch -reproducibility on-fixed-nthreads|MUMPS's solutions vary from run to run"
 			"3D_k2_fcglibuamg|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg|\n26 iterations.*L2 Error = 9.83e-02"
 			"3D_k2_fcglibuamg_mixed|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg -uamg-mixed|\n2[5-7] iterations.*L2 Error = 9.83e-02"
 			"3D_k2_fcglibuamg_mixed_pk1|4|-geo cube -mesh tetra -n 4 -k 2 -s fcglibuamg -p-cs -1 -uamg-mixed|blocks of 3.*\n19 iterations.*L2 Error = 9.83e-02"

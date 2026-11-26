@@ -1303,6 +1303,108 @@ TEST(UAMGLibrary, DefaultPostSmoother)
 	}
 }
 
+// The reproducible modes on one process (ADR-0024). ReproducibilityMode::OnAnyNThreads: the same solution bit for bit on
+// 1 and 4 threads, symmetric (the default Chebyshev) and not (the default l1 block Gauss-Seidel, sequential: not the
+// hybrid one of the other modes); a hybrid smoother set, as pre- or post-smoother, refused there, allowed in
+// OnFixedNThreads
+TEST(UAMGLibrary, ReproducibleOnAnyNumberOfThreads)
+{
+	for (bool symmetric : { true, false })
+	{
+		HybridSystem system = symmetric ? HybridSystem(64) : NonsymmetricSystem(64, 0.3);
+		auto setup = [&](fhhos4::Solver& uamg)
+		{
+			if (symmetric)
+				uamg.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			else
+				uamg.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+		};
+		std::string description = symmetric ? "symmetric" : "non-symmetric";
+		Eigen::VectorXd onOneThread;
+		for (int threads : { 1, 4 })
+		{
+			fhhos4::Solver uamg = ToySolver();
+			uamg.PreSmoother = fhhos4::Smoother::Default;
+			uamg.PostSmoother = fhhos4::Smoother::Default;
+			uamg.Reproducibility = fhhos4::ReproducibilityMode::OnAnyNThreads;
+			uamg.Threads = threads;
+			uamg.Verbosity = 2; // prints the smoothers
+			::testing::internal::CaptureStdout();
+			setup(uamg);
+			Eigen::VectorXd x = Eigen::VectorXd::Zero(system.b.size());
+			fhhos4::Result result = uamg.Solve(system.b, x);
+			std::string output = ::testing::internal::GetCapturedStdout();
+			EXPECT_TRUE(result.Converged) << description;
+			EXPECT_EQ(output.find("Hybrid Gauss-Seidel"), std::string::npos) << description;
+			if (!symmetric)
+				EXPECT_NE(output.find("1 iteration of l1 Gauss-Seidel (forward)"), std::string::npos) << description;
+			if (threads == 1)
+				onOneThread = x;
+			else
+				EXPECT_TRUE((x.array() == onOneThread.array()).all()) << description;
+		}
+	}
+
+	HybridSystem system = NonsymmetricSystem(16, 0.3);
+	for (auto [preSmoother, postSmoother] : { std::pair{ fhhos4::Smoother::HybridBlockGaussSeidel, fhhos4::Smoother::Default },
+	                                          { fhhos4::Smoother::BlockGaussSeidel, fhhos4::Smoother::L1HybridBackwardBlockGaussSeidel } })
+	{
+		fhhos4::Solver hybrid = ToySolver();
+		hybrid.PreSmoother = preSmoother;
+		hybrid.PostSmoother = postSmoother;
+		hybrid.Reproducibility = fhhos4::ReproducibilityMode::OnAnyNThreads;
+		try
+		{
+			hybrid.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne);
+			ADD_FAILURE() << "a hybrid smoother accepted in OnAnyNThreads";
+		}
+		catch (const fhhos4::Error& e)
+		{
+			EXPECT_NE(std::string(e.what()).find("fhhos4::Solver: ReproducibilityMode::OnAnyNThreads"), std::string::npos) << e.what();
+			EXPECT_NE(std::string(e.what()).find("L1BlockGaussSeidel"), std::string::npos) << e.what();
+		}
+		hybrid.Reproducibility = fhhos4::ReproducibilityMode::OnFixedNThreads;
+		EXPECT_NO_THROW(hybrid.SetupNonSym(system.A_TT, system.A_TF, system.A_FT, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne));
+	}
+}
+
+// The l1 block Gauss-Seidel (L1BlockGaussSeidel) on one process, where no row is coupled to another process: the block
+// Gauss-Seidel bit for bit, their default post-smoothers the backward sweeps; non-symmetric, faces of degree 0 (the
+// scalar kernels) and 1 (blocks of 2: a second face function, coupled to no cell)
+TEST(UAMGLibrary, L1BlockGaussSeidelOnOneProcess)
+{
+	HybridSystem system = NonsymmetricSystem(32, 0.3);
+	Blocks degree0{ system.A_TT, system.A_TF, system.A_FT, system.A_FF };
+	Eigen::MatrixXd one = Eigen::MatrixXd::Identity(1, 1), firstFaceFunction(1, 2), faceFunctions(2, 2);
+	firstFaceFunction << 1, 0;
+	faceFunctions << 1, 0, 0, 2;
+	for (int faceDegree : { 0, 1 })
+	{
+		Blocks blocks = faceDegree == 0 ? degree0 : Kron(degree0, one, firstFaceFunction, faceFunctions);
+		Eigen::VectorXd b_T = Eigen::VectorXd::Random(blocks.A_TT.rows()), b_F = Eigen::VectorXd::Random(blocks.A_FF.rows());
+		auto solve = [&](fhhos4::Smoother smoother)
+		{
+			fhhos4::Solver uamg = ToySolver();
+			uamg.FaceDegree = faceDegree;
+			uamg.PreSmoother = smoother;
+			uamg.PostSmoother = fhhos4::Smoother::Default;
+			uamg.Verbosity = 2; // prints the smoothers
+			::testing::internal::CaptureStdout();
+			uamg.SetupNonSym(blocks.A_TT, blocks.A_TF, blocks.A_FT, blocks.A_FF, Constants(system.CellInterpOfOne, blocks.A_TT.rows()), Constants(system.FaceInterpOfOne, blocks.A_FF.rows()));
+			Eigen::VectorXd x_T(blocks.A_TT.rows()), x_F = Eigen::VectorXd::Zero(blocks.A_FF.rows());
+			EXPECT_TRUE(uamg.Solve(b_T, b_F, x_T, x_F).Converged);
+			std::string output = ::testing::internal::GetCapturedStdout();
+			bool l1 = smoother == fhhos4::Smoother::L1BlockGaussSeidel;
+			EXPECT_EQ(output.find("PostSmoothing       : 1 iteration of l1 Gauss-Seidel (backward)") != std::string::npos || output.find("PostSmoothing       : 1 iteration of l1 Block Gauss-Seidel (backward") != std::string::npos, l1) << output;
+			Eigen::VectorXd x(x_T.rows() + x_F.rows());
+			x << x_T, x_F;
+			return x;
+		};
+		Eigen::VectorXd l1 = solve(fhhos4::Smoother::L1BlockGaussSeidel), plain = solve(fhhos4::Smoother::BlockGaussSeidel);
+		EXPECT_TRUE((l1.array() == plain.array()).all()) << "faces of degree " << faceDegree;
+	}
+}
+
 // GhostGlobalNumbers from a container, read in place; int32 numbers refused
 TEST(UAMGLibrary, GhostGlobalNumbers)
 {
@@ -1803,6 +1905,9 @@ TEST(UAMGLibrary, Errors)
 	fhhos4::Solver noRestart = ToySolver();
 	noRestart.Restart = 0;
 	EXPECT_THROW(noRestart.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
+	fhhos4::Solver wrongReproducibility = ToySolver();
+	wrongReproducibility.Reproducibility = static_cast<fhhos4::ReproducibilityMode>(42);
+	EXPECT_THROW(wrongReproducibility.SetupSym(system.A_TT, system.A_TF, system.A_FF, system.CellInterpOfOne, system.FaceInterpOfOne), fhhos4::Error);
 
 	// Non-symmetric matrix: FCG or Cholesky refused, A_FT of the wrong size
 	fhhos4::Solver fcg = ToySolver();

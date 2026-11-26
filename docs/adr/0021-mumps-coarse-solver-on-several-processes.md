@@ -12,3 +12,6 @@ its rows and gets back those of the solution.
 - `CoarseSolver::Cholesky` and `LU` keep their meaning: on several processes they are MUMPS's (`SYM=1`, `SYM=0`).
 - On one process Eigen stays the default (the papers' results unchanged in every build); MUMPS is an explicit choice:
   `CoarseSolver::MUMPS`, `-coarse-solver mumpsch|mumpslu`.
+- In the reproducible modes (ADR-0024, opt-in), MUMPS's solutions varying from run to run on several processes, the
+  coarse matrix is gathered on the process 0 and factorized there by Eigen: the serial step this decision avoids by
+  default.

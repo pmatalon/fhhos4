@@ -62,8 +62,11 @@ waiting.
 ## What changes in the solver
 
 - Each process aggregates its own cells; the faces between processes are kept. The coarsest level is factorized and
-  solved by MUMPS, distributed over all the processes. The number of iterations may change slightly with the number
-  of processes.
+  solved by MUMPS, distributed over all the processes, whose solutions vary from run to run at the rounding level. The
+  number of iterations may change slightly with the number of processes.
+- For the same solution from run to run (on the same number of processes), set `Reproducibility` (see
+  [Parameters](parameters.md)): the coarsest matrix is then gathered on the process of rank 0 and factorized there,
+  a serial step (`CoarseSolver::MUMPS` refused).
 - All the parameters work on several processes. The Gauss-Seidel smoothers are Gauss-Seidel within each process (the
   hybrid ones: within each thread), and Jacobi between the processes, which can diverge (e.g. in 3D at degree 2 or
   more), except the l1 smoothers (the default).

@@ -16,7 +16,8 @@ creates its threads at each of MUMPS's small calls, see `PERFORMANCE.md`). Build
 
 - `Utils/Communicator.h`: the MPI calls, the only file with `#ifdef MPI_ENABLED` but `Solver/LibraryUAMG.cpp` (the
   library's `Comm`; public macro: `FHHOS4_MPI` in `fhhos4_version.h`, `library/Solver.cpp`). `Communicator`
-  (reductions, `AllToAll` for the setups, `Neighbours` for the halos, `FortranHandle()` for MUMPS),
+  (reductions, `AllToAll` for the setups, `Neighbours` for the halos, `GatherV`/`ScatterV` on one process,
+  `FortranHandle()` for MUMPS), `CollectiveCheck()` (an error on one process raised on all of them),
   `Communicator::Current()` (the communicator of
   the reductions of the solvers: `MPI_COMM_WORLD` in the program, the solver's in a library call, `CallScope`),
   `Parallel::Dot/Norm/SquaredNorm` (the sum of the processes' sums; on a process, by blocks of rows: `docs/uamg.md`,
@@ -44,7 +45,12 @@ creates its threads at each of MUMPS's small calls, see `PERFORMANCE.md`). Build
   right-hand side; the solution, as MUMPS distributes it, goes to the owners of its rows by an `IndexMap` whose ghosts
   are the rows held for other processes, built at the first solve; `INFOG(1) = -9`, its estimate of its working space
   too small, e.g. MUMPS 5.7.3 on 3 processes: `ICNTL(14)` doubled and the factorization again, up to 4 times; not
-  deterministic on several processes, the solutions differ at the rounding level from run to run));
+  deterministic on several processes, the solutions differ at the rounding level from run to run)), but in the
+  reproducible modes (ADR-0024; `EigenSparseCholesky`/`EigenSparseLU` created with `gathered` from
+  `args.Solver.Reproducibility` in `AlgebraicSolverFactory::CreateSolver()`): `Solver/Direct/GatheredOnRoot.h`, the
+  rows of `GlobalColumns()` (MUMPS's input) gathered on rank 0 in rank order (`Communicator::GatherV()`), factorized
+  there by the code of one process (its errors on all the processes: `CollectiveCheck()`), each right-hand side
+  gathered and the solution scattered to the owners of its rows (`ScatterV()`); `CoarseSolver::MUMPS` refused there;
   `IterativeSolver::SetDistributedMatrix()`; the blocks setup `Setup(A, A_T_T, A_T_F (local
   columns), A_F_T (empty if symmetric), faceMap, interps)`; `Level::DistributedOperator`, `DistributedP`. FCG applies the full matrix (not the lower
   triangle) on several processes.
@@ -127,8 +133,10 @@ creates its threads at each of MUMPS's small calls, see `PERFORMANCE.md`). Build
 discretization inferred from the blocks of the processes, with an empty first process too, in the iterations of all
 set; `NearNullSpaceBeyondTheConstants`: a third function on 2 components, the iterations of one process within 1 when
 the level of the functions is the coarsest, an empty first process; singular, the kernel of the 3 functions mixed,
-also with the finest level as the coarsest);
+also with the finest level as the coarsest; `ReproducibleModes`: repeated setups and solves bit for bit in both
+reproducible modes, symmetric, non-symmetric and singular, `l1bgs` = `l1hbgs` on one thread per process, MUMPS refused);
 `ctest -R ProgramMPI` (the program under `mpiexec`, L2 errors; 3D k=2 also the iterations of one process; 3D k=0
-`-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps; `ProgramMPI_PartitionCache_*`: a partition written,
+`-uamg-nonsym` its 28 iterations on 4 processes, 200 without the l1 terms of the scalar sweeps, and in
+`-reproducibility on-any-nthreads`; MUMPS refused in a reproducible mode; `ProgramMPI_PartitionCache_*`: a partition written,
 read by the next run, refused for another number of processes, in `build-mpi/test_partition_cache`); in an MPI build, `fhhos4_tests` uses
 `tests/MPI/main.cpp` (MPI initialized), `ToySolver()` without `Comm`.

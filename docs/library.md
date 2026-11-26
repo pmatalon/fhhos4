@@ -58,8 +58,10 @@ Decisions: `docs/adr/` (0002-0006, 0008, 0013, 0020, 0023). Its measurements: `P
 - The compiled functions take plain types only (views, `detail::` vector views); the Eigen functions are inline in the
   header, compiled with the client's Eigen.
 - Parameters with a choice are enums (`fhhos4::Krylov`, `Cycle`, `PCoarsening`, `Smoother`, `Prolongation`,
-  `CoarseSolver`; no strings), as the program's multigrid parameters (`SmootherType`, `CycleType`, `P_CoarsStgy`,
-  `UAMGProlongation` in `Utils/Types.h`; the CLI codes in `SmootherFactory`, the coarse solver stays a solver code):
+  `CoarseSolver`, `ReproducibilityMode`; no strings), as the program's multigrid parameters (`SmootherType`,
+  `CycleType`, `P_CoarsStgy`, `UAMGProlongation` in `Utils/Types.h`; the CLI codes in `SmootherFactory`, the coarse
+  solver stays a solver code), and its `ReproducibilityMode` (`Utils/Types.h`, the library's name and values; the CLI
+  codes in `ReproducibilityCodes`):
   `Solver/LibraryParameters.h` maps them both ways (one table per parameter; `CoarseSolver::MUMPS`: `mumpsch` or
   `mumpslu` for the symmetry of the matrix), for `library/Solver.cpp` and `LibraryUAMG.cpp`.
 

@@ -131,6 +131,15 @@ Gauss-Seidel whose rows coupled to other threads or processes (with which it is 
 times the sum of the absolute values of these couplings, added to their diagonal, and times the old value to their
 right-hand side.
 
+**l1 block Gauss-Seidel** (`l1bgs`):
+l1 Gauss-Seidel sequential within each process: the l1 terms on the rows coupled to other processes only. Its results
+don't depend on the number of threads; the l1 hybrid one (`l1hbgs`) is it on one thread per process.
+
+**Reproducibility mode**:
+The reproducibility of the solution that the solver guarantees, the same solution bit for bit from run to run for a
+fixed number of processes: none, for a fixed number of threads per process, or whatever the number of threads
+(ADR-0024).
+
 **Owner**:
 The process that holds a face's row in a distributed system: the smaller rank among its cells' processes.
 

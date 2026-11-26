@@ -11,7 +11,8 @@
 # K-cycle, mixed precision, block CSR).
 # 39 cases x 2 thread counts x 2 binaries, ~12 minutes.
 #
-# Known differences: the hybrid smoothers (hbgs, hrbgs) in parallel vary from one run to the next (data race).
+# Known differences: none from run to run on one process (the hybrid smoothers depend on the number of threads, not on
+# the run: ADR-0018).
 # 'fcgaggregamg' at k = 0 only: AggregAMG takes blocks of size 1 only (it stops at k >= 1).
 #
 # Usage (from build/, conda env activated): solutions.sh <output dir> <binary before> [binary after, default: ./bin/fhhos4]

@@ -129,6 +129,8 @@ enum class SmootherType : unsigned
 	SymmetricBlockGaussSeidel,
 	AlternatingBlockGaussSeidel,
 	BackwardAlternatingBlockGaussSeidel,
+	L1BlockGaussSeidel, // sequential in each process, the rows coupled to other processes in l1 Gauss-Seidel (Multigrid::L1Theta)
+	L1BackwardBlockGaussSeidel,
 	HybridBlockGaussSeidel, // Gauss-Seidel in the rows of each thread, Jacobi between the threads
 	HybridBackwardBlockGaussSeidel,
 	L1HybridBlockGaussSeidel, // the same, the rows coupled to other threads or processes in l1 Gauss-Seidel (Multigrid::L1Theta)
@@ -138,6 +140,19 @@ enum class SmootherType : unsigned
 	ChebyshevFourthKind,
 	BlockChebyshevFourthKind
 };
+
+// The reproducibility of the solutions that the solvers guarantee (-reproducibility; fhhos4::ReproducibilityMode,
+// ADR-0024): the same solution bit for bit from run to run (same binary, machine, matrix, parameters and number of
+// processes), the parallel algorithms that would break it replaced
+enum class ReproducibilityMode : unsigned
+{
+	None,            // no guarantee: the fastest
+	OnFixedNThreads, // on the same number of threads per process
+	OnAnyNThreads    // on any number of threads
+};
+
+// The codes of -reproducibility, by mode
+inline const char* const ReproducibilityCodes[] = { "none", "on-fixed-nthreads", "on-any-nthreads" };
 
 enum class CoarseningType : unsigned
 {

@@ -399,6 +399,19 @@ TEST(PETScPC, NonSymmetric)
 	ExpectSolves(symmetric.Solve(KSPFCG, "forcedsym_", Degrees + " -pc_fhhos4_symmetric"), symmetric.ExpectedIterations);
 }
 
+// -pc_fhhos4_reproducibility on-any-nthreads, in the view (-ksp_view): the non-symmetric setup (its default smoother,
+// the l1 block Gauss-Seidel; on several processes, the coarse matrix gathered on the process 0)
+TEST(PETScPC, Reproducibility)
+{
+	PETScSystem nonsymmetric(0.3, 1, false);
+	testing::internal::CaptureStdout();
+	PETScSystem::Result result = nonsymmetric.Solve(KSPFGMRES, "repro_", Degrees + " -pc_fhhos4_reproducibility on-any-nthreads -ksp_view");
+	string output = testing::internal::GetCapturedStdout();
+	ExpectSolves(result, nonsymmetric.ExpectedIterations);
+	if (World().IsRoot())
+		EXPECT_NE(output.find("reproducibility on-any-nthreads: the same solution from run to run"), string::npos) << output;
+}
+
 // A vector-valued unknown (-pc_fhhos4_vector_components 2: blocks of 2 DoFs, interleaved), the near null space one vector
 // per component
 TEST(PETScPC, VectorComponents)
