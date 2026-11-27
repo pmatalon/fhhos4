@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <dlfcn.h>
 #include <Eigen/SparseLU>
 #include "Solver/Direct/MUMPS.h"
 
@@ -73,4 +74,26 @@ TEST(MUMPS, SequentialSolve)
 		Vector exact = ExactSolution(A, b);
 		EXPECT_LE((solver.Solve(b) - exact).norm(), 1e-12 * exact.norm()) << "spd " << spd;
 	}
+}
+
+// A client that set OpenBLAS's threads (openblas_set_num_threads(): Code_Aster), then MUMPS on a dense matrix, whose
+// products OpenBLAS splits among its threads: the setup and the solve end, and the client's count is given back. Skipped
+// when the BLAS is not OpenBLAS.
+TEST(MUMPS, ClientSetOpenBLASThreads)
+{
+	auto setNumThreads = reinterpret_cast<void (*)(int)>(dlsym(RTLD_DEFAULT, "openblas_set_num_threads"));
+	auto getNumThreads = reinterpret_cast<int (*)()>(dlsym(RTLD_DEFAULT, "openblas_get_num_threads"));
+	if (!setNumThreads || !getNumThreads)
+		GTEST_SKIP() << "The BLAS is not OpenBLAS";
+	int clientNumThreads = getNumThreads();
+	setNumThreads(4);
+	BigNumber n = 400;
+	DenseMatrix dense = DenseMatrix::NullaryExpr(n, n, [n](Eigen::Index i, Eigen::Index j) { return i == j ? (double)n : 1.0 / (1 + abs(i - j)); });
+	SparseMatrix A = dense.sparseView();
+	MUMPSSolver solver(true);
+	solver.Setup(A);
+	Vector b = Vector::LinSpaced(n, 1.0, 2.0);
+	EXPECT_LE((A * solver.Solve(b) - b).norm(), 1e-12 * b.norm());
+	EXPECT_EQ(getNumThreads(), 4);
+	setNumThreads(clientNumThreads);
 }

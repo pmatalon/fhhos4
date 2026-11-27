@@ -75,7 +75,7 @@ waiting.
   which uses BLIS; `OPENBLAS_NUM_THREADS=1` or `MKL_NUM_THREADS=1` with others): a threaded BLAS makes the many small
   products of the coarsest solves much slower (BLIS starts its threads at each call). MUMPS itself runs on one thread
   (its matrix is small). The same holds for `CoarseSolver::MUMPS` on one process. With the OpenMP build of OpenBLAS,
-  if your code sets its threads (`openblas_set_num_threads()`, which the environment can't override), its products
-  inside MUMPS hang: call `openblas_set_num_threads(1)` before the setups and solves.
+  if your code sets its threads (`openblas_set_num_threads()`, which the environment can't override), the library
+  sets them to 1 during MUMPS's calls (OpenBLAS's products would hang there) and gives yours back.
 
 In Python: see [Python](python.md).

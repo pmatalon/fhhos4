@@ -129,8 +129,8 @@ none` in `OPTION_PETSC` for PETSc's FCG around one cycle instead. One process, o
   keyword `RESI_RELA_PC`, -1 in `STAT_NON_LINE`: `c_solveur.py`; `apmain.F90`, error `PETSC_16`). With `preonly`, a
   solve of the library that does not converge is not reported (PETSc's `CONVERGED_ITS`).
 - Code_Aster sets OpenBLAS's threads itself (`openblas_set_num_threads()` in `libbibfor`, to `ncpus`): on several
-  processes the library's MUMPS (one OpenMP thread) then hangs in OpenBLAS's products (`docs/mpi.md`); the adapter
-  sets OpenBLAS to one thread from `KSP_UTIL` to the end of each solve (a post-solve hook gives Code_Aster's back).
+  processes the library's MUMPS (one OpenMP thread) would hang in OpenBLAS's products; the library sets OpenBLAS to
+  one thread around MUMPS's calls (`docs/mpi.md`).
 - A Python object that the KSP keeps (a `PCPYTHON` context, a pre-solve hook) must not refer to it: KSP -> object ->
   KSP is a cycle through C that Python's collector cannot see, and each matrix's KSP and hierarchy would never be
   freed.

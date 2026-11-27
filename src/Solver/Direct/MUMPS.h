@@ -5,7 +5,43 @@
 using namespace std;
 
 #ifdef MUMPS_ENABLED
+#include <dlfcn.h>
 #include <dmumps_c.h>
+
+// OpenBLAS on one thread while this object lives, if the client set OpenBLAS's threads (openblas_set_num_threads(), e.g.
+// Code_Aster). In OpenBLAS's OpenMP build (from 0.3.34), such a count splits its products, while its parallel region
+// follows OpenMP's count, which MUMPS sets to 1 (ICNTL(16)): the one thread waits forever for the parts of the others.
+// Nothing is changed otherwise: openblas_set_num_threads() marks the count as set for good, and the client's own
+// products with fewer OpenMP threads would then hang. The mark (blas_is_num_threads_set_explicitly) is exported but
+// not in OpenBLAS's interface: without it (another BLAS, another version of OpenBLAS), nothing is done.
+class OpenBLASOnOneThread
+{
+private:
+	void (*_setNumThreads)(int) = nullptr;
+	int _clientNumThreads = 0;
+
+public:
+	OpenBLASOnOneThread()
+	{
+		static const int* numThreadsSetExplicitly = static_cast<const int*>(dlsym(RTLD_DEFAULT, "blas_is_num_threads_set_explicitly"));
+		static auto getNumThreads = reinterpret_cast<int (*)()>(dlsym(RTLD_DEFAULT, "openblas_get_num_threads"));
+		static auto setNumThreads = reinterpret_cast<void (*)(int)>(dlsym(RTLD_DEFAULT, "openblas_set_num_threads"));
+		if (!numThreadsSetExplicitly || !*numThreadsSetExplicitly || !getNumThreads || !setNumThreads || getNumThreads() <= 1)
+			return;
+		_clientNumThreads = getNumThreads();
+		_setNumThreads = setNumThreads;
+		_setNumThreads(1);
+	}
+
+	~OpenBLASOnOneThread()
+	{
+		if (_setNumThreads)
+			_setNumThreads(_clientNumThreads);
+	}
+
+	OpenBLASOnOneThread(const OpenBLASOnOneThread&) = delete;
+	OpenBLASOnOneThread& operator=(const OpenBLASOnOneThread&) = delete;
+};
 
 // MUMPS's sparse factorization (analysis and factorization in the setup, a solve per Solve()): LDL^T without pivoting
 // of a symmetric positive definite matrix (SPD: MUMPS's SYM=1, from its lower triangle), LU otherwise (SYM=0). On
@@ -69,7 +105,10 @@ public:
 		BigNumber n = b.rows();
 		copy(b.data(), b.data() + n, _rhs.begin());
 		_id.job = 3;
-		Run("the solve");
+		{
+			OpenBLASOnOneThread openBLASOnOneThread;
+			Run("the solve");
+		}
 		if (!_solutionMap)
 		{
 			vector<GlobalNumber> ghosts;
@@ -105,6 +144,7 @@ private:
 	{
 		if (n > numeric_limits<MUMPS_INT>::max())
 			Utils::FatalError("MUMPS: " + to_string(n) + " rows, beyond its indices (MUMPS_INT, " + to_string(8 * sizeof(MUMPS_INT)) + " bits).");
+		OpenBLASOnOneThread openBLASOnOneThread;
 		Terminate();
 		_comm = &comm;
 		_firstRow = firstRow;
